@@ -1,0 +1,28 @@
+# k8s/base/postgres/postgres-pv.yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: postgres-pv
+  labels:
+    type: local
+spec:
+  storageClassName: ""
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    # 与 docker-compose.dev.yml 中 db 服务的挂载目录指向同一份物理文件：
+    # Windows 侧为 E:\Project\trace-map\database\postgres，
+    # 在 Docker Desktop 的 Linux VM 中即 /e/Project/travel-map/database/postgres。
+    # 这样 compose 与 k8s 各自启动的 Postgres 操作的是同一个 appdb 库（一次只跑一套）。
+    path: "/e/Project/travel-map/database/postgres"
+    type: DirectoryOrCreate   # 目录不存在时由 kubelet 自动创建，避免 Pod 因挂载失败而无法启动
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - docker-desktop

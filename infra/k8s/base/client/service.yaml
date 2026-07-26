@@ -1,0 +1,12 @@
+# k8s/base/client/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: client
+  namespace: myapp
+spec:
+  ports:
+  - port: 80
+    targetPort: 80
+  selector:
+    app: client
