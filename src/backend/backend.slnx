@@ -1,0 +1,17 @@
+<Solution>
+  <Folder Name="/services/user-service/src/">
+    <Project Path="services/user-service/src/User.Application/User.Application.csproj" />
+    <Project Path="services/user-service/src/User.Domain/User.Domain.csproj" />
+    <Project Path="services/user-service/src/User.Infrastructure/User.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/services/user-service/src/User.Api/">
+    <Project Path="services/user-service/src/User.Api/user.csproj" />
+  </Folder>
+  <Folder Name="/services/user-service/tests/">
+    <Project Path="services/user-service/tests/User.UnitTests/User.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/shared/">
+    <Project Path="shared/Shared.Contracts/Shared.Contracts.csproj" />
+    <Project Path="shared/Shared.Observability/Shared.Observability.csproj" />
+  </Folder>
+</Solution>

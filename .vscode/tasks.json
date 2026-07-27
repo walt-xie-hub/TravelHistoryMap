@@ -1,0 +1,41 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+                "./${workspaceFolder}/c:/Users/46041/AppData/Roaming/Code/User/workspaceStorage/babc4687c811519e94ed9e4658ebcd08/ms-dotnettools.csdevkit/travel-map.sln",
+                "/property:GenerateFullPaths=true",
+                "/consoleloggerparameters:NoSummary;ForceNoAlign"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "publish",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "publish",
+                "./${workspaceFolder}/c:/Users/46041/AppData/Roaming/Code/User/workspaceStorage/babc4687c811519e94ed9e4658ebcd08/ms-dotnettools.csdevkit/travel-map.sln",
+                "/property:GenerateFullPaths=true",
+                "/consoleloggerparameters:NoSummary;ForceNoAlign"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "watch",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "watch",
+                "run",
+                "--project",
+                "./${workspaceFolder}/c:/Users/46041/AppData/Roaming/Code/User/workspaceStorage/babc4687c811519e94ed9e4658ebcd08/ms-dotnettools.csdevkit/travel-map.sln"
+            ],
+            "problemMatcher": "$msCompile"
+        }
+    ]
+}

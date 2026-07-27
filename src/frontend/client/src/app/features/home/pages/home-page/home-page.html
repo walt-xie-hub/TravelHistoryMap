@@ -1,0 +1,14 @@
+<app-page-header
+  title="欢迎使用 Travel Map"
+  subtitle="记录、规划并分享你的每一段旅程"
+/>
+
+<section class="cards">
+  @for (card of cards; track card.title) {
+    <a class="card" [routerLink]="card.link">
+      <span class="card__icon" aria-hidden="true">{{ card.icon }}</span>
+      <span class="card__title">{{ card.title }}</span>
+      <span class="card__desc">{{ card.desc }}</span>
+    </a>
+  }
+</section>

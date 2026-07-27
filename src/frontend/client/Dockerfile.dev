@@ -1,0 +1,17 @@
+# 开发镜像：运行 Angular dev server (ng serve)。
+# 源码由 compose 的 develop.watch 以 action: sync 实时同步进容器，实现热重载。
+FROM node:24-alpine
+
+WORKDIR /app
+
+# 先只复制 package 文件并安装依赖（利用层缓存）；
+# 源码随后通过 watch 同步进入 /app（node_modules 已在 .dockerignore 中排除）。
+COPY package*.json ./
+RUN npm ci
+COPY . .
+
+EXPOSE 4200
+
+# --host 0.0.0.0 允许容器外访问；
+# --poll 2000 让 esbuild dev server 在 Docker 挂载的文件系统上也能可靠检测变更（inotify 不可靠）。
+ENTRYPOINT ["npx", "ng", "serve", "--host", "0.0.0.0", "--port", "4200", "--poll", "2000"]

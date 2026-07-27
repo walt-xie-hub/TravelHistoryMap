@@ -1,0 +1,29 @@
+# 开发镜像：用 SDK 跑 dotnet watch，源码由 compose 的 develop.watch 实时同步进容器，
+# 源码变更时自动重新编译并重启进程，实现编译热重载（无需重建镜像）。
+# 构建上下文 = src/backend（含 services/user-service 与 shared/）。
+FROM mcr.microsoft.com/dotnet/sdk:10.0
+
+WORKDIR /src
+
+# ① 先复制 API 项目及其引用的 .csproj（含跨服务共享库）—— 利用 Docker 层缓存，
+#    依赖不变则无需重跑 restore
+COPY services/user-service/src/User.Domain/User.Domain.csproj ./services/user-service/src/User.Domain/
+COPY services/user-service/src/User.Application/User.Application.csproj ./services/user-service/src/User.Application/
+COPY services/user-service/src/User.Infrastructure/User.Infrastructure.csproj ./services/user-service/src/User.Infrastructure/
+COPY services/user-service/src/User.Api/user.csproj ./services/user-service/src/User.Api/
+COPY shared/Shared.Contracts/Shared.Contracts.csproj ./shared/Shared.Contracts/
+COPY shared/Shared.Observability/Shared.Observability.csproj ./shared/Shared.Observability/
+
+RUN dotnet restore services/user-service/src/User.Api/user.csproj
+
+# ② 复制剩余源码（bin/obj 已在 .dockerignore 中排除，由 watch 同步保持更新）
+COPY . .
+
+EXPOSE 8080
+
+# 轮询文件监听：容器挂载文件系统上 inotify 不可靠，用轮询确保 dotnet watch 能感知变更。
+ENV DOTNET_USE_POLLING_FILE_WATCHER=true
+ENV ASPNETCORE_URLS=http://+:8080
+
+# dotnet watch：监听源码变更 → 重新编译并重启
+ENTRYPOINT ["dotnet", "watch", "--project", "services/user-service/src/User.Api/user.csproj", "run", "--urls", "http://+:8080"]

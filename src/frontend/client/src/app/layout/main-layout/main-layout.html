@@ -1,0 +1,37 @@
+<div class="layout">
+  <header class="layout__header">
+    <a class="brand" routerLink="/home">
+      <span class="brand__logo" aria-hidden="true">🧭</span>
+      <span class="brand__name">{{ appName }}</span>
+    </a>
+    <nav class="nav">
+      @for (item of navItems; track item.path) {
+        <a
+          class="nav__link"
+          [routerLink]="item.path"
+          routerLinkActive="nav__link--active"
+        >
+          <span aria-hidden="true">{{ item.icon }}</span>
+          <span>{{ item.label }}</span>
+        </a>
+      }
+    </nav>
+  </header>
+
+  <main class="layout__content">
+    <router-outlet />
+  </main>
+
+  <footer class="layout__footer">
+    <span>© {{ year }} {{ appName }}</span>
+  </footer>
+
+  <!-- 全局通知 -->
+  <div class="toasts">
+    @for (item of notification.items(); track item.id) {
+      <div class="toast toast--{{ item.level }}" (click)="notification.dismiss(item.id)">
+        {{ item.message }}
+      </div>
+    }
+  </div>
+</div>
