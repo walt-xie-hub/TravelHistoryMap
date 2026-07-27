@@ -1,0 +1,41 @@
+# k8s/overlays/dev/kustomization.yaml —— 本地/开发集群覆盖
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: myapp
+
+resources:
+  - ../../base
+
+# 本地镜像（由 docker build / kind load 提供，无 registry 前缀）
+images:
+  - name: user-service
+    newName: user-service
+    newTag: dev
+  - name: client-app
+    newName: client-app
+    newTag: dev
+
+# 开发环境低副本
+replicas:
+  - name: user-service
+    count: 1
+  - name: client
+    count: 1
+
+# 本地镜像用 Never，避免 kubelet 去拉远程 registry
+patches:
+  - target:
+      kind: Deployment
+      name: user-service
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Never
+  - target:
+      kind: Deployment
+      name: client
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Never

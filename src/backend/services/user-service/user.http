@@ -1,0 +1,35 @@
+@UserApi_HostAddress = http://localhost:5286
+
+### 获取全部用户
+GET {{UserApi_HostAddress}}/api/users
+Accept: application/json
+
+###
+
+### 健康检查
+GET {{UserApi_HostAddress}}/health
+
+###
+
+### 创建用户
+POST {{UserApi_HostAddress}}/api/users
+Content-Type: application/json
+
+{
+  "name": "Alice",
+  "email": "alice@example.com"
+}
+
+###
+
+### 更新用户（乐观锁：底层按 xmin 校验并发）
+PUT {{UserApi_HostAddress}}/api/users/1
+Content-Type: application/json
+
+{
+  "name": "Alice Updated",
+  "email": "alice.new@example.com",
+  "phoneNumber": "13800000000",
+  "avatarUrl": "https://cdn.example.com/a.png",
+  "isActive": true
+}

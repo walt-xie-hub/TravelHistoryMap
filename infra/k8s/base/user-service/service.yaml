@@ -1,0 +1,12 @@
+# k8s/base/user-service/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: user-service
+  namespace: myapp
+spec:
+  ports:
+  - port: 8080
+    targetPort: 8080
+  selector:
+    app: user-service

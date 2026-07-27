@@ -1,0 +1,33 @@
+<div class="dialog-backdrop" (click)="cancel()">
+  <div class="dialog" role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
+    <header class="dialog__head">
+      <h2>{{ isEdit ? '编辑用户' : '新增用户' }}</h2>
+      <button type="button" class="dialog__close" aria-label="关闭" (click)="cancel()">×</button>
+    </header>
+
+    <form [formGroup]="form" (ngSubmit)="submit()">
+      <div class="field">
+        <label for="name">姓名</label>
+        <input id="name" type="text" formControlName="name" placeholder="请输入姓名" autofocus />
+        @if (form.controls.name.touched && form.controls.name.invalid) {
+          <small class="field__error">请输入有效的姓名（最多 50 字）</small>
+        }
+      </div>
+
+      <div class="field">
+        <label for="email">邮箱</label>
+        <input id="email" type="email" formControlName="email" placeholder="name@example.com" />
+        @if (form.controls.email.touched && form.controls.email.invalid) {
+          <small class="field__error">请输入有效的邮箱</small>
+        }
+      </div>
+
+      <footer class="dialog__foot">
+        <button type="button" class="btn btn--ghost" (click)="cancel()">取消</button>
+        <button type="submit" class="btn btn--primary" [disabled]="submitting()">
+          {{ submitting() ? '保存中…' : (isEdit ? '保存' : '创建') }}
+        </button>
+      </footer>
+    </form>
+  </div>
+</div>

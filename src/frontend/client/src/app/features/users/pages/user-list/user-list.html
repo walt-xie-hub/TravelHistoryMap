@@ -1,0 +1,78 @@
+<app-page-header title="用户" subtitle="管理旅行者账号">
+  <button type="button" class="btn btn--primary" (click)="openCreate()">新增用户</button>
+  <button type="button" class="btn btn--ghost" (click)="load()">刷新</button>
+</app-page-header>
+
+@if (loading()) {
+  <app-loading-spinner message="正在加载用户…" />
+} @else if (users().length === 0) {
+  <app-empty-state
+    icon="👤"
+    title="还没有用户"
+    description="点击右上角「新增用户」创建第一个旅行者账号。"
+  />
+} @else {
+  <table class="user-table">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>姓名</th>
+        <th>邮箱</th>
+        <th class="col-actions">操作</th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (user of users(); track user.id) {
+        <tr>
+          <td>{{ user.id }}</td>
+          <td>{{ user.name }}</td>
+          <td>{{ user.email }}</td>
+          <td class="col-actions">
+            @if (deletingId() === user.id) {
+              <span class="confirm">
+                <span class="confirm__text">确认删除？</span>
+                <button
+                  type="button"
+                  class="btn btn--danger"
+                  [disabled]="removing()"
+                  (click)="confirmDelete(user)"
+                >确认</button>
+                <button
+                  type="button"
+                  class="btn btn--ghost"
+                  [disabled]="removing()"
+                  (click)="cancelDelete()"
+                >取消</button>
+              </span>
+            } @else {
+              <button type="button" class="btn btn--ghost" (click)="openEdit(user)">编辑</button>
+              <button
+                type="button"
+                class="btn btn--danger-ghost"
+                [disabled]="removing()"
+                (click)="askDelete(user)"
+              >删除</button>
+            }
+          </td>
+        </tr>
+      }
+    </tbody>
+  </table>
+
+  <app-user-pagination
+    [page]="page()"
+    [pageSize]="pageSize()"
+    [totalCount]="totalCount()"
+    [totalPages]="totalPages()"
+    (pageChange)="changePage($event)"
+    (pageSizeChange)="changePageSize($event)"
+  />
+}
+
+@if (dialogOpen()) {
+  <app-user-form-dialog
+    [user]="editingUser()"
+    (saved)="onSaved($event)"
+    (cancelled)="closeDialog()"
+  />
+}

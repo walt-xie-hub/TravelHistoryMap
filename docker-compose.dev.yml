@@ -1,0 +1,101 @@
+services:
+  # Angular 开发服务器（热重载）：运行 ng serve，源码随宿主变更实时同步进容器
+  client:
+    build:
+      context: ./src/frontend/client
+      dockerfile: Dockerfile.dev
+    container_name: angular-client-dev
+    ports:
+      - "4200:4200"
+    environment:
+      - NODE_ENV=development
+      # 让 chokidar 在挂载文件系统上用轮询检测文件变更
+      - CHOKIDAR_USEPOLLING=true
+    develop:
+      watch:
+        # 源码变更 → 同步进容器，由 ng serve 热重载
+        - action: sync
+          path: ./src/frontend/client
+          target: /app
+          ignore:
+            - node_modules
+            - dist
+            - .angular
+        # 依赖变更 → 重建镜像
+        - action: rebuild
+          path: ./src/frontend/client/package.json
+        - action: rebuild
+          path: ./src/frontend/client/package-lock.json
+    networks:
+      - dev-net
+
+  # .NET WebAPI（热重载）：运行 dotnet watch，源码随宿主变更实时同步并自动重新编译
+  # 数据库用本服务下方的 db（postgres:16-alpine）。
+  # 关键点：db 的数据目录 ./database/postgres 与 k8s 的 PV hostPath
+  # 指向同一份物理文件，所以无论用 compose 还是 k8s 启动，操作的都是
+  # 同一个 appdb 库。注意：同一时间只跑一套，避免两个 PG 写同一目录。
+  server:
+    build:
+      context: ./src/backend
+      dockerfile: services/user-service/Dockerfile.dev
+    container_name: dotnet-api-dev
+    ports:
+      # 与 client 开发环境 environment.ts 的 apiBaseUrl(http://localhost:8080/api) 对齐
+      - "8080:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8080
+      - DOTNET_USE_POLLING_FILE_WATCHER=true
+      # 连接本服务的 db（与 k8s 共享同一份数据目录）。
+      # 注意：.NET 用 GetConnectionString("DefaultConnection")，
+      # 所以 env 必须命名为 ConnectionStrings__DefaultConnection
+      # （__ 映射为 :，对应配置键 ConnectionStrings:DefaultConnection）
+      - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=appdb;Username=appuser;Password=123456;Pooling=true;
+      # 与 k8s secret 的 Db__Password 对齐（这里直接明文，仅 dev 用）
+      - Db__Password=123456
+    # 等到 db 健康（Postgres 真正可连接）后才启动，避免启动竞态
+    depends_on:
+      db:
+        condition: service_healthy
+    develop:
+      watch:
+        # 源码变更 → 同步进容器（含 services/user-service 与 shared/），
+        # 由 dotnet watch 自动重新编译并重启
+        - action: sync
+          path: ./src/backend
+          target: /src
+          ignore:
+            - bin
+            - obj
+        # Dockerfile 变更 → 重建镜像
+        - action: rebuild
+          path: ./src/backend/services/user-service/Dockerfile.dev
+    networks:
+      - dev-net
+
+  # PostgreSQL —— 数据目录与 k8s PV 共享同一物理位置（见 k8s/postgres/postgres-pv.yaml）
+  db:
+    image: postgres:16-alpine
+    container_name: postgres-db
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: appdb
+      POSTGRES_USER: appuser
+      POSTGRES_PASSWORD: 123456
+    volumes:
+      - ./database/postgres:/var/lib/postgresql/data
+    # 健康检查：Postgres 完成 init 并监听 5432 后才算 healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U appuser -d appdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - dev-net
+
+networks:
+  dev-net:
+    driver: bridge

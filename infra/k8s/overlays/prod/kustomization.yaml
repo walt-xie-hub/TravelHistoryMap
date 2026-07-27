@@ -1,0 +1,24 @@
+# k8s/overlays/prod/kustomization.yaml —— 生产集群覆盖
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: myapp
+
+resources:
+  - ../../base
+
+# 生产环境使用私有 registry 中的带版本镜像
+images:
+  - name: user-service
+    newName: registry.example.com/travel-map/user-service
+    newTag: 1.0.0
+  - name: client-app
+    newName: registry.example.com/travel-map/client-app
+    newTag: 1.0.0
+
+# 生产环境多副本，保证高可用
+replicas:
+  - name: user-service
+    count: 3
+  - name: client
+    count: 3

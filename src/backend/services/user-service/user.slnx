@@ -1,0 +1,17 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/User.Application/User.Application.csproj" />
+    <Project Path="src/User.Domain/User.Domain.csproj" />
+    <Project Path="src/User.Infrastructure/User.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/User.Api/">
+    <Project Path="src/User.Api/user.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/User.UnitTests/User.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/shared/">
+    <Project Path="..\..\shared\Shared.Contracts\Shared.Contracts.csproj" />
+    <Project Path="..\..\shared\Shared.Observability\Shared.Observability.csproj" />
+  </Folder>
+</Solution>

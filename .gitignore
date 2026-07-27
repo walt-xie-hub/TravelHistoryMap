@@ -1,0 +1,18 @@
+# ===== 环境数据：切勿提交（compose 与 k8s 共用的 Postgres 物理数据）=====
+/database/
+
+# ===== .NET 生成物 =====
+**/bin/
+**/obj/
+
+# ===== 前端生成物与依赖 =====
+**/dist/
+**/node_modules/
+**/.angular/cache
+
+# ===== 构建 / 运行日志 =====
+docker_build.log
+*.log
+
+# ===== 临时脚本（验证用）=====
+_*.ps1

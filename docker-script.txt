@@ -1,0 +1,20 @@
+--server（在仓库根目录执行；Dockerfile 已移回服务项目内，构建上下文为服务源码目录）
+docker build -t mycontainerapp:1.0 -f src/backend/services/user-service/Dockerfile src/backend
+docker run -d -p 8080:8080 --name myapi mycontainerapp:1.0
+
+--client（在仓库根目录执行）
+--根据yaml创建镜像
+docker build -t angularapp:1.0 -f src/frontend/client/Dockerfile src/frontend/client
+
+--运行镜像
+docker run -d -p 8081:80 --name angularapp angularapp:1.0
+
+--打印logs
+docker logs angularapp
+
+--K8s
+--创建集群
+k3d cluster create myapp --port "8080:80@loadbalancer" --agents 1
+
+--安装 Nginx Ingress
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml

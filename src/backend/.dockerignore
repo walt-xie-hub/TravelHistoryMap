@@ -1,0 +1,8 @@
+# 后端构建上下文（src/backend）的忽略规则
+# 排除生成物与无关目录，避免 COPY . . 把它们打进镜像
+**/bin/
+**/obj/
+**/.vs/
+**/.git/
+**/node_modules/
+**/.angular/
