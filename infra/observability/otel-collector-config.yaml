@@ -1,0 +1,64 @@
+# OpenTelemetry Collector 配置
+# 开发环境：接收应用遥测 → 处理后分发到 Jaeger / Prometheus / Console
+#
+# 架构：
+#   user-service (.NET OTel SDK)
+#       │  OTLP/gRPC
+#       ▼
+#   otel-collector (receivers → processors → exporters)
+#       │                  │
+#       ▼                  ▼
+#   Jaeger (Traces)    Prometheus (Metrics)
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317         # OTLP gRPC 接收端口
+      http:
+        endpoint: 0.0.0.0:4318         # OTLP HTTP 接收端口
+
+processors:
+  # 批量处理器：累积 Span 后批量导出，减少 Jaeger 的网络请求次数
+  batch:
+    timeout: 1s
+    send_batch_size: 1024
+
+  # 内存限制器：防止 Collector 自身 OOM
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 512
+    spike_limit_mib: 128
+
+  # 属性过滤：生产环境可按需打开，去除敏感字段
+  # attributes:
+  #   actions:
+  #     - key: http.request.header.authorization
+  #       action: delete
+
+exporters:
+  # Traces → Jaeger（OTLP/gRPC）
+  otlp/jaeger:
+    endpoint: jaeger:4317
+    tls:
+      insecure: true
+
+  # Metrics → Prometheus scrape 端点（备选；当前 Prometheus 直接抓 App /metrics）
+  prometheus:
+    endpoint: 0.0.0.0:8889
+
+  # 开发调试：输出到控制台，便于诊断
+  debug:
+    verbosity: detailed
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlp/jaeger, debug]
+
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [prometheus, debug]

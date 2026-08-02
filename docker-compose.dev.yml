@@ -53,9 +53,9 @@ services:
       - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=appdb;Username=appuser;Password=123456;Pooling=true;
       # 与 k8s secret 的 Db__Password 对齐（这里直接明文，仅 dev 用）
       - Db__Password=123456
-      # OpenTelemetry OTLP 导出目标：Jaeger（开发环境单容器收集器）
-      # 使用 gRPC 协议 (:4317)
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      # OpenTelemetry OTLP 导出目标：Collector → Jaeger
+      # 使用 gRPC 协议 (:4317)，先经过 Collector 做批量/过滤/路由处理
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
       - OTEL_SERVICE_NAME=user-service
     # 等到 db 健康（Postgres 真正可连接）后才启动，避免启动竞态
     depends_on:
@@ -100,18 +100,36 @@ services:
     networks:
       - dev-net
 
-  # Jaeger All-in-One：开发环境 trace 收集 + 可视化
-  # OTLP gRPC (:4317) / HTTP (:4318) 接收遥测，UI 在 :16686
+  # Jaeger All-in-One：trace 可视化，由 Collector 转发数据
+  # 仅暴露 UI 端口；OTLP 接收改由 otel-collector 代理
   jaeger:
     image: jaegertracing/all-in-one:1
     container_name: jaeger
     restart: always
     ports:
       - "16686:16686"   # Jaeger UI
-      - "4317:4317"     # OTLP gRPC
-      - "4318:4318"     # OTLP HTTP
+      # 4317/4318 不再暴露到宿主，仅 dev-net 内部供 Collector 连接
+    expose:
+      - "4317"
+      - "4318"
     environment:
       - COLLECTOR_OTLP_ENABLED=true
+    networks:
+      - dev-net
+
+  # OpenTelemetry Collector：应用遥测的中转/处理层
+  # 接收所有 OTLP 数据 → processors(批量/过滤/路由) → exporters(Jaeger/Prometheus)
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: otel-collector
+    restart: always
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    ports:
+      - "4317:4317"     # OTLP gRPC（应用发到这里）
+      - "4318:4318"     # OTLP HTTP
+      - "8889:8889"     # Prometheus scrape（Collector 自身 metrics）
+    volumes:
+      - ./infra/observability/otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
     networks:
       - dev-net
 
