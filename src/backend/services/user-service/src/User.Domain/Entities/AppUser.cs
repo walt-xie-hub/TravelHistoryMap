@@ -34,10 +34,9 @@ public class AppUser
     /// <summary>最后更新时间（UTC，可选）</summary>
     public DateTime? UpdatedAt { get; set; }
 
-    /// <summary>
-    /// 乐观锁行版本（uint 类型）。Npgsql EF Core 会自动把它映射到 PostgreSQL 的隐藏系统列 xmin
-    /// （事务 ID），由数据库每次 UPDATE 时自动维护；EF Core 在 UPDATE/DELETE 的 WHERE 中带上做并发校验。
-    /// 数据库表里无需显式创建该列（xmin 是每张表的隐式系统列）。
-    /// </summary>
-    public uint RowVersion { get; set; }
+    // 注：乐观锁行版本（PostgreSQL xmin 系统列）不放在领域实体里，原因是 EF Core 内置
+    // 约定会把任何叫 RowVersion 的属性强制识别为 byte[]（SQL Server [Timestamp] 语义），
+    // 无法在 CLR 层用 uint 表示。该属性在 UserConfiguration 中作为 shadow property 配置：
+    // 映射到 PG 的 xmin 系统列，作为并发令牌；EF Core 在 UPDATE/DELETE 的 WHERE 中
+    // 自动带上 xmin 做并发校验，冲突抛 DbUpdateConcurrencyException。
 }

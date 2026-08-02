@@ -53,6 +53,10 @@ services:
       - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=appdb;Username=appuser;Password=123456;Pooling=true;
       # 与 k8s secret 的 Db__Password 对齐（这里直接明文，仅 dev 用）
       - Db__Password=123456
+      # OpenTelemetry OTLP 导出目标：Jaeger（开发环境单容器收集器）
+      # 使用 gRPC 协议 (:4317)
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - OTEL_SERVICE_NAME=user-service
     # 等到 db 健康（Postgres 真正可连接）后才启动，避免启动竞态
     depends_on:
       db:
@@ -95,6 +99,60 @@ services:
       start_period: 10s
     networks:
       - dev-net
+
+  # Jaeger All-in-One：开发环境 trace 收集 + 可视化
+  # OTLP gRPC (:4317) / HTTP (:4318) 接收遥测，UI 在 :16686
+  jaeger:
+    image: jaegertracing/all-in-one:1
+    container_name: jaeger
+    restart: always
+    ports:
+      - "16686:16686"   # Jaeger UI
+      - "4317:4317"     # OTLP gRPC
+      - "4318:4318"     # OTLP HTTP
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    networks:
+      - dev-net
+
+  # Prometheus：抓取 /metrics 端点，存储时序数据
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: always
+    ports:
+      - "9090:9090"     # Prometheus UI / API
+    volumes:
+      - ./infra/observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.enable-lifecycle"
+    networks:
+      - dev-net
+
+  # Grafana：时序数据可视化，预置 Prometheus 数据源 + ASP.NET Core 仪表板
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: always
+    ports:
+      - "3000:3000"     # Grafana UI
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_INSTALL_PLUGINS=
+    volumes:
+      - ./infra/observability/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./infra/observability/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    networks:
+      - dev-net
+
+volumes:
+  prometheus_data:
+  grafana_data:
 
 networks:
   dev-net:

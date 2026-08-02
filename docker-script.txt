@@ -18,3 +18,21 @@ k3d cluster create myapp --port "8080:80@loadbalancer" --agents 1
 
 --安装 Nginx Ingress
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml
+
+
+# 停止所有服务
+docker compose -f docker-compose.dev.yml down
+
+# 停止并删除数据卷（慎用，会清空数据库）
+docker compose -f docker-compose.dev.yml down -v
+
+# 查看日志
+docker compose -f docker-compose.dev.yml logs -f
+
+# 重新构建镜像后启动
+docker compose -f docker-compose.dev.yml up --build -d
+
+docker compose -f docker-compose.dev.yml up -d
+
+--使用 watch 模式（源码变更自动同步 + 热重载，推荐开发时用）
+docker compose -f docker-compose.dev.yml up --watch

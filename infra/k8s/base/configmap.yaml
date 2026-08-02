@@ -6,3 +6,6 @@ metadata:
   namespace: myapp
 data:
   ASPNETCORE_ENVIRONMENT: "Production"
+  # OpenTelemetry OTLP 导出目标（生产环境部署 OpenTelemetry Collector 后填写）
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+  OTEL_SERVICE_NAME: "user-service"
