@@ -1,14 +1,18 @@
 # ──────────────────────────────────────────────
-# CI：构建 + 单元测试（不涉及部署，不需要任何 secrets）
+# CI：Docker 镜像构建验证（build + 单元测试）
+#
+# 设计原则：Dockerfile 是构建的"唯一事实来源"。
+#   依赖安装、编译、单元测试都已经写进两个 Dockerfile 的 build 阶段
+#   （后端 dotnet test、前端 ng test），测试失败会中断镜像构建。
+#   因此 CI 只需要 docker build 两个镜像，即可完成全部验证，
+#   且与本地 docker build 的结果完全一致。
 #
 # 触发时机：
 #   - push 到 main 分支
 #   - 创建/更新 Pull Request
 #   - 手动触发（仓库 Actions 页面点 "Run workflow" 按钮）
 #
-# 两个任务并行执行：
-#   backend  —— .NET 10 后端：restore → build → test（xUnit）
-#   frontend —— Angular 前端：npm ci → 生产构建 → 单元测试（vitest）
+# 不需要任何 secrets（push: false，只构建不推送）。
 # ──────────────────────────────────────────────
 name: CI
 
@@ -19,62 +23,47 @@ on:
   workflow_dispatch:
 
 jobs:
-  # ── 后端：.NET 10 ──────────────────────────
-  backend:
-    name: Backend (.NET 10)
+  docker-build:
+    name: Docker Images (build + test)
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        # 让下面所有 run 步骤默认在 src/backend 下执行
-        working-directory: src/backend
     steps:
-      # 1. 拉取代码（每个 workflow 的第一步）
+      # 1. 拉取代码
       - uses: actions/checkout@v5
 
-      # 2. 安装 .NET SDK（10.0.x = 最新 10.0 补丁版本）
-      - uses: actions/setup-dotnet@v4
+      # 2. 启用 BuildKit 构建器（docker-container driver），
+      #    这是 build-push-action 与 gha 缓存（cache-from/cache-to）的前置
+      - uses: docker/setup-buildx-action@v4
+
+      # 3. 后端镜像：restore → 单测 → publish 全部在容器内完成
+      #    context 必须是 src/backend（Dockerfile 里 COPY 了 services/ 与 shared/）
+      - name: Build backend image
+        uses: docker/build-push-action@v7
         with:
-          dotnet-version: '10.0.x'
+          context: ./src/backend
+          file: ./src/backend/services/user-service/Dockerfile
+          push: false                      # 只构建验证，不推送
+          tags: user-service:ci
+          # gha 缓存：层缓存存 GitHub Actions cache，下次跑直接复用
+          # scope 区分两个镜像，避免缓存互相覆盖
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
 
-      # 3. 还原 NuGet 依赖
-      - name: Restore
-        run: dotnet restore backend.slnx
-
-      # 4. Release 编译（--no-restore：依赖上一步已还原，加快速度）
-      - name: Build
-        run: dotnet build backend.slnx -c Release --no-restore
-
-      # 5. 运行 xUnit 单元测试（--no-build：用上一步的编译产物）
-      - name: Test
-        run: dotnet test backend.slnx -c Release --no-build --no-restore
-
-  # ── 前端：Angular ──────────────────────────
-  frontend:
-    name: Frontend (Angular)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        # 所有 run 步骤默认在 src/frontend/client 下执行
-        working-directory: src/frontend/client
-    steps:
-      - uses: actions/checkout@v5
-
-      # 2. 安装 Node 24（与前端 Dockerfile 的 node:24-alpine 对齐）
-      #    cache: npm 会自动缓存 npm 依赖，下次跑更快
-      - uses: actions/setup-node@v4
+      # 4. 前端镜像：npm ci → 生产构建 → 单测 → nginx 托管
+      - name: Build frontend image
+        uses: docker/build-push-action@v7
         with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: src/frontend/client/package-lock.json
+          context: ./src/frontend/client
+          file: ./src/frontend/client/Dockerfile
+          push: false
+          tags: client:ci
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
 
-      # 3. 按 package-lock.json 精确安装依赖
-      - name: Install dependencies
-        run: npm ci
-
-      # 4. 生产构建（ng build 默认即 production 配置，产物在 dist/）
-      - name: Build (production)
-        run: npm run build
-
-      # 5. 单元测试（vitest；CI 环境下自动非 watch 模式）
-      - name: Unit tests
-        run: npx ng test --watch=false
+      # 将来要推送到 Azure Container Registry（或 Docker Hub）时，
+      # 在这两段之前加：
+      #   - uses: docker/login-action@v3
+      #     with:
+      #       registry: <你的ACR>.azurecr.io
+      #       username: ${{ secrets.ACR_USERNAME }}
+      #       password: ${{ secrets.ACR_PASSWORD }}
+      # 然后把 push 改为 true、tags 改成完整镜像地址即可

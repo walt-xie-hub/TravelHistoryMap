@@ -20,8 +20,10 @@ COPY shared/Shared.Observability/Shared.Observability.csproj ./shared/Shared.Obs
 
 RUN dotnet restore services/user-service/user.slnx
 
-# ② 复制剩余源码并 publish（Release → /app/out）
+# ② 复制剩余源码，先跑单元测试再 publish（Release → /app/out）
+#    测试失败会中断镜像构建 —— CI 只跑 docker build 即可完成全部验证
 COPY . .
+RUN dotnet test services/user-service/user.slnx -c Release --no-restore
 RUN dotnet publish services/user-service/src/User.Api/user.csproj -c Release -o /app/out --no-restore
 
 # ──────────────────────────────────────────────

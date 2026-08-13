@@ -88,3 +88,90 @@ Grafana :3000 ←── Prometheus (Metrics) + Loki (Logs)
 - **Logs**: 请求日志中间件输出结构化日志（Method、Path、StatusCode、ElapsedMs），可通过 Grafana Explore 以 Loki 数据源查询
 - **Collector debug exporter**: `docker logs otel-collector` 查看完整 span + log 内容
 - **App ConsoleExporter**: DEBUG 构建时 span + log 输出到 `docker logs dotnet-api-dev`
+
+---
+
+## GitHub Actions CI
+
+### 概述
+
+| 项 | 说明 |
+|----|------|
+| 工作流文件 | `.github/workflows/ci.yml` |
+| 触发时机 | push 到 `main`、创建/更新 PR、手动触发（Actions 页面 "Run workflow"） |
+| 运行环境 | GitHub 免费提供的 `ubuntu-latest` 虚拟机 |
+| 费用 | 公共仓库免费（2000 分钟/月共享）；本工作流不需要任何 secrets |
+| 用途 | 每次代码变更自动跑：构建 + 单元测试 + Docker 镜像构建验证 |
+
+### 流水线结构
+
+```
+push 到 main / PR / 手动触发
+   │
+   ▼
+┌─ docker-build（唯一 job）──────────────────┐
+│ checkout → setup-buildx                   │
+│ → 构建后端镜像（容器内跑 dotnet test）      │
+│ → 构建前端镜像（容器内跑 ng test）          │
+└───────────────────────────────────────────┘
+```
+
+任何一步失败 → job 失败 → 整个 workflow 标红。测试失败会直接中断镜像构建，因此一个 job 就完成了"编译 + 单元测试 + 镜像可出"的全部验证。
+
+### 设计原则：Dockerfile 是"唯一构建真相"
+
+| 验证项 | 在哪里执行 |
+|--------|-----------|
+| 依赖安装 | Dockerfile build 阶段（`dotnet restore` / `npm ci`） |
+| 编译 | Dockerfile build 阶段（`dotnet publish` / `ng build`） |
+| 单元测试 | Dockerfile build 阶段（`dotnet test` / `ng test --watch=false`，测试失败即构建失败） |
+| 镜像可出 | CI 的 `docker build` |
+
+好处：构建逻辑只写一处；**本地 `docker build` 与 CI 结果完全一致**；workflow 极简、免费额度消耗更少。
+代价：测试日志嵌在镜像构建日志中；首次构建要拉 base 镜像（gha 层缓存后二次运行很快）。
+
+### 任务详解
+
+| 步骤 | 作用 |
+|------|------|
+| `actions/checkout@v5` | 把仓库代码克隆到虚拟机（每个 workflow 的第一步） |
+| `docker/setup-buildx-action@v4` | 启用 BuildKit 构建器，是 `cache-from/to` 层缓存的前置 |
+| `docker/build-push-action@v7`（后端） | 构建后端镜像：restore → `dotnet test` → publish |
+| `docker/build-push-action@v7`（前端） | 构建前端镜像：`npm ci` → `ng build` → `ng test` → nginx 托管 |
+
+镜像构建的关键参数：
+
+| 参数 | 值 | 原因 |
+|------|----|------|
+| `context` | `./src/backend` / `./src/frontend/client` | 后端必须 `src/backend`：Dockerfile 里 `COPY` 了 `services/` 与 `shared/`，路径相对 context 解析 |
+| `file` | 后端需显式指定 Dockerfile 路径 | Dockerfile 不在 context 根 |
+| `push` | `false` | 只构建验证，不推送（推送需 registry + secrets） |
+| `cache-from/to` | `type=gha,scope=backend/frontend` | 层缓存存 GitHub Actions，二次运行加速；`scope` 区分两个镜像避免缓存冲突 |
+
+### 关键概念速查
+
+| 概念 | 说明 |
+|------|------|
+| `on` | 触发器：`push` / `pull_request` / `schedule`（cron，UTC 时区）/ `workflow_dispatch`（手动） |
+| `jobs` | 任务，默认并行；`needs` 声明依赖（数组可依赖多个）——当前 CI 只有一个 job 未用到，多 job 工作流常用 |
+| `runs-on` | 运行环境：`ubuntu-latest` / `windows-latest` / `macos-latest` |
+| `steps` | 步骤列表，两种形式：`run`（shell 命令）、`uses`（复用 Marketplace Action） |
+| `with` | 传给 Action 的参数（类似函数入参） |
+| `secrets` | 机密配置，存于仓库 Settings → Secrets，YAML 用 `${{ secrets.XXX }}` 引用，禁止明文写密码 |
+| `${{ }}` | 表达式，引用 secrets / env / 上下文（`github.ref`、`github.sha` 等） |
+| `actions/checkout` | 拉代码，几乎每个 workflow 第一步（当前 v5） |
+
+### 常见坑
+
+- 忘记 `actions/checkout` → 找不到代码
+- Docker 构建 context 写错 → `COPY` 找不到 `shared/`（后端 context 必须是 `src/backend`）
+- `schedule` 是 UTC 时区，注意换算
+- secrets 未配置就引用 → `Unrecognized named-value: 'secrets'`
+- 私有仓库每月 2000 分钟免费，公共仓库配额更宽
+
+### 后续扩展
+
+1. 推送镜像到 Azure Container Registry（`docker/login-action@v3` + `push: true` + `ACR_USERNAME`/`ACR_PASSWORD` secrets）
+2. 部署到 Azure Container Apps（`azure/login@v2` + `azure/container-apps-deploy@v2`）
+3. 前端部署到 Azure Static Web Apps 免费计划（`Azure/static-web-apps-deploy`）
+4. 拆分 `deploy.yml`（部署）与 `ci.yml`（构建测试），部署 job 用 `needs` 串联在 CI 之后
