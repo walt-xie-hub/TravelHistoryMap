@@ -47,6 +47,12 @@ exporters:
   prometheus:
     endpoint: 0.0.0.0:8889
 
+  # Logs → Loki（通过 OTLP HTTP 协议推送，Loki 2.9+ 原生支持）
+  otlphttp/loki:
+    endpoint: http://loki:3100/otlp
+    tls:
+      insecure: true
+
   # 开发调试：输出到控制台，便于诊断
   debug:
     verbosity: detailed
@@ -62,3 +68,8 @@ service:
       receivers: [otlp]
       processors: [memory_limiter, batch]
       exporters: [prometheus, debug]
+
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlphttp/loki, debug]

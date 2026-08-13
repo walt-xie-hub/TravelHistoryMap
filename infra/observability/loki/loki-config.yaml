@@ -1,0 +1,51 @@
+# Loki 配置（开发环境单实例模式）
+# 接收 OTel Collector 推送的 OTLP 日志，存储至本地文件系统
+#
+# OTLP 端点: http://loki:3100/otlp （3.x 版本原生支持）
+
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+  grpc_listen_port: 9096
+
+ingester:
+  lifecycler:
+    address: 127.0.0.1
+    ring:
+      kvstore:
+        store: inmemory
+      replication_factor: 1
+    final_sleep: 0s
+  chunk_idle_period: 1h
+  max_chunk_age: 1h
+  chunk_target_size: 1536000
+  chunk_retain_period: 30s
+
+common:
+  instance_addr: 127.0.0.1
+  path_prefix: /loki
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+
+schema_config:
+  configs:
+    - from: 2024-01-01
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+limits_config:
+  # 开发环境
+  max_entries_limit_per_query: 10000
+  allow_structured_metadata: true
+  max_global_streams_per_user: 0

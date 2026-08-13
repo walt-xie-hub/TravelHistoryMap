@@ -150,7 +150,22 @@ services:
     networks:
       - dev-net
 
-  # Grafana：时序数据可视化，预置 Prometheus 数据源 + ASP.NET Core 仪表板
+  # Loki：日志聚合存储，接收 OTel Collector 推送的结构化日志
+  # Grafana 中以 Loki 为数据源即可查询、搜索、过滤日志
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    restart: always
+    ports:
+      - "3100:3100"     # Loki HTTP API
+    volumes:
+      - ./infra/observability/loki/loki-config.yaml:/etc/loki/loki-config.yaml:ro
+      - loki_data:/loki
+    command: -config.file=/etc/loki/loki-config.yaml
+    networks:
+      - dev-net
+
+  # Grafana：时序数据 + 日志可视化，预置 Prometheus + Loki 数据源
   grafana:
     image: grafana/grafana:latest
     container_name: grafana
@@ -171,6 +186,7 @@ services:
 volumes:
   prometheus_data:
   grafana_data:
+  loki_data:
 
 networks:
   dev-net:

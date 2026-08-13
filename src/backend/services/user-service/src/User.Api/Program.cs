@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using User.Api.Endpoints;
 using Swashbuckle.AspNetCore.SwaggerUI;
 using Microsoft.EntityFrameworkCore;
@@ -30,6 +31,38 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
+// 请求日志中间件：为所有 HTTP 请求生成结构化日志 → OTel → Collector → Loki
+app.Use(async (context, next) =>
+{
+    var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
+    var stopwatch = Stopwatch.StartNew();
+
+    try
+    {
+        await next(context);
+        stopwatch.Stop();
+
+        logger.LogInformation(
+            "{Method} {Path} responded {StatusCode} in {ElapsedMs}ms",
+            context.Request.Method,
+            context.Request.Path,
+            context.Response.StatusCode,
+            stopwatch.ElapsedMilliseconds);
+    }
+    catch (Exception ex)
+    {
+        stopwatch.Stop();
+        logger.LogError(
+            ex,
+            "{Method} {Path} failed with {StatusCode} in {ElapsedMs}ms",
+            context.Request.Method,
+            context.Request.Path,
+            context.Response.StatusCode,
+            stopwatch.ElapsedMilliseconds);
+        throw;
+    }
+});
 
 // 确保数据库与模型一致（开发/演示用；生产环境应改用 EF Migration）。
 using (var scope = app.Services.CreateScope())

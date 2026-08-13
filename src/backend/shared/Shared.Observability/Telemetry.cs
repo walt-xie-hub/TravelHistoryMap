@@ -51,6 +51,9 @@ public static class Telemetry
                 otelLogging.SetResourceBuilder(resourceBuilder);
                 otelLogging.IncludeFormattedMessage = true;
                 otelLogging.IncludeScopes = true;
+#if DEBUG
+                otelLogging.AddConsoleExporter();           // DEBUG 时控制台可见日志
+#endif
                 otelLogging.AddOtlpExporter(ConfigureOtlp);
             });
         });
