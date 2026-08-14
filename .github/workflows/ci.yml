@@ -1,5 +1,5 @@
 # ──────────────────────────────────────────────
-# CI：Docker 镜像构建验证（build + 单元测试）
+# CI/CD：Docker 镜像构建验证（build + 单元测试）+ 部署到 Azure
 #
 # 设计原则：Dockerfile 是构建的"唯一事实来源"。
 #   依赖安装、编译、单元测试都已经写进两个 Dockerfile 的 build 阶段
@@ -7,14 +7,23 @@
 #   因此 CI 只需要 docker build 两个镜像，即可完成全部验证，
 #   且与本地 docker build 的结果完全一致。
 #
+# 部署：不重复构建，直接从 user-service 镜像里提取 dotnet publish 产物
+#   （/app/out），zip 部署到 Azure App Service "TravelHistoryMap"。
+#   部署信息（OIDC secrets、azure/login、webapps-deploy、app-name）
+#   参考原 main_travelhistorymap.yml（Azure 部署向导自动生成）。
+#
 # 触发时机：
-#   - push 到 main 分支
-#   - 创建/更新 Pull Request
+#   - push 到 main 分支（构建 + 测试 + 部署）
+#   - 创建/更新 Pull Request（仅构建 + 测试，不部署）
 #   - 手动触发（仓库 Actions 页面点 "Run workflow" 按钮）
 #
-# 不需要任何 secrets（push: false，只构建不推送）。
+# secrets 说明：部署需要仓库 Settings → Secrets 里配置以下三项
+#   （Azure 向导创建 App Service 时已自动生成，无需手动添加）：
+#   AZUREAPPSERVICE_CLIENTID_AA776FAA87AC4876941A37B1963F324A
+#   AZUREAPPSERVICE_TENANTID_82C2B4EA60294E959F2689F91C024F43
+#   AZUREAPPSERVICE_SUBSCRIPTIONID_842056D8DC054D74B9D121D85B480A8C
 # ──────────────────────────────────────────────
-name: CI
+name: CI/CD
 
 on:
   push:
@@ -23,6 +32,7 @@ on:
   workflow_dispatch:
 
 jobs:
+  # ───────────── ① 构建 + 测试（质量门禁）─────────────
   docker-build:
     name: Docker Images (build + test)
     runs-on: ubuntu-latest
@@ -36,6 +46,7 @@ jobs:
 
       # 3. 后端镜像：restore → 单测 → publish 全部在容器内完成
       #    context 必须是 src/backend（Dockerfile 里 COPY 了 services/ 与 shared/）
+      #    load: true → 把镜像载入本地 daemon，供下一步 docker cp 提取发布产物
       - name: Build backend image
         uses: docker/build-push-action@v7
         with:
@@ -43,6 +54,7 @@ jobs:
           file: ./src/backend/services/user-service/Dockerfile
           push: false                      # 只构建验证，不推送
           tags: user-service:ci
+          load: true
           # gha 缓存：层缓存存 GitHub Actions cache，下次跑直接复用
           # scope 区分两个镜像，避免缓存互相覆盖
           cache-from: type=gha,scope=backend
@@ -59,11 +71,55 @@ jobs:
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,mode=max,scope=frontend
 
-      # 将来要推送到 Azure Container Registry（或 Docker Hub）时，
-      # 在这两段之前加：
-      #   - uses: docker/login-action@v3
-      #     with:
-      #       registry: <你的ACR>.azurecr.io
-      #       username: ${{ secrets.ACR_USERNAME }}
-      #       password: ${{ secrets.ACR_PASSWORD }}
-      # 然后把 push 改为 true、tags 改成完整镜像地址即可
+      # 5. 从镜像里提取 dotnet publish 产物（/app/out），
+      #    保证部署包与镜像内容完全一致 —— 不重复构建，符合"唯一构建真相"
+      - name: Extract backend publish output
+        run: |
+          docker create --name extract user-service:ci
+          docker cp extract:/app/out ./publish
+          docker rm extract
+
+      # 6. 上传为 artifact，供 deploy job 下载
+      - name: Upload deploy artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dotnet-app
+          path: ./publish
+          if-no-files-found: error
+
+  # ───────────── ② 部署到 Azure App Service ─────────────
+  deploy:
+    name: Deploy to Azure Web App
+    needs: docker-build                    # 测试/构建通过才部署
+    if: github.event_name != 'pull_request'   # PR 只验证，不部署
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write                      # OIDC 登录 Azure 需要请求 JWT
+      contents: read                       # 下载 artifact
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dotnet-app
+          path: ./publish
+
+      # 无密码登录：OIDC 联邦凭据（client-id/tenant-id/subscription-id 三项 secret）
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_AA776FAA87AC4876941A37B1963F324A }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_82C2B4EA60294E959F2689F91C024F43 }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_842056D8DC054D74B9D121D85B480A8C }}
+
+      # zip 部署到 App Service TravelHistoryMap 的 Production 槽位
+      - name: Deploy to Azure Web App
+        id: deploy-to-webapp
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: 'TravelHistoryMap'
+          slot-name: 'Production'
+          package: ./publish
+
+      # 将来要改成容器化部署（ACR + Container Apps）时，
+      # 把 docker-build 的 push 改为 true、加 docker/login-action@v3，
+      # deploy 换成 azure/container-apps-deploy@v2 即可

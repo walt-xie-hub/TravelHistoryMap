@@ -91,32 +91,42 @@ Grafana :3000 ←── Prometheus (Metrics) + Loki (Logs)
 
 ---
 
-## GitHub Actions CI
+## GitHub Actions CI/CD
 
 ### 概述
 
 | 项 | 说明 |
 |----|------|
 | 工作流文件 | `.github/workflows/ci.yml` |
-| 触发时机 | push 到 `main`、创建/更新 PR、手动触发（Actions 页面 "Run workflow"） |
+| 触发时机 | push 到 `main`（构建+测试+部署）、创建/更新 PR（仅构建+测试）、手动触发 |
 | 运行环境 | GitHub 免费提供的 `ubuntu-latest` 虚拟机 |
-| 费用 | 公共仓库免费（2000 分钟/月共享）；本工作流不需要任何 secrets |
-| 用途 | 每次代码变更自动跑：构建 + 单元测试 + Docker 镜像构建验证 |
+| 费用 | 公共仓库免费（2000 分钟/月共享）；部署部分需要 Azure secrets |
+| 用途 | 每次代码变更自动跑：构建 + 单元测试 + Docker 镜像构建验证 + 部署到 Azure |
 
 ### 流水线结构
 
 ```
-push 到 main / PR / 手动触发
+push 到 main（或 PR / 手动触发）
    │
    ▼
-┌─ docker-build（唯一 job）──────────────────┐
+┌─ docker-build（job ①：构建 + 测试）────────┐
 │ checkout → setup-buildx                   │
 │ → 构建后端镜像（容器内跑 dotnet test）      │
 │ → 构建前端镜像（容器内跑 ng test）          │
-└───────────────────────────────────────────┘
+│ → docker cp 提取后端 publish 产物 (/app/out) │
+│ → 上传 artifact                            │
+└──────────────┬────────────────────────────┘
+               │ needs: docker-build
+               ▼  （仅 push main / 手动触发，PR 跳过）
+┌─ deploy（job ②：部署到 Azure）─────────────┐
+│ 下载 artifact                              │
+│ → azure/login（OIDC 无密码登录）            │
+│ → webapps-deploy zip 部署到                │
+│   App Service: TravelHistoryMap            │
+└────────────────────────────────────────────┘
 ```
 
-任何一步失败 → job 失败 → 整个 workflow 标红。测试失败会直接中断镜像构建，因此一个 job 就完成了"编译 + 单元测试 + 镜像可出"的全部验证。
+任何一步失败 → job 失败 → 整个 workflow 标红。测试失败会直接中断镜像构建，因此一个 job 就完成了"编译 + 单元测试 + 镜像可出"的全部验证；验证通过后自动部署。
 
 ### 设计原则：Dockerfile 是"唯一构建真相"
 
@@ -126,11 +136,12 @@ push 到 main / PR / 手动触发
 | 编译 | Dockerfile build 阶段（`dotnet publish` / `ng build`） |
 | 单元测试 | Dockerfile build 阶段（`dotnet test` / `ng test --watch=false`，测试失败即构建失败） |
 | 镜像可出 | CI 的 `docker build` |
+| 部署产物 | 从镜像里 `docker cp` 提取，**不重复构建**，与镜像内容完全一致 |
 
-好处：构建逻辑只写一处；**本地 `docker build` 与 CI 结果完全一致**；workflow 极简、免费额度消耗更少。
+好处：构建逻辑只写一处；**本地 `docker build` 与 CI 结果完全一致**；部署包即镜像内的产物。
 代价：测试日志嵌在镜像构建日志中；首次构建要拉 base 镜像（gha 层缓存后二次运行很快）。
 
-### 任务详解
+### 任务详解（job ①：docker-build）
 
 | 步骤 | 作用 |
 |------|------|
@@ -138,6 +149,8 @@ push 到 main / PR / 手动触发
 | `docker/setup-buildx-action@v4` | 启用 BuildKit 构建器，是 `cache-from/to` 层缓存的前置 |
 | `docker/build-push-action@v7`（后端） | 构建后端镜像：restore → `dotnet test` → publish |
 | `docker/build-push-action@v7`（前端） | 构建前端镜像：`npm ci` → `ng build` → `ng test` → nginx 托管 |
+| `docker create` + `docker cp` | 从后端镜像提取 `/app/out` 发布产物，部署包与镜像一致 |
+| `actions/upload-artifact@v4` | 上传产物，供 deploy job 跨 job 传递 |
 
 镜像构建的关键参数：
 
@@ -146,7 +159,59 @@ push 到 main / PR / 手动触发
 | `context` | `./src/backend` / `./src/frontend/client` | 后端必须 `src/backend`：Dockerfile 里 `COPY` 了 `services/` 与 `shared/`，路径相对 context 解析 |
 | `file` | 后端需显式指定 Dockerfile 路径 | Dockerfile 不在 context 根 |
 | `push` | `false` | 只构建验证，不推送（推送需 registry + secrets） |
+| `load` | `true`（仅后端） | 把镜像载入本地 daemon，`docker cp` 才能提取产物 |
 | `cache-from/to` | `type=gha,scope=backend/frontend` | 层缓存存 GitHub Actions，二次运行加速；`scope` 区分两个镜像避免缓存冲突 |
+
+### 任务详解（job ②：deploy）
+
+| 步骤 | 作用 |
+|------|------|
+| `needs: docker-build` | 声明依赖：测试/构建通过才部署 |
+| `if: github.event_name != 'pull_request'` | PR 只验证不部署 |
+| `permissions: id-token: write` | OIDC 登录 Azure 需要请求短期 JWT（无密码） |
+| `actions/download-artifact@v4` | 取回 job ① 上传的发布产物 |
+| `azure/login@v2` | 用 client-id / tenant-id / subscription-id 三个 secret 无密码登录 Azure |
+| `azure/webapps-deploy@v3` | zip 部署到 App Service `TravelHistoryMap` 的 Production 槽位 |
+
+部署所需的三个 secrets（Azure 部署向导创建 App Service 时已自动生成）：
+
+```
+AZUREAPPSERVICE_CLIENTID_AA776FAA87AC4876941A37B1963F324A
+AZUREAPPSERVICE_TENANTID_82C2B4EA60294E959F2689F91C024F43
+AZUREAPPSERVICE_SUBSCRIPTIONID_842056D8DC054D74B9D121D85B480A8C
+```
+
+### 关键概念速查
+
+| 概念 | 说明 |
+|------|------|
+| `on` | 触发器：`push` / `pull_request` / `schedule`（cron，UTC 时区）/ `workflow_dispatch`（手动） |
+| `jobs` | 任务，默认并行；`needs` 声明依赖（数组可依赖多个）——当前 CI 用 `needs` 把 deploy 串在 docker-build 之后 |
+| `if` | 条件表达式：`github.event_name` 判断触发事件（如 PR 时跳过部署） |
+| `permissions` | 给 job 的最小权限：`id-token: write` 是 OIDC 登录 Azure 的必要项 |
+| `runs-on` | 运行环境：`ubuntu-latest` / `windows-latest` / `macos-latest` |
+| `steps` | 步骤列表，两种形式：`run`（shell 命令）、`uses`（复用 Marketplace Action） |
+| `with` | 传给 Action 的参数（类似函数入参） |
+| `secrets` | 机密配置，存于仓库 Settings → Secrets，YAML 用 `${{ secrets.XXX }}` 引用，禁止明文写密码 |
+| `${{ }}` | 表达式，引用 secrets / env / 上下文（`github.ref`、`github.event_name`、`github.sha` 等） |
+| artifact | job 间传递文件：`upload-artifact` 上传、`download-artifact` 下载 |
+
+### 常见坑
+
+- 忘记 `actions/checkout` → 找不到代码
+- Docker 构建 context 写错 → `COPY` 找不到 `shared/`（后端 context 必须是 `src/backend`）
+- 后端镜像没加 `load: true` → `docker cp` 报 "No such image"（buildx 默认不载入本地 daemon）
+- 部署 job 忘记 `if` 条件 → PR 也会触发部署
+- `schedule` 是 UTC 时区，注意换算
+- secrets 未配置就引用 → `Unrecognized named-value: 'secrets'`
+- 私有仓库每月 2000 分钟免费，公共仓库配额更宽（注意 Windows runner 按 2 倍时长扣减）
+
+### 后续扩展
+
+1. 推送镜像到 Azure Container Registry（`docker/login-action@v3` + `push: true` + `ACR_USERNAME`/`ACR_PASSWORD` secrets），改为容器化部署
+2. 部署到 Azure Container Apps（`azure/login@v2` + `azure/container-apps-deploy@v2`），可跑多副本 + 自动扩缩
+3. 前端部署到 Azure Static Web Apps 免费计划（`Azure/static-web-apps-deploy`）
+4. 拆分 `deploy.yml`（部署）与 `ci.yml`（构建测试），用 `workflow_run` 或环境审批串联
 
 ### 关键概念速查
 
