@@ -71,12 +71,15 @@ jobs:
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,mode=max,scope=frontend
 
-      # 5. 从镜像里提取 dotnet publish 产物（/app/out），
-      #    保证部署包与镜像内容完全一致 —— 不重复构建，符合"唯一构建真相"
+      # 5. 从镜像里提取 dotnet publish 产物，保证部署包与镜像内容完全一致
+      #    —— 不重复构建，符合"唯一构建真相"。
+      #    注意路径是 /app 而不是 /app/out：publish 的 -o /app/out 在 build 阶段，
+      #    最终镜像（runtime 阶段）是 WORKDIR /app + COPY --from=build /app/out ./，
+      #    产物（user.dll、web.config 等）直接位于 /app 根目录下。
       - name: Extract backend publish output
         run: |
           docker create --name extract user-service:ci
-          docker cp extract:/app/out ./publish
+          docker cp extract:/app/. ./publish
           docker rm extract
 
       # 6. 上传为 artifact，供 deploy job 下载
