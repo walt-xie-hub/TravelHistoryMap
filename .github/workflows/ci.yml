@@ -110,9 +110,9 @@ jobs:
       - name: Login to Azure
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_AA776FAA87AC4876941A37B1963F324A }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_82C2B4EA60294E959F2689F91C024F43 }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_842056D8DC054D74B9D121D85B480A8C }}
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_3E4B653535F64E518FC068312A4ACF78 }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_A2B2CD6D4C5C4A77B27AE5DA70E292AE }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_12264A5C94164B61945E7CA2E9EEE253 }}
 
       # zip 部署到 App Service TravelHistoryMap 的 Production 槽位
       - name: Deploy to Azure Web App
