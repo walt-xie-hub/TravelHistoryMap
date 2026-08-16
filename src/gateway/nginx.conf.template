@@ -1,0 +1,21 @@
+# 网关路由模板（对应 K8s base/client/ingress.yaml 的路径分流逻辑）
+# 运行时由 nginx 官方镜像 envsubst 替换 ${USER_SERVICE_URL} / ${CLIENT_URL}
+server {
+    listen 80;
+
+    # /api/* → 后端 user-service（保留 /api 前缀，后端路由挂载在 /api）
+    location /api/ {
+        proxy_pass ${USER_SERVICE_URL};
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # 其余 → 前端 client（SPA，client 内部 nginx 处理 history fallback）
+    location / {
+        proxy_pass ${CLIENT_URL};
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}

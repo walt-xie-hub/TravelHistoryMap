@@ -1,53 +1,76 @@
-# Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
-# More GitHub Actions for Azure: https://github.com/Azure/actions
-
-name: Build and deploy ASP.Net Core app to Azure Web App - TravelHistoryMap
+# 流水线：build + push 镜像到 ghcr.io → 部署到 Azure Container Apps
+# 覆盖三个容器应用：client（前端静态站）、user-service（后端 API）、gateway（nginx 统一入口）
+name: Build, Push and Deploy to Azure Container Apps
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
 
-jobs:
-  build:
-    runs-on: windows-latest
-    permissions:
-      contents: read #This is required for actions/checkout
+env:
+  REGISTRY: ghcr.io
+  # TODO: 替换为你的 GitHub 用户名（小写）
+  CLIENT_IMAGE: ghcr.io/waltxie1986/travelmap-client
+  SERVER_IMAGE: ghcr.io/waltxie1986/travelmap-user-service
+  GATEWAY_IMAGE: ghcr.io/waltxie1986/travelmap-gateway
+  # 容器应用环境名与区域 —— 内部服务域名格式：<app>.internal.<env-name>.<region>.azurecontainerapps.io
+  CAE_NAME: cae-travelmap
+  CAE_REGION: eastasia
 
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write   # push 镜像到 ghcr.io 必需
+      id-token: write   # azure/login 的 OIDC 必需
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up .NET Core
-        uses: actions/setup-dotnet@v4
+      - name: Login to GHCR
+        uses: docker/login-action@v3
         with:
-          dotnet-version: '10.x'
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build with dotnet
-        run: dotnet build --configuration Release
+      - name: Set image tag
+        id: meta
+        run: echo "tag=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
-      - name: dotnet publish
-        run: dotnet publish -c Release -o "${{env.DOTNET_ROOT}}/myapp"
-
-      - name: Upload artifact for deployment job
-        uses: actions/upload-artifact@v4
+      - name: Build & push client
+        uses: docker/build-push-action@v6
         with:
-          name: .net-app
-          path: ${{env.DOTNET_ROOT}}/myapp
+          context: ./src/frontend/client
+          push: true
+          tags: ${{ env.CLIENT_IMAGE }}:${{ steps.meta.outputs.tag }},${{ env.CLIENT_IMAGE }}:latest
 
-  deploy:
-    runs-on: windows-latest
-    needs: build
-    permissions:
-      id-token: write #This is required for requesting the JWT
-      contents: read #This is required for actions/checkout
-
-    steps:
-      - name: Download artifact from build job
-        uses: actions/download-artifact@v4
+      # 注意：Dockerfile 依赖 services/user-service 与 shared/ 两个目录，
+      # 构建上下文必须指向 ./src/backend
+      - name: Build & push user-service
+        uses: docker/build-push-action@v6
         with:
-          name: .net-app
-      
+          context: ./src/backend
+          file: ./src/backend/services/user-service/Dockerfile
+          push: true
+          tags: ${{ env.SERVER_IMAGE }}:${{ steps.meta.outputs.tag }},${{ env.SERVER_IMAGE }}:latest
+
+      - name: Build & push gateway
+        uses: docker/build-push-action@v6
+        with:
+          context: ./src/gateway
+          push: true
+          tags: ${{ env.GATEWAY_IMAGE }}:${{ steps.meta.outputs.tag }},${{ env.GATEWAY_IMAGE }}:latest
+
+      # 镜像默认可见性与仓库一致；仓库为私有时要显式把镜像设成 public，
+      # 否则 Container Apps 拉取需要额外凭证（免费方案依赖 public 镜像免认证拉取）
+      - name: Set package visibility to public
+        if: github.repository_visibility == 'private'
+        run: |
+          for img in travelmap-client travelmap-user-service travelmap-gateway; do
+            gh api -X PATCH "user/packages/container/$img" -f visibility=public
+          done
+
       - name: Login to Azure
         uses: azure/login@v2
         with:
@@ -55,11 +78,26 @@ jobs:
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_A2B2CD6D4C5C4A77B27AE5DA70E292AE }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_12264A5C94164B61945E7CA2E9EEE253 }}
 
-      - name: Deploy to Azure Web App
-        id: deploy-to-webapp
-        uses: azure/webapps-deploy@v3
+      - name: Deploy user-service
+        uses: azure/containerapps-deploy@v2
         with:
-          app-name: 'TravelHistoryMap'
-          slot-name: 'Production'
-          package: .
-          
+          appName: user-service
+          resourceGroup: rg-travelmap
+          imageToDeploy: ${{ env.SERVER_IMAGE }}:${{ steps.meta.outputs.tag }}
+
+      - name: Deploy client
+        uses: azure/containerapps-deploy@v2
+        with:
+          appName: client
+          resourceGroup: rg-travelmap
+          imageToDeploy: ${{ env.CLIENT_IMAGE }}:${{ steps.meta.outputs.tag }}
+
+      - name: Deploy gateway
+        uses: azure/containerapps-deploy@v2
+        with:
+          appName: gateway
+          resourceGroup: rg-travelmap
+          imageToDeploy: ${{ env.GATEWAY_IMAGE }}:${{ steps.meta.outputs.tag }}
+          environmentVariables: |
+            [{"name":"USER_SERVICE_URL","value":"http://user-service.internal.${{ env.CAE_NAME }}.${{ env.CAE_REGION }}.azurecontainerapps.io"},
+             {"name":"CLIENT_URL","value":"http://client.internal.${{ env.CAE_NAME }}.${{ env.CAE_REGION }}.azurecontainerapps.io"}]
