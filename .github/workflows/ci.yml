@@ -42,9 +42,10 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  CLIENT_IMAGE: ghcr.io/waltxie1986/travelmap-client
-  SERVER_IMAGE: ghcr.io/waltxie1986/travelmap-user-service
-  GATEWAY_IMAGE: ghcr.io/waltxie1986/travelmap-gateway
+  # 仓库已迁移到组织 walt-xie-hub，镜像命名空间跟随仓库 owner
+  CLIENT_IMAGE: ghcr.io/${{ github.repository_owner }}/travelmap-client
+  SERVER_IMAGE: ghcr.io/${{ github.repository_owner }}/travelmap-user-service
+  GATEWAY_IMAGE: ghcr.io/${{ github.repository_owner }}/travelmap-gateway
   # 容器应用环境名与区域 —— 内部服务域名格式：<app>.internal.<env-name>.<region>.azurecontainerapps.io
   CAE_NAME: cae-travelmap
   CAE_REGION: eastasia
@@ -118,9 +119,11 @@ jobs:
       #    否则 Container Apps 拉取需要额外凭证（免费方案依赖 public 镜像免认证拉取）
       - name: Set package visibility to public
         if: github.event_name != 'pull_request' && github.repository_visibility == 'private'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           for img in travelmap-client travelmap-user-service travelmap-gateway; do
-            gh api -X PATCH "user/packages/container/$img" -f visibility=public
+            gh api -X PATCH "orgs/${{ github.repository_owner }}/packages/container/$img" -f visibility=public
           done
 
   # ───────────── ② 部署到 Azure Container Apps ─────────────
