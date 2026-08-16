@@ -143,23 +143,23 @@ jobs:
 
       # 更新已有 Container App 的镜像（应用需已创建，deploy action 不负责创建）
       - name: Deploy user-service
-        uses: azure/containerapps-deploy@v2
+        uses: azure/container-apps-deploy-action@v1
         with:
-          appName: user-service
+          containerAppName: user-service
           resourceGroup: rg-travelmap
           imageToDeploy: ${{ env.SERVER_IMAGE }}:${{ needs.docker-build.outputs.tag }}
 
       - name: Deploy client
-        uses: azure/containerapps-deploy@v2
+        uses: azure/container-apps-deploy-action@v1
         with:
-          appName: client
+          containerAppName: client
           resourceGroup: rg-travelmap
           imageToDeploy: ${{ env.CLIENT_IMAGE }}:${{ needs.docker-build.outputs.tag }}
 
       - name: Deploy gateway
-        uses: azure/containerapps-deploy@v2
+        uses: azure/container-apps-deploy-action@v1
         with:
-          appName: gateway
+          containerAppName: gateway
           resourceGroup: rg-travelmap
           imageToDeploy: ${{ env.GATEWAY_IMAGE }}:${{ needs.docker-build.outputs.tag }}
           environmentVariables: |
