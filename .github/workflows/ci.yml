@@ -1,16 +1,19 @@
 # ──────────────────────────────────────────────
-# CI/CD：Docker 镜像构建验证（build + 单元测试）+ 部署到 Azure
+# CI/CD：Docker 镜像构建验证（build + 单元测试）+ 部署到 Azure Container Apps
 #
 # 设计原则：Dockerfile 是构建的"唯一事实来源"。
-#   依赖安装、编译、单元测试都已经写进两个 Dockerfile 的 build 阶段
+#   依赖安装、编译、单元测试都已经写进 Dockerfile 的 build 阶段
 #   （后端 dotnet test、前端 ng test），测试失败会中断镜像构建。
-#   因此 CI 只需要 docker build 两个镜像，即可完成全部验证，
+#   因此 CI 只需要 docker build 三个镜像，即可完成全部验证，
 #   且与本地 docker build 的结果完全一致。
 #
-# 部署：不重复构建，直接从 user-service 镜像里提取 dotnet publish 产物
-#   （/app/out），zip 部署到 Azure App Service "TravelHistoryMap"。
-#   部署信息（OIDC secrets、azure/login、webapps-deploy、app-name）
-#   参考原 main_travelhistorymap.yml（Azure 部署向导自动生成）。
+# 部署：镜像 push 到 ghcr.io（GitHub Container Registry），再用
+#   azure/containerapps-deploy 更新 Azure Container Apps：
+#   - user-service  → 后端 API（.NET，internal 入口）
+#   - client        → 前端静态站（nginx，internal 入口）
+#   - gateway       → nginx 统一入口（复刻 K8s ingress 的路径分流：
+#                      /api/* → user-service，/* → client，唯一 external 入口）
+#   免费方案：镜像设 public 免认证拉取；Container Apps min-replicas 0 缩容到零。
 #
 # 触发时机：
 #   - push 到 main 分支（构建 + 测试 + 部署）
@@ -18,10 +21,16 @@
 #   - 手动触发（仓库 Actions 页面点 "Run workflow" 按钮）
 #
 # secrets 说明：部署需要仓库 Settings → Secrets 里配置以下三项
-#   （Azure 向导创建 App Service 时已自动生成，无需手动添加）：
-#   AZUREAPPSERVICE_CLIENTID_AA776FAA87AC4876941A37B1963F324A
-#   AZUREAPPSERVICE_TENANTID_82C2B4EA60294E959F2689F91C024F43
-#   AZUREAPPSERVICE_SUBSCRIPTIONID_842056D8DC054D74B9D121D85B480A8C
+#   （Azure 门户创建 OIDC 联邦凭据时生成，App Service 向导留下的同样可用）：
+#   AZUREAPPSERVICE_CLIENTID_3E4B653535F64E518FC068312A4ACF78
+#   AZUREAPPSERVICE_TENANTID_A2B2CD6D4C5C4A77B27AE5DA70E292AE
+#   AZUREAPPSERVICE_SUBSCRIPTIONID_12264A5C94164B61945E7CA2E9EEE253
+#
+# 部署前置条件（一次性，az CLI 完成）：
+#   rg-travelmap 资源组 / cae-travelmap 环境 / 三个 Container App 已创建；
+#   gateway 配置 USER_SERVICE_URL、CLIENT_URL（internal 服务地址）；
+#   user-service 配置 db-password secret 与 PostgreSQL 连接串；
+#   PostgreSQL Flexible Server（B1ms 免费层）。
 # ──────────────────────────────────────────────
 name: CI/CD
 
@@ -31,11 +40,25 @@ on:
   pull_request:
   workflow_dispatch:
 
+env:
+  REGISTRY: ghcr.io
+  CLIENT_IMAGE: ghcr.io/waltxie1986/travelmap-client
+  SERVER_IMAGE: ghcr.io/waltxie1986/travelmap-user-service
+  GATEWAY_IMAGE: ghcr.io/waltxie1986/travelmap-gateway
+  # 容器应用环境名与区域 —— 内部服务域名格式：<app>.internal.<env-name>.<region>.azurecontainerapps.io
+  CAE_NAME: cae-travelmap
+  CAE_REGION: eastasia
+
 jobs:
   # ───────────── ① 构建 + 测试（质量门禁）─────────────
   docker-build:
     name: Docker Images (build + test)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write          # push 镜像到 ghcr.io 必需（PR 只构建不 push）
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
     steps:
       # 1. 拉取代码
       - uses: actions/checkout@v5
@@ -44,68 +67,72 @@ jobs:
       #    这是 build-push-action 与 gha 缓存（cache-from/cache-to）的前置
       - uses: docker/setup-buildx-action@v4
 
-      # 3. 后端镜像：restore → 单测 → publish 全部在容器内完成
+      # 3. 登录 GHCR（GITHUB_TOKEN 自动提供，无需 PAT）
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # 4. 镜像 tag 用 commit 短 SHA，支持回滚
+      - name: Set image tag
+        id: meta
+        run: echo "tag=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      # 5. 前端镜像：npm ci → 生产构建 → 单测 → nginx 托管
+      #    PR 只构建验证，push 到 main 才推送镜像
+      - name: Build & push client
+        uses: docker/build-push-action@v7
+        with:
+          context: ./src/frontend/client
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ env.CLIENT_IMAGE }}:${{ steps.meta.outputs.tag }},${{ env.CLIENT_IMAGE }}:latest
+          # gha 缓存：层缓存存 GitHub Actions cache，scope 区分镜像避免互相覆盖
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
+
+      # 6. 后端镜像：restore → 单测 → publish 全部在容器内完成
       #    context 必须是 src/backend（Dockerfile 里 COPY 了 services/ 与 shared/）
-      #    load: true → 把镜像载入本地 daemon，供下一步 docker cp 提取发布产物
-      - name: Build backend image
+      - name: Build & push user-service
         uses: docker/build-push-action@v7
         with:
           context: ./src/backend
           file: ./src/backend/services/user-service/Dockerfile
-          push: false                      # 只构建验证，不推送
-          tags: user-service:ci
-          load: true
-          # gha 缓存：层缓存存 GitHub Actions cache，下次跑直接复用
-          # scope 区分两个镜像，避免缓存互相覆盖
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ env.SERVER_IMAGE }}:${{ steps.meta.outputs.tag }},${{ env.SERVER_IMAGE }}:latest
           cache-from: type=gha,scope=backend
           cache-to: type=gha,mode=max,scope=backend
 
-      # 4. 前端镜像：npm ci → 生产构建 → 单测 → nginx 托管
-      - name: Build frontend image
+      # 7. 网关镜像：nginx 统一入口（配置经环境变量注入，见 src/gateway）
+      - name: Build & push gateway
         uses: docker/build-push-action@v7
         with:
-          context: ./src/frontend/client
-          file: ./src/frontend/client/Dockerfile
-          push: false
-          tags: client:ci
-          cache-from: type=gha,scope=frontend
-          cache-to: type=gha,mode=max,scope=frontend
+          context: ./src/gateway
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ env.GATEWAY_IMAGE }}:${{ steps.meta.outputs.tag }},${{ env.GATEWAY_IMAGE }}:latest
+          cache-from: type=gha,scope=gateway
+          cache-to: type=gha,mode=max,scope=gateway
 
-      # 5. 从镜像里提取 dotnet publish 产物，保证部署包与镜像内容完全一致
-      #    —— 不重复构建，符合"唯一构建真相"。
-      #    注意路径是 /app 而不是 /app/out：publish 的 -o /app/out 在 build 阶段，
-      #    最终镜像（runtime 阶段）是 WORKDIR /app + COPY --from=build /app/out ./，
-      #    产物（user.dll、web.config 等）直接位于 /app 根目录下。
-      - name: Extract backend publish output
+      # 8. 镜像默认可见性与仓库一致；仓库为私有时要显式设成 public，
+      #    否则 Container Apps 拉取需要额外凭证（免费方案依赖 public 镜像免认证拉取）
+      - name: Set package visibility to public
+        if: github.event_name != 'pull_request' && github.repository_visibility == 'private'
         run: |
-          docker create --name extract user-service:ci
-          docker cp extract:/app/. ./publish
-          docker rm extract
+          for img in travelmap-client travelmap-user-service travelmap-gateway; do
+            gh api -X PATCH "user/packages/container/$img" -f visibility=public
+          done
 
-      # 6. 上传为 artifact，供 deploy job 下载
-      - name: Upload deploy artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: dotnet-app
-          path: ./publish
-          if-no-files-found: error
-
-  # ───────────── ② 部署到 Azure App Service ─────────────
+  # ───────────── ② 部署到 Azure Container Apps ─────────────
   deploy:
-    name: Deploy to Azure Web App
+    name: Deploy to Azure Container Apps
     needs: docker-build                    # 测试/构建通过才部署
     if: github.event_name != 'pull_request'   # PR 只验证，不部署
     runs-on: ubuntu-latest
     permissions:
       id-token: write                      # OIDC 登录 Azure 需要请求 JWT
-      contents: read                       # 下载 artifact
+      contents: read
     steps:
-      - name: Download artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: dotnet-app
-          path: ./publish
-
       # 无密码登录：OIDC 联邦凭据（client-id/tenant-id/subscription-id 三项 secret）
       - name: Login to Azure
         uses: azure/login@v2
@@ -114,15 +141,27 @@ jobs:
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_A2B2CD6D4C5C4A77B27AE5DA70E292AE }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_12264A5C94164B61945E7CA2E9EEE253 }}
 
-      # zip 部署到 App Service TravelHistoryMap 的 Production 槽位
-      - name: Deploy to Azure Web App
-        id: deploy-to-webapp
-        uses: azure/webapps-deploy@v3
+      # 更新已有 Container App 的镜像（应用需已创建，deploy action 不负责创建）
+      - name: Deploy user-service
+        uses: azure/containerapps-deploy@v2
         with:
-          app-name: 'TravelHistoryMap'
-          slot-name: 'Production'
-          package: ./publish
+          appName: user-service
+          resourceGroup: rg-travelmap
+          imageToDeploy: ${{ env.SERVER_IMAGE }}:${{ needs.docker-build.outputs.tag }}
 
-      # 将来要改成容器化部署（ACR + Container Apps）时，
-      # 把 docker-build 的 push 改为 true、加 docker/login-action@v3，
-      # deploy 换成 azure/container-apps-deploy@v2 即可
+      - name: Deploy client
+        uses: azure/containerapps-deploy@v2
+        with:
+          appName: client
+          resourceGroup: rg-travelmap
+          imageToDeploy: ${{ env.CLIENT_IMAGE }}:${{ needs.docker-build.outputs.tag }}
+
+      - name: Deploy gateway
+        uses: azure/containerapps-deploy@v2
+        with:
+          appName: gateway
+          resourceGroup: rg-travelmap
+          imageToDeploy: ${{ env.GATEWAY_IMAGE }}:${{ needs.docker-build.outputs.tag }}
+          environmentVariables: |
+            [{"name":"USER_SERVICE_URL","value":"http://user-service.internal.${{ env.CAE_NAME }}.${{ env.CAE_REGION }}.azurecontainerapps.io"},
+             {"name":"CLIENT_URL","value":"http://client.internal.${{ env.CAE_NAME }}.${{ env.CAE_REGION }}.azurecontainerapps.io"}]
