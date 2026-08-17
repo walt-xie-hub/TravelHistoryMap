@@ -48,7 +48,8 @@ env:
   GATEWAY_IMAGE: ghcr.io/${{ github.repository_owner }}/travelmap-gateway
   # 容器应用环境名与区域 —— 内部服务域名格式：<app>.internal.<env-name>.<region>.azurecontainerapps.io
   CAE_NAME: cae-travelmap
-  CAE_REGION: eastasia
+  CAE_REGION: eastus
+  RESOURCE_GROUP: travelMap
 
 jobs:
   # ───────────── ① 构建 + 测试（质量门禁）─────────────
@@ -149,21 +150,21 @@ jobs:
         uses: azure/container-apps-deploy-action@v1
         with:
           containerAppName: user-service
-          resourceGroup: rg-travelmap
+          resourceGroup: ${{ env.RESOURCE_GROUP }}
           imageToDeploy: ${{ env.SERVER_IMAGE }}:${{ needs.docker-build.outputs.tag }}
 
       - name: Deploy client
         uses: azure/container-apps-deploy-action@v1
         with:
           containerAppName: client
-          resourceGroup: rg-travelmap
+          resourceGroup: ${{ env.RESOURCE_GROUP }}
           imageToDeploy: ${{ env.CLIENT_IMAGE }}:${{ needs.docker-build.outputs.tag }}
 
       - name: Deploy gateway
         uses: azure/container-apps-deploy-action@v1
         with:
           containerAppName: gateway
-          resourceGroup: rg-travelmap
+          resourceGroup: ${{ env.RESOURCE_GROUP }}
           imageToDeploy: ${{ env.GATEWAY_IMAGE }}:${{ needs.docker-build.outputs.tag }}
           environmentVariables: |
             [{"name":"USER_SERVICE_URL","value":"http://user-service.internal.${{ env.CAE_NAME }}.${{ env.CAE_REGION }}.azurecontainerapps.io"},

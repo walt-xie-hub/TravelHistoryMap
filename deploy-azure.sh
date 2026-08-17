@@ -6,8 +6,8 @@
 # 使用：PG_PASSWORD="你的密码" bash deploy-azure.sh
 #
 # 与 .github/workflows/ci.yml 的约定：
-#   - 资源组   rg-travelmap
-#   - 环境     cae-travelmap（区域 eastasia，与 CAE_NAME/CAE_REGION 一致）
+#   - 资源组   travelMap
+#   - 环境     cae-travelmap（区域 eastus，与 CAE_NAME/CAE_REGION 一致）
 #   - 镜像     ghcr.io/walt-xie-hub/travelmap-{client,user-service,gateway}
 #   - ingress  client/user-service 为 internal，gateway 为 external（唯一入口）
 #   - 免费     min-replicas 0 缩容到零；PostgreSQL B1ms 免费层（12 个月）
@@ -15,9 +15,9 @@
 set -euo pipefail
 
 # ── 可调参数 ────────────────────────────────────────────────
-RESOURCE_GROUP="rg-travelmap"
+RESOURCE_GROUP="travelMap"
 ENV_NAME="cae-travelmap"
-REGION="eastasia"
+REGION="eastus"
 ORG="walt-xie-hub"                        # GitHub 组织名（ghcr 命名空间）
 PG_SERVER="pg-travelmap"
 PG_USER="appuser"

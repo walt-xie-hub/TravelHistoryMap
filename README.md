@@ -199,7 +199,7 @@ CI 的 deploy 只更新已存在应用的镜像，**不负责创建**。首次�
 PG_PASSWORD="你的密码" bash deploy-azure.sh
 ```
 
-脚本会创建：资源组 `rg-travelmap`、容器应用环境 `cae-travelmap`、PostgreSQL Flexible Server（B1ms 免费层）、三个 Container App（client/user-service 为 internal，gateway 为 external 唯一入口）。之后推 `main` 即自动部署。
+脚本会创建：资源组 `travelMap`、容器应用环境 `cae-travelmap`（位于 `eastus`）、PostgreSQL Flexible Server（B1ms 免费层）、三个 Container App（client/user-service 为 internal，gateway 为 external 唯一入口）。之后推 `main` 即自动部署。
 
 ### 常见坑
 
