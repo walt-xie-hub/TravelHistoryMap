@@ -19,6 +19,8 @@ RESOURCE_GROUP="travelMap"
 ENV_NAME="cae-travelmap"
 REGION="eastus"
 ORG="walt-xie-hub"                        # GitHub 组织名（ghcr 命名空间）
+GHCR_USERNAME="${GHCR_USERNAME:-}"        # 拉取私有 ghcr.io 镜像所需用户名
+GHCR_PASSWORD="${GHCR_PASSWORD:-}"        # 拉取私有 ghcr.io 镜像所需 PAT
 PG_SERVER="pg-travelmap"
 PG_USER="appuser"
 PG_DATABASE="appdb"
@@ -55,14 +57,16 @@ az containerapp create \
   --secrets db-password="$PG_PASSWORD" \
   --env-vars \
     "ConnectionStrings__DefaultConnection=Host=$PG_HOST;Port=5432;Database=$PG_DATABASE;Username=$PG_USER;Password=secretref:db-password;Pooling=true" \
-    "Db__Password=secretref:db-password"
+    "Db__Password=secretref:db-password" \
+  $( [ -n "$GHCR_USERNAME" ] && echo "--registry-server ghcr.io --registry-username $GHCR_USERNAME --registry-password $GHCR_PASSWORD" )
 
 # ② 前端 client：internal
 echo "==> 创建 client（internal）"
 az containerapp create \
   --name client -g "$RESOURCE_GROUP" --environment "$ENV_NAME" \
   --image "ghcr.io/$ORG/travelmap-client:latest" \
-  --target-port 80 --ingress internal --min-replicas 0 --max-replicas 3
+  --target-port 80 --ingress internal --min-replicas 0 --max-replicas 3 \
+  $( [ -n "$GHCR_USERNAME" ] && echo "--registry-server ghcr.io --registry-username $GHCR_USERNAME --registry-password $GHCR_PASSWORD" )
 
 # ③ 网关 gateway：external（唯一公网入口），转发到两个 internal 服务
 echo "==> 创建 gateway（external）"
@@ -72,7 +76,8 @@ az containerapp create \
   --target-port 80 --ingress external --min-replicas 0 --max-replicas 3 \
   --env-vars \
     "USER_SERVICE_URL=http://user-service.internal.$ENV_NAME.$REGION.azurecontainerapps.io" \
-    "CLIENT_URL=http://client.internal.$ENV_NAME.$REGION.azurecontainerapps.io"
+    "CLIENT_URL=http://client.internal.$ENV_NAME.$REGION.azurecontainerapps.io" \
+  $( [ -n "$GHCR_USERNAME" ] && echo "--registry-server ghcr.io --registry-username $GHCR_USERNAME --registry-password $GHCR_PASSWORD" )
 
 # ── 5. 输出公网入口 ─────────────────────────────────────────
 echo "==> 部署完成，网关入口："
