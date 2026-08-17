@@ -179,5 +179,5 @@ jobs:
           registryUsername: ${{ secrets.GHCR_USERNAME }}
           registryPassword: ${{ secrets.GHCR_PASSWORD }}
           environmentVariables: |
-            [{"name":"USER_SERVICE_URL","value":"http://user-service.internal.${{ env.CAE_NAME }}.${{ env.CAE_REGION }}.azurecontainerapps.io"},
-             {"name":"CLIENT_URL","value":"http://client.internal.${{ env.CAE_NAME }}.${{ env.CAE_REGION }}.azurecontainerapps.io"}]
+            USER_SERVICE_URL=http://user-service.internal.${{ env.CAE_NAME }}.${{ env.CAE_REGION }}.azurecontainerapps.io
+            CLIENT_URL=http://client.internal.${{ env.CAE_NAME }}.${{ env.CAE_REGION }}.azurecontainerapps.io
