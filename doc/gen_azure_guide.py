@@ -7,7 +7,6 @@
 """
 import zipfile
 import os
-import re
 
 # ---------------------------------------------------------------- 工具函数
 
@@ -32,21 +31,6 @@ def run(text, bold=False, italic=False, color=None, font=None, size=None):
     return '<w:r>%s<w:t xml:space="preserve">%s</w:t></w:r>' % (rpr_xml, esc(text))
 
 
-def split_runs(s):
-    """把纯文本 / run XML / run+文本混合的字符串拆成合法 run 列表。
-    避免 para()/bullet() 对已生成的 <w:r> XML 再次转义（双重转义）。"""
-    out = []
-    pos = 0
-    for m in re.finditer(r"<w:r(?:>| [^>]*>).*?</w:r>", s, re.S):
-        if m.start() > pos:
-            out.append(run(s[pos:m.start()]))
-        out.append(m.group())
-        pos = m.end()
-    if pos < len(s):
-        out.append(run(s[pos:]))
-    return out or [run(s)]
-
-
 def para(runs, style=None, spacing_after=120, indent=None, shade=None):
     """runs 可以是字符串或 run xml 列表"""
     ppr = []
@@ -59,31 +43,12 @@ def para(runs, style=None, spacing_after=120, indent=None, shade=None):
         ppr.append('<w:shd w:val="clear" w:color="auto" w:fill="%s"/>' % shade)
     ppr_xml = "<w:pPr>%s</w:pPr>" % "".join(ppr) if ppr else ""
     if isinstance(runs, str):
-        runs = split_runs(runs)
+        runs = [run(runs)]
     return "<w:p>%s%s</w:p>" % (ppr_xml, "".join(runs))
 
 
-_bk_id = [100]
-
-
-def heading(text, level=1, anchor=None):
-    if anchor:
-        _bk_id[0] += 1
-        bid = _bk_id[0]
-        runs = ['<w:bookmarkStart w:id="%d" w:name="%s"/>' % (bid, anchor),
-                run(text),
-                '<w:bookmarkEnd w:id="%d"/>' % bid]
-    else:
-        runs = run(text)
-    return para(runs, style="Heading%d" % level, spacing_after=200)
-
-
-def toc_item(text, anchor):
-    return ('<w:p><w:pPr><w:ind w:left="200"/><w:spacing w:after="40"/></w:pPr>'
-            '<w:hyperlink w:anchor="%s"><w:r><w:rPr><w:color w:val="0563C1"/>'
-            '<w:u w:val="single"/></w:rPr>'
-            '<w:t xml:space="preserve">%s</w:t></w:r></w:hyperlink></w:p>'
-            % (anchor, esc(text)))
+def heading(text, level=1):
+    return para(text, style="Heading%d" % level, spacing_after=200)
 
 
 def code_block(lines):
@@ -97,42 +62,46 @@ def code_block(lines):
 
 def bullet(text_runs, level=0):
     if isinstance(text_runs, str):
-        text_runs = "".join(split_runs(text_runs))
-    style = "ListBullet" if level == 0 else "ListBullet2"
-    numpr = '<w:numPr><w:ilvl w:val="%d"/><w:numId w:val="1"/></w:numPr>' % level
-    return '<w:p><w:pPr><w:pStyle w:val="%s"/><w:spacing w:after="60"/>%s</w:pPr>%s</w:p>' % (style, numpr, text_runs)
+        text_runs = run(text_runs)
+    numpr = ""
+    if level == 0:
+        numpr = '<w:pPr><w:pStyle w:val="ListBullet"/><w:spacing w:after="60"/></w:pPr>'
+    else:
+        numpr = '<w:pPr><w:pStyle w:val="ListBullet2"/><w:spacing w:after="60"/></w:pPr>'
+    return "<w:p>%s%s</w:p>" % (numpr, text_runs)
 
 
 def table(headers, rows, col_widths=None, header_bold=True, font_size=None):
     n = len(headers)
-    TOTAL_W = 9000
     if col_widths is None:
-        col_widths = [TOTAL_W // n] * n
+        col_widths = [10000 // n] * n
     grid = "".join('<w:gridCol w:w="%d"/>' % w for w in col_widths)
 
-    def cell(val, w, bold=False, shade=None):
-        shd = '<w:shd w:val="clear" w:color="auto" w:fill="%s"/>' % shade if shade else ""
+    def cell(text_runs, bold=False):
+        if isinstance(text_runs, str):
+            text_runs = run(text_runs, bold=bold, size=font_size)
+        # 支持多行（\n 拆成多个段落）
         tc_inner = []
-        if isinstance(val, str):
-            for ln in val.split("\n"):
-                tc_inner.append('<w:p><w:pPr><w:spacing w:after="0"/></w:pPr>%s</w:p>' % run(ln, bold=bold, size=font_size))
+        if isinstance(text_runs, str) or (isinstance(text_runs, list) and len(text_runs) == 1 and isinstance(text_runs[0], str)):
+            txt = text_runs if isinstance(text_runs, str) else text_runs[0]
+            for i, ln in enumerate(txt.split("\n")):
+                r = run(ln, bold=bold, size=font_size)
+                tc_inner.append('<w:p><w:pPr><w:spacing w:after="0"/></w:pPr>%s</w:p>' % r)
         else:
-            tc_inner.append('<w:p><w:pPr><w:spacing w:after="0"/></w:pPr>%s</w:p>' % val)
-        return '<w:tc><w:tcPr><w:tcW w:w="%d" w:type="dxa"/>%s<w:vAlign w:val="center"/></w:tcPr>%s</w:tc>' % (w, shd, "".join(tc_inner))
+            tc_inner.append('<w:p><w:pPr><w:spacing w:after="0"/></w:pPr>%s</w:p>' % text_runs)
+        return '<w:tc><w:tcPr><w:tcW w:w="%d" w:type="dxa"/><w:vAlign w:val="center"/></w:tcPr>%s</w:tc>' % (0, "".join(tc_inner))
 
     rows_xml = []
     for r_i, row in enumerate(rows):
         cells = []
         for c_i, val in enumerate(row):
             bold = header_bold and r_i == 0
-            shade = "DEEBF7" if r_i == 0 else None
-            cells.append(cell(val, col_widths[c_i], bold=bold, shade=shade))
+            cells.append(cell(val, bold=bold))
         tbl_header = '<w:trPr><w:tblHeader/></w:trPr>' if r_i == 0 else ""
         rows_xml.append("<w:tr>%s%s</w:tr>" % (tbl_header, "".join(cells)))
     return (
-        '<w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="%d" w:type="dxa"/>'
-        '<w:jc w:val="center"/><w:tblLayout w:type="fixed"/></w:tblPr>'
-        "<w:tblGrid>%s</w:tblGrid>%s</w:tbl>" % (TOTAL_W, grid, "".join(rows_xml))
+        '<w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="0" w:type="auto"/></w:tblPr>'
+        "<w:tblGrid>%s</w:tblGrid>%s</w:tbl>" % (grid, "".join(rows_xml))
     )
 
 
@@ -148,26 +117,8 @@ BODY.append(heading("TravelMap Azure 部署配置完全指南", 1))
 BODY.append(para(run("—— 从租户、订阅、资源组到资源的全链路配置手册（含问题排查）", bold=True, color="1F4E79"), spacing_after=100))
 BODY.append(para(run("适用范围：本项目（GitHub 组织 walt-xie-hub / TravelHistoryMap 仓库）通过 GitHub Actions 将三个容器镜像部署到 Azure Container Apps 的全部 Azure 侧配置。", italic=True), spacing_after=200))
 
-# 目录（点击可跳转）
-BODY.append(heading("目录", 2))
-TOC_ITEMS = [
-    ("第一章 总体架构与部署链路", "ch1"),
-    ("第二章 租户（Tenant / Microsoft Entra ID）", "ch2"),
-    ("第三章 订阅（Subscription）", "ch3"),
-    ("第四章 资源组（Resource Group）", "ch4"),
-    ("第五章 资源（Resources）", "ch5"),
-    ("第六章 GitHub 侧配套配置", "ch6"),
-    ("第七章 全量问题排查速查表", "ch7"),
-    ("附录 A 一次性初始化脚本（deploy-azure.sh 等价命令）", "appA"),
-    ("附录 B 常用验证命令", "appB"),
-    ("附录 C 关键命名对照表", "appC"),
-]
-for txt, anchor in TOC_ITEMS:
-    BODY.append(toc_item(txt, anchor))
-BODY.append(spacer())
-
 # ---------------- 第一章
-BODY.append(heading("第一章 总体架构与部署链路", 1, anchor="ch1"))
+BODY.append(heading("第一章 总体架构与部署链路", 1))
 BODY.append(heading("1.1 应用部署架构", 2))
 BODY.append(code_block([
     "浏览器 ──► gateway（nginx 网关，唯一 external 公网入口）",
@@ -193,15 +144,15 @@ BODY.append(table(
     [
         ["租户（Microsoft Entra ID）", "App Registration + Federated Credentials + 服务主体", "第二章", "让 GitHub Actions 能无密码登录 Azure"],
         ["订阅", "资源提供程序注册 + 角色分配（Contributor）", "第三章", "开通服务能力 + 授权 CI 操作权限"],
-        ["资源组", "travelMap", "第四章", "把本次部署的所有资源归到一个逻辑分组"],
+        ["资源组", "rg-travelmap", "第四章", "把本次部署的所有资源归到一个逻辑分组"],
         ["资源", "Container Apps 环境 / 3 个容器应用 / PostgreSQL", "第五章", "实际运行的服务"],
         ["GitHub", "仓库 Secrets + ci.yml workflow", "第六章", "触发构建、推送镜像、执行部署"],
     ],
-    col_widths=[1900, 3200, 1200, 2700],
+    col_widths=[2100, 3600, 1300, 3000],
 ))
 
 # ---------------- 第二章
-BODY.append(heading("第二章 租户（Tenant / Microsoft Entra ID）", 1, anchor="ch2"))
+BODY.append(heading("第二章 租户（Tenant / Microsoft Entra ID）", 1))
 BODY.append(heading("2.1 租户是什么", 2))
 BODY.append(para("Azure 租户（Tenant）就是你的 Microsoft Entra ID（旧称 Azure AD）目录，是所有身份与权限的顶层容器。本项目的核心诉求是：让 GitHub Actions 在无密码（OIDC）情况下登录 Azure 执行部署，这件事就是由租户里的三个对象协同完成的："))
 BODY.append(bullet(run("App Registration（应用注册）：在租户里登记一个应用身份，作为 GitHub Actions 的\"登录账号\"。", bold=True)))
@@ -214,9 +165,9 @@ BODY.append(table(
     [
         ["App Registration", "GitHub Actions 用它的 Application (client) ID 请求登录令牌", "Client ID = 仓库 secret 中 AZUREAPPSERVICE_CLIENTID_... 的值（形如 07921b08-...）"],
         ["Federated Credential", "Azure 只接受它\"声明信任\"的 GitHub 来源；声明不对就登录失败", "subject 必须精确匹配：repo:walt-xie-hub@317605909/TravelHistoryMap:ref:refs/heads/main"],
-        ["服务主体授权", "登录成功后要能操作资源，否则报\"没有权限查看订阅\"", "给服务主体分配 Contributor 角色（见 3.3）"],
+        ["服务主体授权", "登录成功后要能操作资源，否则报\"没有权限查看订阅\"", "给服务主体分配 Contributor 角色（见 3.4）"],
     ],
-    col_widths=[1900, 3800, 3300],
+    col_widths=[2100, 4200, 3700],
 ))
 
 BODY.append(heading("2.3 怎么配置", 2))
@@ -249,12 +200,12 @@ BODY.append(table(
         ["Login to Azure 失败，错误提到 token 里的仓库路径是 walt-xie-hub/TravelHistoryMap，但 Azure 侧只信任旧仓库", "仓库从个人迁移到组织后，Federated Credential 的 subject 还停留在旧仓库", "把 subject 更新为 repo:walt-xie-hub@317605909/TravelHistoryMap:ref:refs/heads/main"],
         ["OIDC 报 subject 不匹配，提示 refs/heads/master", "Azure 里配的分支是 master，而仓库默认分支是 main", "把 Branch/主题标识符改为 main"],
     ],
-    col_widths=[3100, 3000, 2900],
+    col_widths=[3400, 3300, 3300],
 ))
 BODY.append(para(run("注意：一个应用可配多条 Federated Credential；若未来支持 workflow_dispatch 或 PR 部署，可再加 subject：repo:walt-xie-hub/TravelHistoryMap:pull_request。", italic=True), spacing_after=200))
 
 # ---------------- 第三章
-BODY.append(heading("第三章 订阅（Subscription）", 1, anchor="ch3"))
+BODY.append(heading("第三章 订阅（Subscription）", 1))
 BODY.append(heading("3.1 订阅是什么", 2))
 BODY.append(para("订阅是资源的计费与权限边界容器。资源组和资源都必须挂在某个订阅下。本项目有两个\"订阅级\"动作必须完成，否则 CI 部署必然失败。"))
 
@@ -268,7 +219,7 @@ BODY.append(table(
         ["Microsoft.OperationalInsights", "Log Analytics 工作区（应用日志收集）", "建议注册，创建环境时可能自动关联日志工作区"],
         ["Microsoft.Insights", "监控指标与告警（Metrics / Alerts）", "建议注册，看 CPU/内存/请求数指标需要"],
     ],
-    col_widths=[2500, 3800, 2700],
+    col_widths=[2800, 4200, 3000],
 ))
 BODY.append(para(run("怎么配（CLI，Cloud Shell）：", bold=True), spacing_after=60))
 BODY.append(code_block([
@@ -281,7 +232,7 @@ BODY.append(heading("3.3 动作二：给服务主体分配角色（权限）", 2
 BODY.append(para(run("为什么配：", bold=True) + "OIDC 登录成功只代表\"身份验证通过\"，不代表\"有权限操作\"。服务主体默认看不到任何订阅/资源，必须显式授权，否则 deploy 阶段报 AuthorizationFailed / 没有权限查看订阅。"))
 BODY.append(para(run("授权范围选择：", bold=True)))
 BODY.append(bullet(run("订阅级别（/subscriptions/<id>）：最简单，任何资源都能操作，权限偏大。", bold=True)))
-BODY.append(bullet(run("资源组级别（/subscriptions/<id>/resourceGroups/travelMap）：最小权限，推荐，但前提是 travelMap 已创建。", bold=True)))
+BODY.append(bullet(run("资源组级别（/subscriptions/<id>/resourceGroups/rg-travelmap）：最小权限，推荐，但前提是 rg-travelmap 已创建。", bold=True)))
 BODY.append(para(run("怎么配（CLI，Cloud Shell，PowerShell 语法）：", bold=True), spacing_after=60))
 BODY.append(code_block([
     '# 订阅级（最稳）',
@@ -291,7 +242,7 @@ BODY.append(code_block([
     '',
     '# 资源组级（最小权限，更安全）',
     'az role assignment create --assignee $CLIENT_ID --role Contributor `',
-    '  --scope "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/travelMap"',
+    '  --scope "/subscriptions/$SUBSCRIPTION_ID/resourceGroups/rg-travelmap"',
 ]))
 BODY.append(para(run("怎么配（门户）：", bold=True) + "订阅 → 访问控制 (IAM) → + 添加 → 添加角色分配 → 角色页签选 Contributor（参与者）→ 成员页签搜索应用注册名称或 Client ID → 查看 + 分配。", spacing_after=100))
 BODY.append(para(run("验证：", bold=True) + "az role assignment list --assignee \"$CLIENT_ID\" --all -o table，看到一行 Contributor 即成功。", spacing_after=200))
@@ -304,58 +255,58 @@ BODY.append(table(
         ["门户\"添加角色分配\"搜索\"参与者\"结果为空/全是细分角色", "门户角色向导的搜索+类别过滤组合有 bug", "清空过滤、搜英文 Contributor；或直接用 CLI 一条命令解决"],
         ["角色浏览页明明能看到\"参与者（常规）\"", "门户向导过滤异常（非角色不存在）", "Contributor 是 Azure 四大基础内置角色之一，不可能被移除，改走 CLI"],
     ],
-    col_widths=[3100, 3000, 2900],
+    col_widths=[3400, 3300, 3300],
 ))
 
 # ---------------- 第四章
-BODY.append(heading("第四章 资源组（Resource Group）", 1, anchor="ch4"))
+BODY.append(heading("第四章 资源组（Resource Group）", 1))
 BODY.append(heading("4.1 资源组是什么", 2))
-BODY.append(para("资源组是资源的逻辑容器，用于统一管理生命周期、权限与成本归属。本项目所有 Azure 资源统一放在 travelMap 下，便于一键排查和按组授权（最小权限授权通常就落在资源组上）。"))
+BODY.append(para("资源组是资源的逻辑容器，用于统一管理生命周期、权限与成本归属。本项目所有 Azure 资源统一放在 rg-travelmap 下，便于一键排查和按组授权（最小权限授权通常就落在资源组上）。"))
 
 BODY.append(heading("4.2 配置什么、为什么、怎么配", 2))
 BODY.append(table(
     ["项", "说明"],
     [
-        ["名称", "travelMap（注意大小写：Azure 门户中实际显示为 travelMap，与 ci.yml 中 RESOURCE_GROUP=travelMap 一致）"],
-        ["区域", "westus2（美国西部 2，West US 2），必须与 ci.yml 中 CAE_REGION=westus2 一致"],
+        ["名称", "rg-travelmap"],
+        ["区域", "eastasia（东亚），必须与 ci.yml 中 CAE_REGION=eastasia 一致"],
         ["为什么", "deploy action 的 scope、脚本的资源定位都基于它；区域与镜像/环境所在区域保持一致可避免跨区域访问"],
-        ["怎么配", 'az group create --name travelMap --location westus2'],
+        ["怎么配", 'az group create --name rg-travelmap --location eastasia'],
     ],
-    col_widths=[1500, 7500],
+    col_widths=[1600, 8400],
 ))
-BODY.append(para(run("坑：", bold=True) + "① 如果选择资源组级授权（3.3 最小权限方案），必须先创建资源组再授权，否则 scope 不存在会报错。② 若 CI 报 ResourceGroupNotFound，说明该资源组尚未创建，而 deploy action 只更新已存在的资源、不会自动创建资源组，必须先行创建（见附录 A）。", spacing_after=200))
+BODY.append(para(run("坑：", bold=True) + "如果选择资源组级授权（3.3 最小权限方案），必须先创建资源组再授权，否则 scope 不存在会报错。", spacing_after=200))
 
 # ---------------- 第五章
-BODY.append(heading("第五章 资源（Resources）", 1, anchor="ch5"))
+BODY.append(heading("第五章 资源（Resources）", 1))
 BODY.append(heading("5.1 资源清单总览", 2))
 BODY.append(table(
     ["资源", "名称", "类型/规格", "入口类型"],
     [
-        ["容器应用环境", "cae-travelmap", "Azure Container Apps 环境（区域 westus2）", "—"],
+        ["容器应用环境", "cae-travelmap", "Azure Container Apps 环境（区域 eastasia）", "—"],
         ["容器应用·后端", "user-service", "ghcr.io/walt-xie-hub/travelmap-user-service:latest，:8080", "internal"],
         ["容器应用·前端", "client", "ghcr.io/walt-xie-hub/travelmap-client:latest，:80", "internal"],
         ["容器应用·网关", "gateway", "ghcr.io/walt-xie-hub/travelmap-gateway:latest，:80", "external（唯一公网入口）"],
         ["数据库", "pg-travelmap", "PostgreSQL Flexible Server，Standard_B1ms（免费层）", "public access Enabled"],
     ],
-    col_widths=[1600, 2100, 3200, 2100],
+    col_widths=[1800, 2300, 3600, 2300],
 ))
 
 BODY.append(heading("5.2 容器应用环境 cae-travelmap", 2))
 BODY.append(para(run("是什么：", bold=True) + "Container Apps 环境是容器应用共享的运行时与网络边界（类似 Kubernetes 集群）。环境名必须与 ci.yml 的 CAE_NAME=cae-travelmap 一致。"))
 BODY.append(para(run("为什么配：", bold=True) + "所有容器应用都要在同一个环境内才能用内部域名互相访问；环境也是 min-replicas 0 缩容策略与免费额度的归属单位。", spacing_after=100))
 BODY.append(code_block([
-    'az containerapp env create --name cae-travelmap -g travelMap --location westus2',
+    'az containerapp env create --name cae-travelmap -g rg-travelmap --location eastasia',
 ]))
 
 BODY.append(heading("5.3 三个容器应用详解", 2))
 BODY.append(para(run("设计原则：只有 gateway 对外（external），user-service 与 client 对内（internal）。", bold=True, color="C00000")))
 BODY.append(bullet(run("为什么：", bold=True) + "用户只应通过网关访问；后端和前端不直接暴露公网，减少攻击面、省公网 IP。"))
-BODY.append(bullet(run("内部域名格式：", bold=True) + "<应用名>.internal.<环境名>.<区域>.azurecontainerapps.io，例如 user-service.internal.cae-travelmap.westus2.azurecontainerapps.io"))
+BODY.append(bullet(run("内部域名格式：", bold=True) + "<应用名>.internal.<环境名>.<区域>.azurecontainerapps.io，例如 user-service.internal.cae-travelmap.eastasia.azurecontainerapps.io"))
 
 BODY.append(para(run("① user-service（后端，internal，:8080）", bold=True), spacing_after=60))
 BODY.append(code_block([
     'az containerapp create \\',
-    '  --name user-service -g travelMap --environment cae-travelmap \\',
+    '  --name user-service -g rg-travelmap --environment cae-travelmap \\',
     '  --image ghcr.io/walt-xie-hub/travelmap-user-service:latest \\',
     '  --target-port 8080 --ingress internal --min-replicas 0 --max-replicas 3 \\',
     '  --secrets db-password="<你的PG密码>" \\',
@@ -369,7 +320,7 @@ BODY.append(bullet(run("min-replicas 0：", bold=True) + "空闲缩容到零，�
 BODY.append(para(run("② client（前端，internal，:80）", bold=True), spacing_after=60))
 BODY.append(code_block([
     'az containerapp create \\',
-    '  --name client -g travelMap --environment cae-travelmap \\',
+    '  --name client -g rg-travelmap --environment cae-travelmap \\',
     '  --image ghcr.io/walt-xie-hub/travelmap-client:latest \\',
     '  --target-port 80 --ingress internal --min-replicas 0 --max-replicas 3',
 ]))
@@ -377,85 +328,29 @@ BODY.append(code_block([
 BODY.append(para(run("③ gateway（网关，external，:80，唯一入口）", bold=True), spacing_after=60))
 BODY.append(code_block([
     'az containerapp create \\',
-    '  --name gateway -g travelMap --environment cae-travelmap \\',
+    '  --name gateway -g rg-travelmap --environment cae-travelmap \\',
     '  --image ghcr.io/walt-xie-hub/travelmap-gateway:latest \\',
     '  --target-port 80 --ingress external --min-replicas 0 --max-replicas 3 \\',
     '  --env-vars \\',
-    '    "USER_SERVICE_URL=http://user-service.internal.cae-travelmap.westus2.azurecontainerapps.io" \\',
-    '    "CLIENT_URL=http://client.internal.cae-travelmap.westus2.azurecontainerapps.io"',
+    '    "USER_SERVICE_URL=http://user-service.internal.cae-travelmap.eastasia.azurecontainerapps.io" \\',
+    '    "CLIENT_URL=http://client.internal.cae-travelmap.eastasia.azurecontainerapps.io"',
 ]))
 BODY.append(bullet(run("环境变量的作用：", bold=True) + "gateway 的 nginx 模板用它们生成 /api/* 到后端、/* 到前端的反向代理地址。地址写错会导致页面 502。"))
-BODY.append(bullet(run("⚠ ci.yml 里 environmentVariables 必须用 KEY=VALUE 格式：", bold=True) + "container-apps-deploy-action@v1 的 environmentVariables 参数不接受 JSON 数组，写成 [{\"name\":\"USER_SERVICE_URL\",...}] 会被解析成无效的 {name:CLIENT_URL,value:...} 导致 deploy 报 Invalid format。正确写法是每行一个 KEY=VALUE："))
-BODY.append(code_block([
-    'environmentVariables: |',
-    '  USER_SERVICE_URL=http://user-service.internal.cae-travelmap.westus2.azurecontainerapps.io',
-    '  CLIENT_URL=http://client.internal.cae-travelmap.westus2.azurecontainerapps.io',
-]))
 
-BODY.append(para(run("获取公网地址：", bold=True) + "az containerapp show -n gateway -g travelMap --query properties.configuration.ingress.fqdn -o tsv，输出 https://gateway.xxx.westus2.azurecontainerapps.io 即网站入口。", spacing_after=200))
+BODY.append(para(run("获取公网地址：", bold=True) + "az containerapp show -n gateway -g rg-travelmap --query properties.configuration.ingress.fqdn -o tsv，输出 https://gateway.xxx.eastasia.azurecontainerapps.io 即网站入口。", spacing_after=200))
 
 BODY.append(heading("5.4 数据库 PostgreSQL（pg-travelmap）", 2))
-BODY.append(para(run("CLI 方式：", bold=True), spacing_after=60))
 BODY.append(code_block([
-    'az postgres flexible-server create -g travelMap \\',
+    'az postgres flexible-server create -g rg-travelmap \\',
     '  --name pg-travelmap --sku-name Standard_B1ms --tier Burstable \\',
     '  --storage-size 32 --public-access Enabled \\',
     '  --admin-user appuser --admin-password "<你的强密码>" --yes',
-    'az postgres flexible-server db create -g travelMap -n pg-travelmap --database-name appdb',
-    'az postgres flexible-server firewall-rule create -g travelMap -n pg-travelmap \\',
-    '  --rule-name allow-azure --start-ip-address 0.0.0.0 --end-ip-address 255.255.255.255',
 ]))
 BODY.append(bullet(run("为什么 B1ms：", bold=True) + "Burstable 突发性能机型，12 个月内免费；到期转付费，需设提醒。"))
 BODY.append(bullet(run("连接串：", bold=True) + "Host=pg-travelmap.postgres.database.azure.com;Port=5432;Database=appdb;Username=appuser;Password=...(通过 secret 注入)。"))
-BODY.append(para(run("门户（界面）方式：", bold=True), spacing_after=60))
-BODY.append(bullet("① portal.azure.com → 搜索 \"Azure Database for PostgreSQL flexible server\" → Create"))
-BODY.append(bullet("② 基础：资源组选 travelMap，服务器名 pg-travelmap，区域选 West US 2（与容器应用同区域），PostgreSQL 版本 16，工作负载 Development"))
-BODY.append(bullet("③ 计算 + 存储：Configure server → Burstable → Standard_B1ms，存储 32 GB，确认显示 \"This tier is free for 12 months\" → Save"))
-BODY.append(bullet("④ 管理员：用户名 appuser，设置并记住密码"))
-BODY.append(bullet("⑤ 网络：Public access 选 Allow public access，并勾选 \"Allow public access from any Azure service within Azure to this server\"（让 Container Apps 能连）"))
-BODY.append(bullet("⑥ Review + create → Create，部署约 3-5 分钟"))
-BODY.append(bullet("⑦ 进服务器详情页 → Databases → Add，创建 appdb"))
-BODY.append(bullet("⑧ 最后在 user-service 的容器配置里把连接串密码改成实际密码（界面创建时密码只有你自己知道）"))
-
-BODY.append(heading("5.5 镜像仓库访问权限（GHCR 私有镜像）——本项目新踩的坑", 2))
-BODY.append(para(run("现象：", bold=True) + "deploy 阶段在\"Create the Container App from provided arguments\"报错：UNAUTHORIZED: authentication required（或 pull access denied）。"))
-BODY.append(para(run("根因：", bold=True) + "CI 把镜像推送到 ghcr.io/walt-xie-hub/travelmap-*（组织命名空间）。GitHub 组织的 GHCR 包默认是私有的（Private），Azure Container Apps 拉取镜像时没有凭据，因此被拒绝。"))
-BODY.append(table(
-    ["方案", "做法", "适用场景"],
-    [
-        ["A. 包设为 Public", "组织管理员允许公开包 → 每个包设置改 Public", "最简单，个人/小团队首选"],
-        ["B. registry 凭据（PAT）", "生成 GitHub PAT，作为 registry 用户名/密码传给 Azure", "不想公开包，能接受维护 PAT"],
-        ["C. 迁移 ACR", "镜像改推 Azure Container Registry", "长期方案，彻底免 GHCR 鉴权"],
-    ],
-    col_widths=[1500, 4400, 3100],
-))
-BODY.append(para(run("方案 A 详细步骤：", bold=True) + "先让组织管理员在 https://github.com/organizations/walt-xie-hub/settings/packages → Package creation 勾选 Public package creation；再进入每个包的 Package settings（Danger Zone）→ Change visibility → Public。三个包 travelmap-user-service / travelmap-client / travelmap-gateway 都要改。本项目组织当前禁用了 Public（选项灰色），需先开放组织策略。", spacing_after=120))
-BODY.append(para(run("方案 B 详细步骤（本项目已落地，提交 c6efb5a）：", bold=True), spacing_after=60))
-BODY.append(bullet("① 生成 PAT：GitHub → Settings → Developer settings → Personal access tokens → Generate new token (classic)，勾选 read:packages（包关联仓库时另勾 repo）"))
-BODY.append(bullet("② 仓库添加 secrets：GHCR_USERNAME（GitHub 用户名）、GHCR_PASSWORD（PAT）"))
-BODY.append(bullet("③ deploy-azure.sh 创建应用时加 registry 参数（三个应用都加，脚本已内置、设置 GHCR_USERNAME/GHCR_PASSWORD 环境变量后自动生效）："), )
-BODY.append(code_block([
-    'az containerapp create ... \\',
-    '  --registry-server ghcr.io \\',
-    '  --registry-username "$GHCR_USERNAME" \\',
-    '  --registry-password "$GHCR_PASSWORD"',
-]))
-BODY.append(bullet("④ ci.yml 的 container-apps-deploy-action 加参数（三个 deploy 步骤都已加）："))
-BODY.append(code_block([
-    '- name: Deploy user-service',
-    '  uses: azure/container-apps-deploy-action@v1',
-    '  with:',
-    '    containerAppName: user-service',
-    '    resourceGroup: ${{ env.RESOURCE_GROUP }}',
-    '    imageToDeploy: ${{ env.SERVER_IMAGE }}:${{ needs.docker-build.outputs.tag }}',
-    '    registryUrl: ghcr.io',
-    '    registryUsername: ${{ secrets.GHCR_USERNAME }}',
-    '    registryPassword: ${{ secrets.GHCR_PASSWORD }}',
-]))
-BODY.append(bullet(run("注意：", bold=True) + "container-apps-deploy-action 更新已有应用时会按新凭据重新拉镜像；若之前 Azure 上还没建出应用，需先跑 deploy-azure.sh 初始化（脚本同样需要 GHCR_USERNAME/GHCR_PASSWORD）。"))
 
 # ---------------- 第六章
-BODY.append(heading("第六章 GitHub 侧配套配置", 1, anchor="ch6"))
+BODY.append(heading("第六章 GitHub 侧配套配置", 1))
 BODY.append(heading("6.1 仓库 Secrets（OIDC 三件套）", 2))
 BODY.append(para("这三个 secret 由 Azure 部署向导自动生成，存放在仓库 Settings → Secrets and variables → Actions，供 ci.yml 的 azure/login 使用："))
 BODY.append(code_block([
@@ -471,17 +366,13 @@ BODY.append(heading("6.2 ci.yml 关键设计点", 2))
 BODY.append(table(
     ["配置项", "作用"],
     [
-        ["env.RESOURCE_GROUP = travelMap", "统一资源组名，避免 deploy 步骤硬编码漏改"],
-        ["env.CAE_NAME = cae-travelmap / env.CAE_REGION = westus2", "环境名与区域必须与 Azure 侧一致，内部域名依赖它们"],
         ["镜像命名空间：ghcr.io/${{ github.repository_owner }}/travelmap-*", "镜像跟随仓库 owner。仓库在组织 walt-xie-hub 下时自动推送到 ghcr.io/walt-xie-hub/*，迁移仓库后不用改代码"],
         ["包可见性接口：orgs/<owner>/packages/container/<img>", "组织仓库的 GHCR 包属于 org 命名空间，必须调用 orgs 接口（user/packages 只能改个人包）；并显式传 GH_TOKEN"],
         ["deploy job 条件：github.event_name != 'pull_request'", "PR 只构建测试不部署"],
         ["permissions: id-token: write", "OIDC 登录 Azure 需要请求短期 JWT"],
-        ["container-apps-deploy-action × 3", "只更新已存在应用的镜像，不负责创建（资源必须预先建好，见第五章；资源不存在报 Container App not found / ResourceGroupNotFound）"],
-        ["environmentVariables 用 KEY=VALUE 多行格式", "action 不接受 JSON 数组，写成 JSON 会报 Invalid format {name:CLIENT_URL,value:...}，见 5.3"],
-        ["deploy 步骤带 registryUrl/registryUsername/registryPassword", "GHCR 镜像为私有，必须传凭据，否则拉镜像报 UNAUTHORIZED，见 5.5"],
+        ["container-apps-deploy-action × 3", "只更新已存在应用的镜像，不负责创建（资源必须预先建好，见第五章）"],
     ],
-    col_widths=[4500, 4500],
+    col_widths=[5000, 5000],
 ))
 
 BODY.append(heading("6.3 常见 GitHub 侧问题", 2))
@@ -491,14 +382,13 @@ BODY.append(table(
         ["buildx 报 502 Bad Gateway", "GitHub Actions 基础设施偶发网络抖动", "点 Re-run failed jobs 重跑即可，通常一次就过"],
         ["推镜像报权限错误（无法 push 到 ghcr.io/waltxie1986/...）", "仓库迁到组织后镜像命名空间还是个人", "ci.yml 改用 ${{ github.repository_owner }}"],
         ["设置包可见性失败", "调用了 user/packages 接口，组织包要用 orgs 接口", "改用 orgs/<owner>/packages/container/<img> 并传 GH_TOKEN"],
-        ["包设置里 Public 选项灰色不可选", "组织策略禁用了 public packages", "组织管理员开放 Public package creation，或改用方案 B（PAT 凭据）"],
         ["本地 git push 提示仓库迁移", "git remote 还指向旧地址", 'git remote set-url origin https://github.com/walt-xie-hub/TravelHistoryMap.git'],
     ],
-    col_widths=[2900, 3000, 3100],
+    col_widths=[3200, 3300, 3500],
 ))
 
 # ---------------- 第七章
-BODY.append(heading("第七章 全量问题排查速查表", 1, anchor="ch7"))
+BODY.append(heading("第七章 全量问题排查速查表", 1))
 BODY.append(table(
     ["序号", "报错/现象", "定位层级", "根因", "解决动作"],
     [
@@ -507,22 +397,16 @@ BODY.append(table(
         ["3", "Login 通过但报无订阅/权限不足", "订阅", "服务主体没有 Contributor", "az role assignment create --assignee <CLIENT_ID> --role Contributor --scope ..."],
         ["4", "门户搜不到\"参与者\"", "订阅（门户 UI）", "门户角色向导过滤 bug", "清过滤搜 Contributor 或直接用 CLI"],
         ["5", "deploy 报 not registered for Microsoft.App", "订阅", "资源提供程序未注册", "az provider register -n Microsoft.App --wait（顺手注册 OperationalInsights / Insights）"],
-        ["6", "deploy 报 ResourceGroupNotFound", "资源组", "资源组 travelMap 未创建；deploy 只更新不创建", "az group create --name travelMap --location westus2，再 Re-run"],
-        ["7", "deploy 报 Container App not found", "资源", "Azure 上还没建 3 个容器应用", "运行仓库根目录 deploy-azure.sh 初始化"],
-        ["8", "deploy 报 UNAUTHORIZED: authentication required", "镜像仓库", "GHCR 包是私有，Azure 无凭据拉取", "包设 Public（需组织开放策略）或配置 PAT registry 凭据，见 5.5"],
-        ["9", "推镜像权限错误 / 包可见性失败", "GitHub", "镜像命名空间与包接口未跟随组织", "ci.yml 用 ${{ github.repository_owner }} + orgs/.../packages"],
-        ["10", "buildx 502", "GitHub", "基础设施偶发网络抖动", "Re-run failed jobs"],
-        ["11", "访问网关 502 / 页面白屏", "资源", "gateway 的 USER_SERVICE_URL / CLIENT_URL 内部域名或环境名/区域不对", "核对 cae-travelmap / westus2 与内部域名格式"],
-        ["12", "deploy 报 Invalid format: {name:CLIENT_URL,value:...}", "CI", "environmentVariables 写成了 JSON 数组，action 不认", "改用每行一个 KEY=VALUE 的多行格式，见 5.3"],
-        ["13", "user-service 启动报 Npgsql 连接失败 / 超时", "数据库", "pg-travelmap 未创建、防火墙未放行或密码错误", "确认服务器 Ready、allow-azure 防火墙规则、连接串密码与 secret 一致"],
-        ["14", "页面能打开但登录/注册报数据库错误", "数据库", "数据库 appdb 未创建或连接串 Database 名不对", "在 pg-travelmap 上创建 appdb 并核对连接串"],
-        ["15", "区域不一致：资源在 westus2，ci.yml 写 eastus", "CI/资源", "环境创建时选了别的区域，CAE_REGION 未同步", "统一 CAE_REGION/脚本 REGION 与实际区域一致，否则重建环境后内部域名失效"],
+        ["6", "deploy 报 Container App not found", "资源", "Azure 上还没建 3 个容器应用", "运行仓库根目录 deploy-azure.sh 初始化"],
+        ["7", "推镜像权限错误 / 包可见性失败", "GitHub", "镜像命名空间与包接口未跟随组织", "ci.yml 用 ${{ github.repository_owner }} + orgs/.../packages"],
+        ["8", "buildx 502", "GitHub", "基础设施偶发网络抖动", "Re-run failed jobs"],
+        ["9", "访问网关 502 / 页面白屏", "资源", "gateway 的 USER_SERVICE_URL / CLIENT_URL 内部域名或环境名/区域不对", "核对 cae-travelmap / eastasia 与内部域名格式"],
     ],
-    col_widths=[450, 2600, 900, 2550, 2500],
+    col_widths=[500, 2900, 1000, 2800, 2800],
 ))
 
 # ---------------- 附录
-BODY.append(heading("附录 A 一次性初始化脚本（deploy-azure.sh 等价命令）", 1, anchor="appA"))
+BODY.append(heading("附录 A 一次性初始化脚本（deploy-azure.sh 等价命令）", 1))
 BODY.append(code_block([
     '# 0) 注册资源提供程序（一次）',
     'az provider register --namespace Microsoft.App --wait',
@@ -530,11 +414,11 @@ BODY.append(code_block([
     'az provider register --namespace Microsoft.Insights --wait',
     '',
     '# 1) 资源组 + 环境',
-    'az group create --name travelMap --location westus2',
-    'az containerapp env create --name cae-travelmap -g travelMap --location westus2',
+    'az group create --name rg-travelmap --location eastasia',
+    'az containerapp env create --name cae-travelmap -g rg-travelmap --location eastasia',
     '',
     '# 2) PostgreSQL 免费层',
-    'az postgres flexible-server create -g travelMap --name pg-travelmap \\',
+    'az postgres flexible-server create -g rg-travelmap --name pg-travelmap \\',
     '  --sku-name Standard_B1ms --tier Burstable --storage-size 32 \\',
     '  --public-access Enabled --admin-user appuser --admin-password "<密码>" --yes',
     '',
@@ -542,31 +426,31 @@ BODY.append(code_block([
     '$CLIENT_ID="<CLIENT_ID>"; $SUBSCRIPTION_ID="<SUBSCRIPTION_ID>"',
     'az role assignment create --assignee $CLIENT_ID --role Contributor --scope "/subscriptions/$SUBSCRIPTION_ID"',
     '',
-    '# 4) 三个容器应用（镜像路径：ghcr.io/walt-xie-hub/*）——见 5.3；私有镜像需加 registry 凭据，见 5.5',
+    '# 4) 三个容器应用（镜像路径：ghcr.io/walt-xie-hub/*）——见 5.3',
     '# 5) 触发 CI：push main 或手动 Run workflow',
 ]))
 
-BODY.append(heading("附录 B 常用验证命令", 1, anchor="appB"))
+BODY.append(heading("附录 B 常用验证命令", 1))
 BODY.append(code_block([
     'az provider show --namespace Microsoft.App --query registrationState -o tsv   # 应为 Registered',
     'az role assignment list --assignee "$CLIENT_ID" --all -o table                # 应有 Contributor 一行',
-    'az containerapp show -n gateway -g travelMap --query properties.configuration.ingress.fqdn -o tsv  # 公网入口',
-    'az containerapp list -g travelMap -o table                                    # 3 个应用是否就绪',
+    'az containerapp show -n gateway -g rg-travelmap --query properties.configuration.ingress.fqdn -o tsv  # 公网入口',
+    'az containerapp list -g rg-travelmap -o table                                 # 3 个应用是否就绪',
 ]))
 
-BODY.append(heading("附录 C 关键命名对照表", 1, anchor="appC"))
+BODY.append(heading("附录 C 关键命名对照表", 1))
 BODY.append(table(
     ["用途", "命名", "对应位置"],
     [
-        ["资源组", "travelMap", "Azure / ci.yml RESOURCE_GROUP / deploy-azure.sh"],
+        ["资源组", "rg-travelmap", "Azure / ci.yml / deploy-azure.sh"],
         ["容器应用环境", "cae-travelmap", "Azure / ci.yml CAE_NAME"],
-        ["区域", "westus2", "ci.yml CAE_REGION / 资源创建命令"],
+        ["区域", "eastasia", "ci.yml CAE_REGION / 资源创建命令"],
         ["镜像前缀", "ghcr.io/walt-xie-hub/", "ci.yml / deploy-azure.sh"],
         ["数据库", "pg-travelmap", "连接串 Host"],
         ["OIDC 三个 secret", "AZUREAPPSERVICE_*", "GitHub 仓库 Secrets"],
         ["Federated subject", "repo:walt-xie-hub@317605909/TravelHistoryMap:ref:refs/heads/main", "Microsoft Entra ID"],
     ],
-    col_widths=[1900, 3200, 3900],
+    col_widths=[2100, 3600, 4300],
 ))
 
 BODY.append(spacer())
@@ -580,35 +464,18 @@ CONTENT_TYPES = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Default Extension="xml" ContentType="application/xml"/>
 <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
 <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
-<Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/>
 </Types>'''
 
 RELS = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
 <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
 <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="word/styles.xml"/>
-<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="word/numbering.xml"/>
 </Relationships>'''
 
 DOC_RELS = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
 <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
-<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>
 </Relationships>'''
-
-NUMBERING = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-<w:abstractNum w:abstractNumId="0">
-<w:multiLevelType w:val="hybridMultilevel"/>
-<w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="bullet"/><w:lvlText w:val="•"/><w:lvlJc w:val="left"/>
-<w:pPr><w:ind w:left="480" w:hanging="240"/></w:pPr>
-<w:rPr><w:rFonts w:ascii="Symbol" w:hAnsi="Symbol" w:hint="default"/></w:rPr></w:lvl>
-<w:lvl w:ilvl="1"><w:start w:val="1"/><w:numFmt w:val="bullet"/><w:lvlText w:val="◦"/><w:lvlJc w:val="left"/>
-<w:pPr><w:ind w:left="900" w:hanging="240"/></w:pPr>
-<w:rPr><w:rFonts w:ascii="Courier New" w:hAnsi="Courier New" w:hint="default"/></w:rPr></w:lvl>
-</w:abstractNum>
-<w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num>
-</w:numbering>'''
 
 STYLES = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
@@ -627,13 +494,13 @@ STYLES = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:pPr><w:keepNext/><w:spacing w:before="200" w:after="120"/><w:outlineLvl w:val="2"/></w:pPr>
 <w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:eastAsia="微软雅黑"/><w:b/><w:color w:val="2E74B5"/><w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr></w:style>
 <w:style w:type="paragraph" w:styleId="CodeBlock"><w:name w:val="CodeBlock"/>
-<w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/><w:ind w:left="200" w:right="200"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F2"/></w:pPr>
+<w:pPr><w:spacing w:after="0"/><w:ind w:left="200"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F2"/></w:pPr>
 <w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas" w:eastAsia="微软雅黑"/><w:sz w:val="19"/><w:szCs w:val="19"/></w:rPr></w:style>
 <w:style w:type="paragraph" w:styleId="ListBullet"><w:name w:val="ListBullet"/>
-<w:pPr><w:spacing w:after="60"/></w:pPr>
+<w:pPr><w:spacing w:after="60"/><w:ind w:left="480" w:hanging="240"/></w:pPr>
 <w:rPr><w:rFonts w:eastAsia="微软雅黑"/></w:rPr></w:style>
 <w:style w:type="paragraph" w:styleId="ListBullet2"><w:name w:val="ListBullet2"/>
-<w:pPr><w:spacing w:after="60"/></w:pPr>
+<w:pPr><w:spacing w:after="60"/><w:ind w:left="900" w:hanging="240"/></w:pPr>
 <w:rPr><w:rFonts w:eastAsia="微软雅黑"/></w:rPr></w:style>
 <w:style w:type="table" w:styleId="TableGrid"><w:name w:val="TableGrid"/>
 <w:tblPr><w:tblBorders>
@@ -661,7 +528,6 @@ def main():
         z.writestr("_rels/.rels", RELS)
         z.writestr("word/document.xml", DOCUMENT)
         z.writestr("word/styles.xml", STYLES)
-        z.writestr("word/numbering.xml", NUMBERING)
         z.writestr("word/_rels/document.xml.rels", DOC_RELS)
     print("OK -> %s" % out_path)
 
