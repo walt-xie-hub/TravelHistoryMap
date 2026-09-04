@@ -53,6 +53,10 @@ services:
       - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=appdb;Username=appuser;Password=123456;Pooling=true;
       # 与 k8s secret 的 Db__Password 对齐（这里直接明文，仅 dev 用）
       - Db__Password=123456
+      # JWT（ADR-0005）：travel-server 用同一组值做验证；生产由 k8s secret 注入
+      - Jwt__Key=travel-map-dev-jwt-signing-key-0123456789abcdef
+      - Jwt__Issuer=travel-map
+      - Jwt__Audience=travel-map-client
       # OpenTelemetry OTLP 导出目标：Collector → Jaeger
       # 使用 gRPC 协议 (:4317)，先经过 Collector 做批量/过滤/路由处理
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
@@ -95,6 +99,10 @@ services:
       # 连接本服务的 db（与 k8s 共享同一份数据目录）。
       - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=appdb;Username=appuser;Password=123456;Pooling=true;
       - Db__Password=123456
+      # JWT（ADR-0005）：与 user-service 共享签名密钥，仅做验证不签发
+      - Jwt__Key=travel-map-dev-jwt-signing-key-0123456789abcdef
+      - Jwt__Issuer=travel-map
+      - Jwt__Audience=travel-map-client
       # OpenTelemetry OTLP 导出目标：Collector → Jaeger
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
       - OTEL_SERVICE_NAME=travel-service

@@ -19,7 +19,7 @@ public class AppUser
     /// <summary>手机号（可选）</summary>
     public string? PhoneNumber { get; set; }
 
-    /// <summary>密码哈希（可选，预留鉴权字段）</summary>
+    /// <summary>密码哈希（PBKDF2，ADR-0005；无值表示无凭据、不可登录）</summary>
     public string? PasswordHash { get; set; }
 
     /// <summary>头像 URL（可选）</summary>

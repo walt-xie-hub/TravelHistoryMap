@@ -1,27 +1,24 @@
-using User.Domain.Common;
 using User.Domain.Entities;
 
 namespace User.Domain.Abstractions;
 
 /// <summary>
-/// 用户仓储接口。定义在领域层，由基础设施层实现（依赖倒置）。
+/// 用户仓储抽象（领域层定义）。公开 users CRUD 下线后，仅保留认证与 me 资源所需的读取/写入。
 /// </summary>
 public interface IUserRepository
 {
-    Task<IEnumerable<AppUser>> GetAllAsync(CancellationToken cancellationToken = default);
+    /// <summary>按 id 读取（跟踪外）。</summary>
+    Task<AppUser?> GetByIdAsync(int id, CancellationToken ct = default);
 
-    /// <summary>
-    /// 分页查询用户。page 从 1 开始；返回本页数据、总条数与总页数。
-    /// </summary>
-    Task<PagedResult<AppUser>> GetPagedAsync(int page, int pageSize, CancellationToken cancellationToken = default);
+    /// <summary>按规范化邮箱读取（跟踪外）。</summary>
+    Task<AppUser?> GetByEmailAsync(string email, CancellationToken ct = default);
 
-    Task<AppUser?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
+    /// <summary>判断除指定用户外邮箱是否已被占用（改资料时冲突预检）。</summary>
+    Task<bool> AnyByEmailAsync(string email, int excludeUserId, CancellationToken ct = default);
 
-    Task<AppUser> AddAsync(AppUser user, CancellationToken cancellationToken = default);
+    /// <summary>新增用户。</summary>
+    Task<AppUser> AddAsync(AppUser user, CancellationToken ct = default);
 
-    /// <summary>更新已有用户（EF 会基于 RowVersion/xmin 做乐观锁校验）。</summary>
-    Task<AppUser?> UpdateAsync(AppUser user, CancellationToken cancellationToken = default);
-
-    /// <summary>按主键删除用户；不存在时返回 false。</summary>
-    Task<bool> DeleteAsync(int id, CancellationToken cancellationToken = default);
+    /// <summary>保存字段修改；用户不存在返回 null。</summary>
+    Task<AppUser?> UpdateAsync(AppUser user, CancellationToken ct = default);
 }

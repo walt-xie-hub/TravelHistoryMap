@@ -19,6 +19,6 @@ interface FeatureCard {
 export class HomePage {
   protected readonly cards: FeatureCard[] = [
     { icon: '🗺️', title: '地图', desc: '在地图上探索与标记你的旅行足迹。', link: '/map' },
-    { icon: '👤', title: '用户', desc: '管理旅行者账号与资料。', link: '/users' },
+    { icon: '👤', title: '我的资料', desc: '修改个人资料与登录密码。', link: '/profile' },
   ];
 }

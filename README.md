@@ -11,6 +11,18 @@ docker compose -f docker-compose.dev.yml up -d
 
 ---
 
+## 账号与登录
+
+应用**只有登录用户才能进入主界面**：`/login`、`/register` 为公开页，其余路由由 `authGuard` 保护，业务请求自动携带 JWT（见 `docs/adr/0005`）。
+
+- **注册**：注册是创建账号的唯一途径，注册成功即自动登录。
+- **开发种子账号**（`user-service` 以 Development 启动时幂等创建）：
+  - 邮箱：`demo@travel.local`
+  - 密码：`Demo@123456`
+- 登录后右上角显示用户名与头像（头像可填图片 URL，留空则显示姓名首字母），点击后出现菜单，可进入「我的资料」（`/profile`，修改姓名/邮箱/电话/头像与登录密码）或「登出」。
+
+---
+
 ## 前端地图（AMap JS API）密钥
 
 地图页（`/map`，Angular 前端 `src/frontend/client`）使用高德地图 JS API 2.0 渲染用户的旅行足迹（决策见 `docs/adr/0003`、`docs/adr/0004`）。高德 SDK 需要浏览器端密钥才能加载：

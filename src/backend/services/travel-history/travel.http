@@ -1,34 +1,37 @@
-@TravelApi_HostAddress = http://localhost:5287
+@TravelApi_HostAddress = http://localhost:8081
 
 ### 健康检查
 GET {{TravelApi_HostAddress}}/health
 
 ###
 
-### 按用户分页列出旅行记录（时间窗可选）
-GET {{TravelApi_HostAddress}}/api/travels?userId=1&page=1&pageSize=10
+### 我的足迹分页（ADR-0005：不再传 userId，归属来自 token；先登录 user-service 获取 token 填入 {{accessToken}}）
+GET {{TravelApi_HostAddress}}/api/travels?page=1&pageSize=10
 Accept: application/json
+Authorization: Bearer {{accessToken}}
 
 ###
 
-### 按用户 + 到达时间窗过滤（UTC ISO 8601）
-GET {{TravelApi_HostAddress}}/api/travels?userId=1&from=2026-05-01T00:00:00Z&to=2026-06-01T00:00:00Z&page=1&pageSize=10
+### 我的足迹 + 到达时间窗过滤（UTC ISO 8601）
+GET {{TravelApi_HostAddress}}/api/travels?from=2026-05-01T00:00:00Z&to=2026-06-01T00:00:00Z&page=1&pageSize=10
 Accept: application/json
+Authorization: Bearer {{accessToken}}
 
 ###
 
-### 按 id 获取单条旅行记录
+### 按 id 获取单条记录（非本人一律 404）
 GET {{TravelApi_HostAddress}}/api/travels/1
 Accept: application/json
+Authorization: Bearer {{accessToken}}
 
 ###
 
 ### 创建旅行记录（已完成停留：departedAt ≥ arrivedAt）
 POST {{TravelApi_HostAddress}}/api/travels
 Content-Type: application/json
+Authorization: Bearer {{accessToken}}
 
 {
-  "userId": 1,
   "locationName": "Shanghai",
   "latitude": 31.2304,
   "longitude": 121.4737,
@@ -41,9 +44,9 @@ Content-Type: application/json
 ### 创建旅行记录（进行中停留：省略 departedAt）
 POST {{TravelApi_HostAddress}}/api/travels
 Content-Type: application/json
+Authorization: Bearer {{accessToken}}
 
 {
-  "userId": 1,
   "locationName": "Hangzhou",
   "latitude": 30.2741,
   "longitude": 120.1551,
@@ -55,6 +58,7 @@ Content-Type: application/json
 ### 更新旅行记录（补录离开时间）
 PUT {{TravelApi_HostAddress}}/api/travels/2
 Content-Type: application/json
+Authorization: Bearer {{accessToken}}
 
 {
   "locationName": "Hangzhou",
@@ -68,3 +72,4 @@ Content-Type: application/json
 
 ### 删除旅行记录
 DELETE {{TravelApi_HostAddress}}/api/travels/2
+Authorization: Bearer {{accessToken}}

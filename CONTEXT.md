@@ -5,8 +5,12 @@
 ## Language
 
 **User**:
-由 user-service 拥有并管理的用户档案（`users` 表）。其他服务只通过整数 `user_id` 引用它，不复制用户数据。
+由 user-service 拥有并管理的用户档案（`users` 表）。用户持有**凭据**（email + password）用于登录；注册是创建用户的唯一途径（公开的 users CRUD 已下线）。其他服务只通过整数 `user_id` 引用它，不复制用户数据。
 _Avoid_: member, account, owner
+
+**Signed-in user**（登录用户）:
+已通过 user-service 登录流程认证、获准进入主界面的用户。主界面数据（如 Travel records、地图足迹）只呈现给其归属的登录用户自己。
+_Avoid_: guest, anonymous, current account
 
 **Travel record**（旅行记录）:
 一名用户在某地点的一段有明确到达与离开边界的一次停留。一条记录对应地图上的一个点；同一地点多次到访是独立的多条记录。由 travel-history 服务拥有（`TravelRecords` 表）。

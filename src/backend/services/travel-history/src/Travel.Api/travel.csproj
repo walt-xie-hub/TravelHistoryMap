@@ -17,6 +17,8 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.9" />
     <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUi" Version="9.0.4" />
+    <!-- JWT Bearer 验证（ADR-0005），与 user-service 共享密钥配置 -->
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.9" />
   </ItemGroup>
 
 </Project>

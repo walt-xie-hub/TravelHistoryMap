@@ -71,4 +71,27 @@ public static class DatabaseInitializer
                 connection.Close();
         }
     }
+
+    /// <summary>
+    /// 仅 Development 环境调用的演示账号种子（ADR-0005）：幂等创建 demo@travel.local / Demo@123456。
+    /// 演示账号有 PBKDF2 密码哈希，可登录并看到自己的足迹；生产环境不调用。
+    /// </summary>
+    public static async Task SeedDevelopmentUserAsync(this IServiceProvider services, CancellationToken ct = default)
+    {
+        using var scope = services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var hasher = scope.ServiceProvider.GetRequiredService<User.Application.Abstractions.IPasswordHasher>();
+
+        const string email = "demo@travel.local";
+        if (await db.Users.AnyAsync(u => u.Email == email, ct))
+            return;
+
+        db.Users.Add(new Domain.Entities.AppUser
+        {
+            Name = "Demo User",
+            Email = email,
+            PasswordHash = hasher.Hash("Demo@123456"),
+        });
+        await db.SaveChangesAsync(ct);
+    }
 }

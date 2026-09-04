@@ -1,14 +1,10 @@
-<app-page-header title="地图" subtitle="查看每个用户在各停留点的旅行足迹" />
+<app-page-header title="地图" subtitle="我的旅行足迹 · 按到达时间倒序" />
 
 <div class="map-layout">
   <app-map-side-panel
-    [users]="userOptions()"
-    [usersLoading]="usersLoading()"
-    [selectedUserId]="selectedUserId()"
     [records]="records()"
     [travelLoading]="travelLoading()"
     [selectedRecordId]="selectedRecordId()"
-    (userChange)="onUserChange($event)"
     (filterChange)="onFilterChange($event)"
     (recordSelect)="onRecordSelect($event)"
   />
@@ -47,39 +43,23 @@
           </p>
         </div>
       </div>
-    } @else {
-      @if (usersLoading()) {
+    } @else if (mapState() === 'ready') {
+      @if (travelLoading()) {
         <div class="map-overlay map-overlay--ghost">
-          <app-loading-spinner message="加载用户中…" />
+          <app-loading-spinner message="加载足迹中…" />
         </div>
-      } @else if (userOptions().length === 0) {
-        <div class="map-overlay map-overlay--ghost">
-          <app-empty-state
-            icon="👥"
-            title="暂无用户"
-            description="请先在“用户”页创建用户，再回来查看足迹。"
-          />
-        </div>
-      } @else if (selectedUserId() === null) {
-        <div class="map-overlay map-overlay--ghost">
-          <app-empty-state
-            icon="🧭"
-            title="请选择用户"
-            description="从左侧选择用户后，地图将标注其旅行停留记录。"
-          />
-        </div>
-      } @else if (!travelLoading() && travelError()) {
+      } @else if (travelError()) {
         <div class="map-overlay map-overlay--ghost">
           <app-empty-state icon="⚠️" title="加载失败" [description]="travelError() ?? ''">
             <button type="button" class="btn btn-primary" (click)="onRetry()">重试</button>
           </app-empty-state>
         </div>
-      } @else if (!travelLoading() && records().length === 0) {
+      } @else if (records().length === 0) {
         <div class="map-overlay map-overlay--ghost">
           <app-empty-state
             icon="🧳"
             title="暂无停留记录"
-            description="该时间范围内没有记录。可切换时间范围，或通过 travel-history API 录入。"
+            description="当前时间范围内还没有足迹。可切换时间范围，或通过 travel-history API 录入。"
           />
         </div>
       }
