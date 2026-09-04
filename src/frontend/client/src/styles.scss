@@ -2,12 +2,18 @@
 
 :root {
   --primary: #2563eb;
+  --primary-strong: #1d4ed8;
+  --primary-soft: #eff6ff;
   --surface: #ffffff;
   --surface-hover: #f3f4f6;
   --border-color: #e5e7eb;
   --text-strong: #111827;
+  --text: #111827;
   --text-muted: #6b7280;
+  --success: #059669;
+  --success-soft: #ecfdf5;
   --bg: #f9fafb;
+  --shadow-sm: 0 1px 2px rgb(16 24 40 / 0.06);
 }
 
 * {
@@ -29,4 +35,159 @@ body {
     'Segoe UI Symbol';
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* ===== 地图页（AMap）标注与气泡样式 =====
+   这些元素由高德 SDK 动态插入 map 容器 DOM，无法走组件样式封装，
+   因此作为全局命名空间样式（.tm-*）维护。见 docs/adr/0003、0004。 */
+
+.tm-marker {
+  position: relative;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--primary);
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.28);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+
+  &:hover {
+    transform: translate(-50%, -50%) scale(1.12);
+  }
+
+  &--merged {
+    width: auto;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: var(--primary-strong);
+  }
+
+  &--ongoing {
+    background: var(--success);
+  }
+
+  &--merged.tm-marker--ongoing {
+    background: var(--success);
+  }
+}
+
+/* 进行中停留：脉冲光环 */
+.tm-marker--ongoing::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: inherit;
+  border: 2px solid var(--success);
+  opacity: 0.7;
+  animation: tm-pulse 1.6s ease-out infinite;
+  pointer-events: none;
+}
+
+@keyframes tm-pulse {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.8;
+  }
+  70% {
+    transform: scale(1.35);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.35);
+    opacity: 0;
+  }
+}
+
+/* 气泡内容 */
+.tm-info {
+  min-width: 230px;
+  max-width: 300px;
+  font-family: inherit;
+}
+
+.tm-info__title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 2px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.tm-info__sub {
+  margin: 0 0 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.tm-info__list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.tm-info__row {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 7px 9px;
+  border: none;
+  border-radius: 8px;
+  background: var(--surface-hover);
+  font: inherit;
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover {
+    background: var(--primary-soft);
+  }
+
+  &:not(:last-child) {
+    border-bottom: 1px solid var(--border-color);
+  }
+}
+
+.tm-info__row-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-strong);
+}
+
+.tm-info__row-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.tm-info__badge {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--success-soft);
+  color: var(--success);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 16px;
+  flex: none;
+}
+
+/* 高德默认 InfoWindow 箭头在缩放时位置即可；这里统一收窄内容内边距 */
+.amap-info-content {
+  padding: 10px 12px;
 }

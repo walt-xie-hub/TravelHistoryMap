@@ -1,0 +1,128 @@
+<aside class="side-panel">
+  <div class="panel-block">
+    <label class="field-label" for="map-user-select">查看用户</label>
+    @if (usersLoading()) {
+      <app-loading-spinner message="加载用户中…" />
+    } @else {
+      <select
+        id="map-user-select"
+        class="user-select"
+        [value]="selectedUserId() ?? ''"
+        (change)="onUserSelect($event)"
+      >
+        <option value="" disabled>请选择用户</option>
+        @for (user of users(); track user.id) {
+          <option [value]="user.id" [selected]="user.id === selectedUserId()">{{ user.name }}</option>
+        }
+      </select>
+      @if (users().length === 0) {
+        <p class="field-hint">暂无用户，请先在“用户”页创建。</p>
+      }
+    }
+  </div>
+
+  <div class="panel-block">
+    <div class="stats-row">
+      <span class="stat"><strong>{{ total() }}</strong> 次停留</span>
+      @if (ongoingCount() > 0) {
+        <span class="stat stat--ongoing"><strong>{{ ongoingCount() }}</strong> 进行中</span>
+      }
+    </div>
+  </div>
+
+  <div class="panel-block">
+    <div class="chips" role="group" aria-label="时间范围筛选">
+      <button type="button" class="chip" [class.is-active]="isKind('all')" (click)="selectKind('all')">
+        全部
+      </button>
+      <button
+        type="button"
+        class="chip"
+        [class.is-active]="isKind('last30')"
+        (click)="selectKind('last30')"
+      >
+        近30天
+      </button>
+      <button type="button" class="chip" [class.is-active]="isKind('year')" (click)="selectKind('year')">
+        今年
+      </button>
+      <button
+        type="button"
+        class="chip"
+        [class.is-active]="isKind('custom')"
+        (click)="selectKind('custom')"
+      >
+        自定义
+      </button>
+    </div>
+
+    @if (isKind('custom')) {
+      <div class="custom-range">
+        <label>
+          从
+          <input
+            type="date"
+            [value]="customFrom()"
+            (input)="onCustomFrom($any($event.target).value)"
+          />
+        </label>
+        <label>
+          至
+          <input
+            type="date"
+            [value]="customTo()"
+            (input)="onCustomTo($any($event.target).value)"
+          />
+        </label>
+        <div class="custom-actions">
+          <button
+            type="button"
+            class="btn btn-primary"
+            [disabled]="!customComplete()"
+            (click)="applyCustom()"
+          >
+            应用
+          </button>
+          <button type="button" class="btn" (click)="clearCustom()">清除</button>
+        </div>
+      </div>
+    }
+  </div>
+
+  <div class="panel-block panel-block--list">
+    <div class="list-heading">
+      <span>停留记录</span>
+      @if (records().length > 0) {
+        <span class="list-count">{{ total() }}</span>
+      }
+    </div>
+
+    @if (travelLoading()) {
+      <app-loading-spinner message="加载停留记录中…" />
+    } @else if (rows().length === 0) {
+      <p class="field-hint">该时间范围内暂无停留记录。</p>
+    } @else {
+      <div class="record-list" role="list">
+        @for (row of rows(); track row.record.id) {
+          <button
+            type="button"
+            role="listitem"
+            class="record-row"
+            [id]="'tm-record-' + row.record.id"
+            [class.is-active]="row.record.id === selectedRecordId()"
+            (click)="onRecordSelect(row.record.id)"
+          >
+            <span class="record-main">
+              <span class="record-name">{{ row.record.locationName }}</span>
+              @if (!row.record.departedAt) {
+                <span class="badge badge--ongoing">进行中</span>
+              }
+            </span>
+            <span class="record-sub">{{ row.rangeLabel }}</span>
+            <span class="record-sub record-sub--duration">停留 {{ row.durationLabel }}</span>
+          </button>
+        }
+      </div>
+    }
+  </div>
+</aside>

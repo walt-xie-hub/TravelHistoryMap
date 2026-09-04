@@ -77,6 +77,49 @@ services:
     networks:
       - dev-net
 
+  # travel-history WebAPI（热重载）：镜像 user-service 的 server 开发模式。
+  # 与 user-service 共享同一个 appdb（见 src/backend/services/travel-history/src/
+  # Travel.Infrastructure/Persistence/DatabaseInitializer.cs 的共享引导，docs/adr/0002）。
+  travel-server:
+    build:
+      context: ./src/backend
+      dockerfile: services/travel-history/Dockerfile.dev
+    container_name: travel-api-dev
+    ports:
+      # 避开 user-service 的 8080；前端调用走网关时再统一到 80/443（见 nginx.conf.template）
+      - "8081:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8080
+      - DOTNET_USE_POLLING_FILE_WATCHER=true
+      # 连接本服务的 db（与 k8s 共享同一份数据目录）。
+      - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=appdb;Username=appuser;Password=123456;Pooling=true;
+      - Db__Password=123456
+      # OpenTelemetry OTLP 导出目标：Collector → Jaeger
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_SERVICE_NAME=travel-service
+    # 等到 db 健康（Postgres 真正可连接）后才启动，避免启动竞态。
+    # user-service 同时也在引导共享库 schema；travel 侧 DatabaseInitializer 自带重试，
+    # 可容忍 Users 表/外键尚未就绪的启动顺序问题。
+    depends_on:
+      db:
+        condition: service_healthy
+    develop:
+      watch:
+        # 源码变更 → 同步进容器（含 services/travel-history 与 shared/），
+        # 由 dotnet watch 自动重新编译并重启
+        - action: sync
+          path: ./src/backend
+          target: /src
+          ignore:
+            - bin
+            - obj
+        # Dockerfile 变更 → 重建镜像
+        - action: rebuild
+          path: ./src/backend/services/travel-history/Dockerfile.dev
+    networks:
+      - dev-net
+
   # PostgreSQL —— 数据目录与 k8s PV 共享同一物理位置（见 k8s/postgres/postgres-pv.yaml）
   db:
     image: postgres:16-alpine

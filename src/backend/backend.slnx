@@ -10,6 +10,17 @@
   <Folder Name="/services/user-service/tests/">
     <Project Path="services/user-service/tests/User.UnitTests/User.UnitTests.csproj" />
   </Folder>
+  <Folder Name="/services/travel-history/src/">
+    <Project Path="services/travel-history/src/Travel.Domain/Travel.Domain.csproj" />
+    <Project Path="services/travel-history/src/Travel.Application/Travel.Application.csproj" />
+    <Project Path="services/travel-history/src/Travel.Infrastructure/Travel.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/services/travel-history/src/Travel.Api/">
+    <Project Path="services/travel-history/src/Travel.Api/travel.csproj" />
+  </Folder>
+  <Folder Name="/services/travel-history/tests/">
+    <Project Path="services/travel-history/tests/Travel.UnitTests/Travel.UnitTests.csproj" />
+  </Folder>
   <Folder Name="/shared/">
     <Project Path="shared/Shared.Contracts/Shared.Contracts.csproj" />
     <Project Path="shared/Shared.Observability/Shared.Observability.csproj" />

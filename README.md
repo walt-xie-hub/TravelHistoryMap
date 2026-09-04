@@ -11,6 +11,22 @@ docker compose -f docker-compose.dev.yml up -d
 
 ---
 
+## 前端地图（AMap JS API）密钥
+
+地图页（`/map`，Angular 前端 `src/frontend/client`）使用高德地图 JS API 2.0 渲染用户的旅行足迹（决策见 `docs/adr/0003`、`docs/adr/0004`）。高德 SDK 需要浏览器端密钥才能加载：
+
+1. 打开 https://lbs.amap.com ，注册/登录并完成个人实名认证。
+2. 控制台 → 应用管理 → 我的应用 → **创建新应用** → 添加 key：服务平台选 **“Web端(JS API)”**，类型 “JavaScript API”。
+3. 在 key 的**域名白名单**中加入本页地址（本地开发为 `http://localhost:4200`；生产为部署域名）。
+4. 把 key 与配套的 **securityJsCode** 填入 `src/frontend/client/src/environments/environment.ts`（dev）或 `environment.prod.ts`（prod）的 `amap` 字段。
+
+未配置密钥时地图页会显示指引而不是崩溃；填入后刷新页面即可。
+
+前端启动：`cd src/frontend/client && npm install && npm start`（默认 http://localhost:4200）。
+后端 dev 端口：user-service `http://localhost:8080`，travel-history `http://localhost:8081`（由 docker-compose.dev.yml 暴露）。
+
+---
+
 ## 可观测性 (OpenTelemetry)
 
 ```

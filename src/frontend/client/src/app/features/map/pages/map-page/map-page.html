@@ -1,9 +1,99 @@
-<app-page-header title="地图" subtitle="探索并标记你的旅行足迹" />
+<app-page-header title="地图" subtitle="查看每个用户在各停留点的旅行足迹" />
 
-<div class="map-placeholder">
-  <app-empty-state
-    icon="🗺️"
-    title="地图功能建设中"
-    description="此模块预留给地图渲染与足迹标注（可接入 Leaflet / Mapbox 等）。"
+<div class="map-layout">
+  <app-map-side-panel
+    [users]="userOptions()"
+    [usersLoading]="usersLoading()"
+    [selectedUserId]="selectedUserId()"
+    [records]="records()"
+    [travelLoading]="travelLoading()"
+    [selectedRecordId]="selectedRecordId()"
+    (userChange)="onUserChange($event)"
+    (filterChange)="onFilterChange($event)"
+    (recordSelect)="onRecordSelect($event)"
   />
+
+  <section class="map-stage">
+    <div #mapContainer class="map-canvas" aria-label="旅行足迹地图"></div>
+
+    @if (mapState() === 'missing-key') {
+      <div class="map-overlay map-overlay--card">
+        <div class="overlay-card-inner">
+          <h2 class="overlay-title">尚未配置高德地图密钥</h2>
+          <p class="overlay-text">
+            地图功能依赖高德地图 JS API。请到 lbs.amap.com 注册并申请 Web端(JS API) 的 key
+            与安全密钥，然后：
+          </p>
+          <ol class="overlay-steps">
+            <li>
+              在高德控制台把本页地址加入域名白名单（本地开发为
+              <code>http://localhost:4200</code>）。
+            </li>
+            <li>
+              将 key 与 securityJsCode 填入 <code>src/environments/environment.ts</code> 的
+              <code>amap</code> 字段（生产见 <code>environment.prod.ts</code>）。
+            </li>
+            <li>刷新本页即可看到地图。</li>
+          </ol>
+        </div>
+      </div>
+    } @else if (mapState() === 'error') {
+      <div class="map-overlay map-overlay--card">
+        <div class="overlay-card-inner">
+          <h2 class="overlay-title">地图加载失败</h2>
+          <p class="overlay-text">{{ mapErrorMsg() }}</p>
+          <p class="overlay-hint">
+            请确认 key 与 securityJsCode 正确、已加入高德 JS API，且域名白名单包含当前页面地址。
+          </p>
+        </div>
+      </div>
+    } @else {
+      @if (usersLoading()) {
+        <div class="map-overlay map-overlay--ghost">
+          <app-loading-spinner message="加载用户中…" />
+        </div>
+      } @else if (userOptions().length === 0) {
+        <div class="map-overlay map-overlay--ghost">
+          <app-empty-state
+            icon="👥"
+            title="暂无用户"
+            description="请先在“用户”页创建用户，再回来查看足迹。"
+          />
+        </div>
+      } @else if (selectedUserId() === null) {
+        <div class="map-overlay map-overlay--ghost">
+          <app-empty-state
+            icon="🧭"
+            title="请选择用户"
+            description="从左侧选择用户后，地图将标注其旅行停留记录。"
+          />
+        </div>
+      } @else if (!travelLoading() && travelError()) {
+        <div class="map-overlay map-overlay--ghost">
+          <app-empty-state icon="⚠️" title="加载失败" [description]="travelError() ?? ''">
+            <button type="button" class="btn btn-primary" (click)="onRetry()">重试</button>
+          </app-empty-state>
+        </div>
+      } @else if (!travelLoading() && records().length === 0) {
+        <div class="map-overlay map-overlay--ghost">
+          <app-empty-state
+            icon="🧳"
+            title="暂无停留记录"
+            description="该时间范围内没有记录。可切换时间范围，或通过 travel-history API 录入。"
+          />
+        </div>
+      }
+    }
+
+    @if (mapState() === 'ready' && hasRecords()) {
+      <div class="map-legend">
+        <span class="legend-item"><i class="legend-dot"></i>普通停留</span>
+        <span class="legend-item"><i class="legend-dot legend-dot--ongoing"></i>进行中</span>
+        <span class="legend-item"><i class="legend-dot legend-dot--merged"></i>多次到访</span>
+      </div>
+      <button type="button" class="btn btn-ghost map-fit-btn" (click)="onFitAll()">
+        回到全览
+      </button>
+    }
+  </section>
 </div>
