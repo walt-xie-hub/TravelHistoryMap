@@ -1,0 +1,17 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Travel.Domain/Travel.Domain.csproj" />
+    <Project Path="src/Travel.Application/Travel.Application.csproj" />
+    <Project Path="src/Travel.Infrastructure/Travel.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Travel.Api/">
+    <Project Path="src/Travel.Api/travel.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Travel.UnitTests/Travel.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/shared/">
+    <Project Path="..\..\shared\Shared.Contracts\Shared.Contracts.csproj" />
+    <Project Path="..\..\shared\Shared.Observability\Shared.Observability.csproj" />
+  </Folder>
+</Solution>
