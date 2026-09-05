@@ -1,9 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using User.Application.Abstractions;
 using User.Domain.Abstractions;
 using User.Infrastructure.Persistence;
 using User.Infrastructure.Repositories;
+using User.Infrastructure.Security;
 
 namespace User.Infrastructure;
 
@@ -26,6 +28,9 @@ public static class DependencyInjection
 
         // 仓储实现注册到领域抽象
         services.AddScoped<IUserRepository, UserRepository>();
+
+        // 密码哈希（PBKDF2，基于 ASP.NET Core Identity PasswordHasher）
+        services.AddSingleton<IPasswordHasher, PasswordHasher>();
 
         return services;
     }

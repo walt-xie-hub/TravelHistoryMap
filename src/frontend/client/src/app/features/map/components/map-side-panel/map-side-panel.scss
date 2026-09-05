@@ -49,22 +49,6 @@
   color: var(--text-muted, #6b7280);
 }
 
-.user-select {
-  width: 100%;
-  padding: 8px 10px;
-  border-radius: 8px;
-  border: 1px solid var(--border-color, #d1d5db);
-  background: var(--surface, #ffffff);
-  font: inherit;
-  color: var(--text, #111827);
-  outline: none;
-
-  &:focus {
-    border-color: var(--primary, #2563eb);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary, #2563eb) 15%, transparent);
-  }
-}
-
 .stats-row {
   display: flex;
   gap: 16px;

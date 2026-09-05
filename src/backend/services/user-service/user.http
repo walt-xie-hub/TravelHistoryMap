@@ -1,35 +1,63 @@
-@UserApi_HostAddress = http://localhost:5286
-
-### 获取全部用户
-GET {{UserApi_HostAddress}}/api/users
-Accept: application/json
-
-###
+@UserApi_HostAddress = http://localhost:8080
 
 ### 健康检查
 GET {{UserApi_HostAddress}}/health
 
 ###
 
-### 创建用户
-POST {{UserApi_HostAddress}}/api/users
+### 注册（注册是创建用户的唯一途径；成功即签发 token 自动登录，ADR-0005）
+POST {{UserApi_HostAddress}}/api/auth/register
 Content-Type: application/json
 
 {
   "name": "Alice",
-  "email": "alice@example.com"
+  "email": "alice@example.com",
+  "password": "P@ssw0rd123"
 }
 
 ###
 
-### 更新用户（乐观锁：底层按 xmin 校验并发）
-PUT {{UserApi_HostAddress}}/api/users/1
+### 登录（dev 种子账号：demo@travel.local / Demo@123456）
+POST {{UserApi_HostAddress}}/api/auth/login
 Content-Type: application/json
 
 {
-  "name": "Alice Updated",
-  "email": "alice.new@example.com",
+  "email": "demo@travel.local",
+  "password": "Demo@123456"
+}
+
+> {%
+    client.global.set("accessToken", response.body.token);
+%}
+
+###
+
+### 当前用户档案（需 Bearer）
+GET {{UserApi_HostAddress}}/api/users/me
+Authorization: Bearer {{accessToken}}
+
+###
+
+### 修改本人资料（邮箱冲突返回 409）
+PUT {{UserApi_HostAddress}}/api/users/me
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "name": "Demo User",
+  "email": "demo@travel.local",
   "phoneNumber": "13800000000",
-  "avatarUrl": "https://cdn.example.com/a.png",
-  "isActive": true
+  "avatarUrl": "https://cdn.example.com/a.png"
+}
+
+###
+
+### 修改本人密码（校验当前密码）
+PUT {{UserApi_HostAddress}}/api/users/me/password
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "currentPassword": "Demo@123456",
+  "newPassword": "NewPass@123456"
 }

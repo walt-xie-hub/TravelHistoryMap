@@ -1,0 +1,144 @@
+.profile {
+  &__head {
+    margin-bottom: 1.5rem;
+  }
+
+  &__title {
+    margin: 0 0 0.25rem;
+    font-size: 1.5rem;
+  }
+
+  &__sub {
+    margin: 0;
+    font-size: 0.875rem;
+    color: var(--text-muted, #6b7280);
+  }
+
+  &__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 1.25rem;
+    align-items: start;
+  }
+}
+
+.card {
+  padding: 1.5rem;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 0.875rem;
+  background: var(--surface, #ffffff);
+  box-shadow: var(--shadow-sm, 0 1px 2px rgba(16, 24, 40, 0.06));
+
+  &__title {
+    margin: 0 0 0.25rem;
+    font-size: 1.0625rem;
+  }
+
+  &__hint {
+    margin: 0 0 1.25rem;
+    font-size: 0.8125rem;
+    color: var(--text-muted, #6b7280);
+  }
+
+  &__actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 1.25rem;
+  }
+}
+
+.avatar-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+
+  &__img {
+    flex: none;
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 1px solid var(--border-color, #e5e7eb);
+    background: var(--surface-hover, #f3f4f6);
+
+    &--fallback {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--primary-soft, #eff6ff);
+      color: var(--primary, #2563eb);
+      font-size: 1.5rem;
+      font-weight: 700;
+    }
+  }
+
+  &__hint {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-strong, #111827);
+
+    p {
+      margin: 0.25rem 0 0;
+      font-size: 0.8125rem;
+      font-weight: 400;
+      color: var(--text-muted, #6b7280);
+    }
+  }
+}
+
+.field {
+  display: block;
+  margin-bottom: 1rem;
+
+  &__label {
+    display: block;
+    margin-bottom: 0.375rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--text-strong, #111827);
+  }
+
+  &__control {
+    width: 100%;
+    padding: 0.625rem 0.75rem;
+    border: 1px solid var(--border-color, #e5e7eb);
+    border-radius: 0.5rem;
+    background: var(--surface, #ffffff);
+    font: inherit;
+    font-size: 0.9375rem;
+    color: var(--text-strong, #111827);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+
+    &:focus {
+      outline: none;
+      border-color: var(--primary, #2563eb);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary, #2563eb) 18%, transparent);
+    }
+  }
+}
+
+.btn {
+  padding: 0.625rem 1rem;
+  border: none;
+  border-radius: 0.5rem;
+  font: inherit;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+
+  &--primary {
+    background: var(--primary, #2563eb);
+    color: #ffffff;
+
+    &:hover:not(:disabled) {
+      background: var(--primary-strong, #1d4ed8);
+    }
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+  }
+}

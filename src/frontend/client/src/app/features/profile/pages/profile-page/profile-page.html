@@ -1,0 +1,138 @@
+<section class="profile">
+  <header class="profile__head">
+    <h1 class="profile__title">我的资料</h1>
+    <p class="profile__sub">查看并维护你的账号信息。</p>
+  </header>
+
+  <div class="profile__grid">
+    <!-- 基本信息 -->
+    <form class="card" (ngSubmit)="saveProfile()" novalidate>
+      <h2 class="card__title">基本信息</h2>
+
+      <div class="avatar-row">
+        @if (avatarPreview(); as preview) {
+          <img
+            class="avatar-row__img"
+            [src]="preview.url"
+            alt="头像预览"
+            referrerpolicy="no-referrer"
+          />
+        } @else {
+          <span class="avatar-row__img avatar-row__img--fallback">
+            {{ avatarInitial() }}
+          </span>
+        }
+        <div class="avatar-row__hint">
+          <span>头像</span>
+          <p>留空时使用姓名首字母圆形头像。</p>
+        </div>
+      </div>
+
+      <label class="field">
+        <span class="field__label">头像 URL</span>
+        <input
+          class="field__control"
+          type="url"
+          name="avatarUrl"
+          placeholder="https://…"
+          [value]="avatarUrl()"
+          (input)="onAvatarUrlChange($event)"
+        />
+      </label>
+
+      <label class="field">
+        <span class="field__label">姓名</span>
+        <input
+          class="field__control"
+          type="text"
+          name="name"
+          [value]="name()"
+          (input)="onNameChange($event)"
+          required
+        />
+      </label>
+
+      <label class="field">
+        <span class="field__label">邮箱</span>
+        <input
+          class="field__control"
+          type="email"
+          name="email"
+          [value]="email()"
+          (input)="onEmailChange($event)"
+          required
+        />
+      </label>
+
+      <label class="field">
+        <span class="field__label">电话</span>
+        <input
+          class="field__control"
+          type="tel"
+          name="phoneNumber"
+          placeholder="可选"
+          [value]="phoneNumber()"
+          (input)="onPhoneChange($event)"
+        />
+      </label>
+
+      <div class="card__actions">
+        <button class="btn btn--primary" type="submit" [disabled]="savingProfile()">
+          {{ savingProfile() ? '保存中…' : '保存修改' }}
+        </button>
+      </div>
+    </form>
+
+    <!-- 修改密码 -->
+    <form class="card" (ngSubmit)="savePassword()" novalidate>
+      <h2 class="card__title">修改密码</h2>
+      <p class="card__hint">定期更换密码可提升账号安全性。</p>
+
+      <label class="field">
+        <span class="field__label">当前密码</span>
+        <input
+          class="field__control"
+          type="password"
+          name="currentPassword"
+          autocomplete="current-password"
+          [value]="currentPassword()"
+          (input)="onCurrentPasswordChange($event)"
+          required
+        />
+      </label>
+
+      <label class="field">
+        <span class="field__label">新密码</span>
+        <input
+          class="field__control"
+          type="password"
+          name="newPassword"
+          autocomplete="new-password"
+          placeholder="至少 8 位字符"
+          [value]="newPassword()"
+          (input)="onNewPasswordChange($event)"
+          required
+        />
+      </label>
+
+      <label class="field">
+        <span class="field__label">确认新密码</span>
+        <input
+          class="field__control"
+          type="password"
+          name="confirmPassword"
+          autocomplete="new-password"
+          [value]="confirmPassword()"
+          (input)="onConfirmPasswordChange($event)"
+          required
+        />
+      </label>
+
+      <div class="card__actions">
+        <button class="btn btn--primary" type="submit" [disabled]="savingPassword()">
+          {{ savingPassword() ? '提交中…' : '更新密码' }}
+        </button>
+      </div>
+    </form>
+  </div>
+</section>

@@ -1,0 +1,47 @@
+<form class="auth-card" (ngSubmit)="submit()" novalidate>
+  <div class="auth-card__brand">
+    <div class="auth-card__logo" aria-hidden="true">🧭</div>
+    <h1 class="auth-card__title">{{ appName }}</h1>
+    <p class="auth-card__subtitle">登录后查看你的旅行足迹</p>
+  </div>
+
+  @if (errorMessage(); as message) {
+    <div class="auth-card__error" role="alert">{{ message }}</div>
+  }
+
+  <label class="field">
+    <span class="field__label">邮箱</span>
+    <input
+      class="field__control"
+      type="email"
+      name="email"
+      autocomplete="email"
+      placeholder="you@example.com"
+      [value]="email()"
+      (input)="onEmailChange($event)"
+      required
+    />
+  </label>
+
+  <label class="field">
+    <span class="field__label">密码</span>
+    <input
+      class="field__control"
+      type="password"
+      name="password"
+      autocomplete="current-password"
+      placeholder="请输入密码"
+      [value]="password()"
+      (input)="onPasswordChange($event)"
+      required
+    />
+  </label>
+
+  <button class="auth-card__submit" type="submit" [disabled]="submitting()">
+    {{ submitting() ? '登录中…' : '登 录' }}
+  </button>
+
+  <p class="auth-card__footer">
+    还没有账号？<a routerLink="/register">立即注册</a>
+  </p>
+</form>

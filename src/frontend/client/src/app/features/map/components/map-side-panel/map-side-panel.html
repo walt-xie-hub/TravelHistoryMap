@@ -1,27 +1,5 @@
 <aside class="side-panel">
   <div class="panel-block">
-    <label class="field-label" for="map-user-select">查看用户</label>
-    @if (usersLoading()) {
-      <app-loading-spinner message="加载用户中…" />
-    } @else {
-      <select
-        id="map-user-select"
-        class="user-select"
-        [value]="selectedUserId() ?? ''"
-        (change)="onUserSelect($event)"
-      >
-        <option value="" disabled>请选择用户</option>
-        @for (user of users(); track user.id) {
-          <option [value]="user.id" [selected]="user.id === selectedUserId()">{{ user.name }}</option>
-        }
-      </select>
-      @if (users().length === 0) {
-        <p class="field-hint">暂无用户，请先在“用户”页创建。</p>
-      }
-    }
-  </div>
-
-  <div class="panel-block">
     <div class="stats-row">
       <span class="stat"><strong>{{ total() }}</strong> 次停留</span>
       @if (ongoingCount() > 0) {

@@ -1,4 +1,7 @@
 using System.Diagnostics;
+using System.Text;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
 using Travel.Api.Endpoints;
 using Swashbuckle.AspNetCore.SwaggerUI;
 using Travel.Application.Abstractions;
@@ -16,6 +19,28 @@ builder.Services.AddObservability("travel-service");
 // 组合根：在唯一能引用所有层的地方完成装配
 builder.Services.AddScoped<ITravelService, TravelService>();
 builder.Services.AddInfrastructure(builder.Configuration);
+
+// JWT 验证（ADR-0005）：与 user-service 共享同一组 Jwt 配置（签名密钥/签发者/受众），
+// 本服务只验证不签发。足迹归属以 token 中的用户身份为准。
+var jwtSection = builder.Configuration.GetSection("Jwt");
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = jwtSection["Issuer"] ?? "travel-map",
+            ValidateAudience = true,
+            ValidAudience = jwtSection["Audience"] ?? "travel-map-client",
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(jwtSection["Key"]
+                    ?? throw new InvalidOperationException("Jwt:Key is not configured."))),
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromMinutes(1),
+        };
+    });
+builder.Services.AddAuthorization();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
@@ -101,6 +126,10 @@ app.UseSwaggerUI(options =>
 
 // 开发态允许跨域（必须在 MapTravelEndpoints 之前）
 app.UseCors("DevCors");
+
+// 认证/授权（JWT 校验须在业务端点映射前启用）
+app.UseAuthentication();
+app.UseAuthorization();
 
 // 暴露 /metrics 端点供 Prometheus 抓取（必须在 UseCors 之后、Map 之前）
 app.UseObservability();

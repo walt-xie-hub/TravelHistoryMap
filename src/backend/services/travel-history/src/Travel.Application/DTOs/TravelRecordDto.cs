@@ -14,10 +14,10 @@ public record TravelRecordDto(
     DateTimeOffset? DepartedAt);
 
 /// <summary>
-/// 创建旅行记录请求模型。无鉴权现状下由客户端显式传入 userId（与 user-service 约定一致）。
+/// 创建旅行记录请求模型（ADR-0005）。归属用户不再由客户端传入：
+/// 一律取自 JWT（NameIdentifier），见 TravelEndpoints / ITravelService.CreateAsync。
 /// </summary>
 public record CreateTravelDto(
-    int UserId,
     string LocationName,
     decimal Latitude,
     decimal Longitude,

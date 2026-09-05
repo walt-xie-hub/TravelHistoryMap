@@ -1,48 +1,69 @@
+using System.Security.Claims;
 using User.Application.Abstractions;
 using User.Application.DTOs;
+using User.Domain.Common;
 
 namespace User.Api.Endpoints;
 
 /// <summary>
-/// 用户微服务 API 端点（最小 API）。表现层只依赖应用层抽象。
+/// 本人档案端点（me 资源，ADR-0005）：全部要求有效 JWT，userId 一律取自 token 而非路径/查询参数。
+/// 公开的 users CRUD（创建/改任意用户/删除/列表）已下线，注册是创建用户的唯一途径。
 /// </summary>
 public static class UserEndpoints
 {
-    public static IEndpointRouteBuilder MapUserEndpoints(this IEndpointRouteBuilder app)
+    public static void MapUserEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/users");
+        var group = app.MapGroup("/api/users").RequireAuthorization();
+        group.MapGet("/me", GetMeAsync);
+        group.MapPut("/me", UpdateMeAsync);
+        group.MapPut("/me/password", ChangePasswordAsync);
+    }
 
-        group.MapGet("/", async (IUserService svc, CancellationToken ct, int page = 1, int pageSize = 10) =>
+    private static int CurrentUserId(ClaimsPrincipal principal)
+        => int.TryParse(principal.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : 0;
+
+    private static async Task<IResult> GetMeAsync(ClaimsPrincipal principal, IUserService users, CancellationToken ct)
+    {
+        var me = await users.GetByIdAsync(CurrentUserId(principal), ct);
+        return me is null
+            ? Results.NotFound(new { message = "用户不存在。" })
+            : Results.Ok(me);
+    }
+
+    private static async Task<IResult> UpdateMeAsync(ClaimsPrincipal principal, UpdateProfileDto dto, IUserService users, CancellationToken ct)
+    {
+        try
         {
-            page = page < 1 ? 1 : page;
-            pageSize = pageSize is < 1 or > 100 ? 10 : pageSize;
-            return Results.Ok(await svc.GetPagedAsync(page, pageSize, ct));
-        });
-
-        group.MapGet("/{id:int}", async (int id, IUserService svc, CancellationToken ct) =>
+            var me = await users.UpdateProfileAsync(CurrentUserId(principal), dto, ct);
+            return Results.Ok(me);
+        }
+        catch (EmailAlreadyExistsException)
         {
-            var user = await svc.GetByIdAsync(id, ct);
-            return user is null ? Results.NotFound() : Results.Ok(user);
-        });
-
-        group.MapPost("/", async (CreateUserDto dto, IUserService svc, CancellationToken ct) =>
+            return Results.Conflict(new { message = "该邮箱已被其他账号使用。" });
+        }
+        catch (UserNotFoundException)
         {
-            var created = await svc.CreateAsync(dto, ct);
-            return Results.Created($"/api/users/{created.Id}", created);
-        });
+            return Results.NotFound(new { message = "用户不存在。" });
+        }
+    }
 
-        group.MapPut("/{id:int}", async (int id, UpdateUserDto dto, IUserService svc, CancellationToken ct) =>
+    private static async Task<IResult> ChangePasswordAsync(ClaimsPrincipal principal, ChangePasswordDto dto, IUserService users, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(dto.NewPassword) || dto.NewPassword.Length < 8)
+            return Results.BadRequest(new { message = "新密码长度至少 8 位。" });
+
+        try
         {
-            var updated = await svc.UpdateAsync(id, dto, ct);
-            return updated is null ? Results.NotFound() : Results.Ok(updated);
-        });
-
-        group.MapDelete("/{id:int}", async (int id, IUserService svc, CancellationToken ct) =>
+            await users.ChangePasswordAsync(CurrentUserId(principal), dto.CurrentPassword, dto.NewPassword, ct);
+            return Results.NoContent();
+        }
+        catch (InvalidCredentialsException)
         {
-            var deleted = await svc.DeleteAsync(id, ct);
-            return deleted ? Results.NoContent() : Results.NotFound();
-        });
-
-        return app;
+            return Results.BadRequest(new { message = "当前密码不正确。" });
+        }
+        catch (UserNotFoundException)
+        {
+            return Results.NotFound(new { message = "用户不存在。" });
+        }
     }
 }

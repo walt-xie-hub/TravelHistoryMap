@@ -2,6 +2,8 @@ namespace Travel.Application.Abstractions;
 
 /// <summary>
 /// 旅行记录用例接口。表现层只依赖此抽象。
+/// ADR-0005：userId 一律由表现层从认证身份（JWT NameIdentifier）解析后传入，
+/// 不再信任客户端在 body/query 中声明的归属者。
 /// </summary>
 public interface ITravelService
 {
@@ -16,11 +18,15 @@ public interface ITravelService
         int pageSize,
         CancellationToken cancellationToken = default);
 
-    Task<DTOs.TravelRecordDto?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
+    /// <summary>按主键读取记录；记录不属于该用户时返回 null（不泄露存在性）。</summary>
+    Task<DTOs.TravelRecordDto?> GetByIdAsync(int userId, int id, CancellationToken cancellationToken = default);
 
-    Task<DTOs.TravelRecordDto> CreateAsync(DTOs.CreateTravelDto dto, CancellationToken cancellationToken = default);
+    /// <summary>为 userId 创建一条记录（dto 不再携带归属者）。</summary>
+    Task<DTOs.TravelRecordDto> CreateAsync(int userId, DTOs.CreateTravelDto dto, CancellationToken cancellationToken = default);
 
-    Task<DTOs.TravelRecordDto?> UpdateAsync(int id, DTOs.UpdateTravelDto dto, CancellationToken cancellationToken = default);
+    /// <summary>更新 userId 名下的记录；非本人或不存在返回 null。</summary>
+    Task<DTOs.TravelRecordDto?> UpdateAsync(int userId, int id, DTOs.UpdateTravelDto dto, CancellationToken cancellationToken = default);
 
-    Task<bool> DeleteAsync(int id, CancellationToken cancellationToken = default);
+    /// <summary>删除 userId 名下的记录；非本人或不存在返回 false。</summary>
+    Task<bool> DeleteAsync(int userId, int id, CancellationToken cancellationToken = default);
 }

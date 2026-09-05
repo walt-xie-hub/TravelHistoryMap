@@ -1,7 +1,11 @@
 using System.Diagnostics;
+using System.Text;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
 using User.Api.Endpoints;
 using Swashbuckle.AspNetCore.SwaggerUI;
 using Microsoft.EntityFrameworkCore;
+using User.Api.Security;
 using User.Application.Abstractions;
 using User.Application.Services;
 using User.Infrastructure;
@@ -16,6 +20,28 @@ builder.Services.AddObservability("user-service");
 // 组合根：在唯一能引用所有层的地方完成装配
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddInfrastructure(builder.Configuration);
+
+// JWT 认证（ADR-0005）：自签发 HS256 access token；Key/Issuer/Audience 与 travel-history 共享同一组配置
+var jwtSection = builder.Configuration.GetSection("Jwt");
+builder.Services.AddSingleton<JwtTokenFactory>();
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = jwtSection["Issuer"] ?? "travel-map",
+            ValidateAudience = true,
+            ValidAudience = jwtSection["Audience"] ?? "travel-map-client",
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(jwtSection["Key"]
+                    ?? throw new InvalidOperationException("Jwt:Key is not configured."))),
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromMinutes(1),
+        };
+    });
+builder.Services.AddAuthorization();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
@@ -68,6 +94,10 @@ app.Use(async (context, next) =>
 // 库内可能已有 travel-history 建的表，裸 EnsureCreated 会整体跳过，必须走本引导器。
 app.Services.EnsureUserSchema();
 
+// dev 演示账号（ADR-0005）：仅 Development，幂等 seed demo@travel.local / Demo@123456
+if (app.Environment.IsDevelopment())
+    await app.Services.SeedDevelopmentUserAsync();
+
 // Configure the HTTP request pipeline.
 // 容器只监听 HTTP(8080)，未配置 HTTPS 终结点与证书，因此关闭 HttpsRedirection，
 // 否则所有 HTTP 请求（含 /swagger）会被重定向到不可达的 https 端口而打不开。
@@ -82,13 +112,18 @@ app.UseSwaggerUI(options =>
     options.SwaggerEndpoint("/openapi/v1.json", "User API v1");
 });
 
-// 开发态允许跨域（必须在 MapUserEndpoints 之前）
+// 开发态允许跨域（必须在 MapEndpoints 之前）
 app.UseCors("DevCors");
+
+// 认证/授权（JWT 校验须在业务端点映射前启用）
+app.UseAuthentication();
+app.UseAuthorization();
 
 // 暴露 /metrics 端点供 Prometheus 抓取（必须在 UseCors 之后、Map 之前）
 app.UseObservability();
 
-// 用户微服务端点
+// 认证与用户微服务端点
+app.MapAuthEndpoints();
 app.MapUserEndpoints();
 
 // 健康检查（供容器探针 / 网关使用）

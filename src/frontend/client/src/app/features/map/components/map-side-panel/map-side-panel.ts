@@ -7,12 +7,6 @@ import type {
 } from '../../models/travel-record.model';
 import { fmtDuration, fmtRange } from '../../utils/travel-display';
 
-export interface MapUserOption {
-  id: number;
-  name: string;
-  email: string;
-}
-
 interface TravelRow {
   record: TravelRecord;
   rangeLabel: string;
@@ -30,8 +24,9 @@ function localDayToIso(dateText: string, atEndOfDay: boolean): string {
 }
 
 /**
- * 地图页侧边时间线面板：用户选择（记忆于 localStorage）、停留统计、
- * 时间范围筛选 chips（全部/近30天/今年/自定义 → 后端 from/to）与按到达时间倒序的记录列表。
+ * 地图页侧边时间线面板：停留统计、时间范围筛选 chips
+ * （全部/近30天/今年/自定义 → 后端 from/to）与按到达时间倒序的记录列表。
+ * ADR-0005：记录归属=当前登录用户（JWT），面板不再提供用户选择。
  * 展示决策见 docs/adr/0004。
  */
 @Component({
@@ -42,14 +37,10 @@ function localDayToIso(dateText: string, atEndOfDay: boolean): string {
   styleUrl: './map-side-panel.scss',
 })
 export class MapSidePanel {
-  readonly users = input<MapUserOption[]>([]);
-  readonly usersLoading = input(false);
-  readonly selectedUserId = input<number | null>(null);
   readonly records = input<TravelRecord[]>([]);
   readonly travelLoading = input(false);
   readonly selectedRecordId = input<number | null>(null);
 
-  readonly userChange = output<number>();
   readonly filterChange = output<TravelRangeRequest>();
   readonly recordSelect = output<number>();
 
@@ -79,11 +70,6 @@ export class MapSidePanel {
         document.getElementById(`tm-record-${id}`)?.scrollIntoView({ block: 'nearest' });
       });
     });
-  }
-
-  onUserSelect(event: Event): void {
-    const id = Number((event.target as HTMLSelectElement).value);
-    if (Number.isFinite(id) && id > 0) this.userChange.emit(id);
   }
 
   selectKind(kind: TravelRangeKind): void {

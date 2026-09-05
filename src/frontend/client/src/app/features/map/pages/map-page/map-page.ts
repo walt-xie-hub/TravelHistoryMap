@@ -9,19 +9,16 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import { lastValueFrom } from 'rxjs';
 import { EmptyState } from '@shared/components/empty-state/empty-state';
 import { LoadingSpinner } from '@shared/components/loading-spinner/loading-spinner';
 import { PageHeader } from '@shared/components/page-header/page-header';
-import { UserService } from '@features/users/services/user.service';
-import type { User } from '@features/users/models/user.model';
 import type {
   AmapInfoWindow,
   AmapMap,
   AmapMarker,
   AmapNamespace,
 } from '../../../../../types/amap';
-import { MapSidePanel, MapUserOption } from '../../components/map-side-panel/map-side-panel';
+import { MapSidePanel } from '../../components/map-side-panel/map-side-panel';
 import { AmapLoaderService } from '../../services/amap-loader.service';
 import { TravelHistoryService } from '../../services/travel-history.service';
 import type { TravelRangeRequest, TravelRecord } from '../../models/travel-record.model';
@@ -32,14 +29,14 @@ const DEFAULT_CENTER = [104.1954, 35.8617] as const; // 中国全国视野
 const DEFAULT_ZOOM = 5;
 const FOCUS_ZOOM = 10;
 const FIT_PADDING: number[] = [70, 70, 70, 70];
-const USER_KEY = 'map.lastUserId';
 const PAGE_SIZE = 100;
 
 type MapState = 'idle' | 'ready' | 'missing-key' | 'error';
 
 /**
- * 地图页：加载高德地图 JS API，展示所选用户的旅行足迹。
- * 决策来源：docs/adr/0003（AMap + WGS-84 存储 / GCJ-02 渲染）、docs/adr/0004（展示层规则）。
+ * 地图页：加载高德地图 JS API，展示【当前登录用户】的旅行足迹。
+ * ADR-0005：不再有“用户下拉”，足迹归属来自登录态（token），服务端只返回本人记录。
+ * 决策来源：docs/adr/0003（AMap + WGS-84 存储 / GCJ-02 渲染）、0004（展示层规则）、0005（登录化）。
  */
 @Component({
   selector: 'app-map-page',
@@ -49,26 +46,18 @@ type MapState = 'idle' | 'ready' | 'missing-key' | 'error';
   styleUrl: './map-page.scss',
 })
 export class MapPage implements AfterViewInit, OnDestroy {
-  private readonly userService = inject(UserService);
   private readonly travelService = inject(TravelHistoryService);
   private readonly amapLoader = inject(AmapLoaderService);
 
   private readonly mapContainer =
     viewChild.required<ElementRef<HTMLDivElement>>('mapContainer');
 
-  readonly users = signal<User[]>([]);
-  readonly usersLoading = signal(true);
-  readonly selectedUserId = signal<number | null>(null);
   readonly records = signal<TravelRecord[]>([]);
   readonly travelLoading = signal(false);
   readonly travelError = signal<string | null>(null);
   readonly mapState = signal<MapState>('idle');
   readonly mapErrorMsg = signal('');
   readonly selectedRecordId = signal<number | null>(null);
-
-  readonly userOptions = computed<MapUserOption[]>(() =>
-    this.users().map((u) => ({ id: u.id, name: u.name, email: u.email })),
-  );
 
   /** 进行中/过去 的标注计数徽标（legend 用） */
   readonly hasRecords = computed(() => this.records().length > 0);
@@ -83,9 +72,8 @@ export class MapPage implements AfterViewInit, OnDestroy {
   private loadedKey = '';
   private fetchSeq = 0;
 
-  async ngAfterViewInit(): Promise<void> {
+  ngAfterViewInit(): void {
     this.initMap();
-    await this.loadUsers();
   }
 
   ngOnDestroy(): void {
@@ -135,57 +123,14 @@ export class MapPage implements AfterViewInit, OnDestroy {
       closeWhenClickMap: false,
     });
     this.mapState.set('ready');
-    if (this.selectedUserId() === null || this.loadedKey !== this.currentKey()) {
-      void this.refreshRecords();
-    } else {
+    if (this.loadedKey !== this.currentKey()) void this.refreshRecords();
+    else {
       this.renderMarkers();
       this.fitView();
     }
   }
 
-  // ---------- 用户 ----------
-
-  private async loadUsers(): Promise<void> {
-    try {
-      const all = await this.fetchAllUsers();
-      this.users.set(all);
-      const stored = Number(window.localStorage.getItem(USER_KEY));
-      const preferred = Number.isFinite(stored) && stored > 0 ? stored : null;
-      const chosen =
-        preferred !== null && all.some((u) => u.id === preferred)
-          ? preferred
-          : (all[0]?.id ?? null);
-      this.selectedUserId.set(chosen);
-      if (chosen !== null) window.localStorage.setItem(USER_KEY, String(chosen));
-      else window.localStorage.removeItem(USER_KEY);
-    } finally {
-      this.usersLoading.set(false);
-    }
-  }
-
-  private async fetchAllUsers(): Promise<User[]> {
-    const collected: User[] = [];
-    let page = 1;
-    // eslint-disable-next-line no-constant-condition
-    while (true) {
-      const result = await lastValueFrom(this.userService.getPaged(page, PAGE_SIZE));
-      collected.push(...result.items);
-      if (result.items.length < PAGE_SIZE) break;
-      page += 1;
-    }
-    return collected;
-  }
-
-  onUserChange(userId: number): void {
-    if (userId === this.selectedUserId()) return;
-    this.selectedUserId.set(userId);
-    window.localStorage.setItem(USER_KEY, String(userId));
-    this.selectedRecordId.set(null);
-    this.infoWindow?.close();
-    void this.refreshRecords();
-  }
-
-  // ---------- 数据拉取（服务端时间窗过滤） ----------
+  // ---------- 数据拉取（归属=登录用户，服务端时间窗过滤） ----------
 
   onFilterChange(request: TravelRangeRequest): void {
     this.range = request;
@@ -195,19 +140,18 @@ export class MapPage implements AfterViewInit, OnDestroy {
   }
 
   private currentKey(): string {
-    return `${this.selectedUserId()}|${this.range.kind}|${this.range.from ?? ''}|${this.range.to ?? ''}`;
+    return `${this.range.kind}|${this.range.from ?? ''}|${this.range.to ?? ''}`;
   }
 
   private async refreshRecords(): Promise<void> {
-    const userId = this.selectedUserId();
-    if (userId === null || this.mapState() !== 'ready') return;
+    if (this.mapState() !== 'ready') return;
 
     const seq = ++this.fetchSeq;
     const key = this.currentKey();
     this.travelLoading.set(true);
     this.travelError.set(null);
     try {
-      const rows = await this.travelService.getAllForUser(userId, {
+      const rows = await this.travelService.getAll({
         from: this.range.from,
         to: this.range.to,
       });

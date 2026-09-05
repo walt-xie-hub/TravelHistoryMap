@@ -1,0 +1,75 @@
+<form class="auth-card" (ngSubmit)="submit()" novalidate>
+  <div class="auth-card__brand">
+    <div class="auth-card__logo" aria-hidden="true">🧭</div>
+    <h1 class="auth-card__title">创建账号</h1>
+    <p class="auth-card__subtitle">注册 {{ appName }} 并记录你的足迹</p>
+  </div>
+
+  @if (errorMessage(); as message) {
+    <div class="auth-card__error" role="alert">{{ message }}</div>
+  }
+
+  <label class="field">
+    <span class="field__label">姓名</span>
+    <input
+      class="field__control"
+      type="text"
+      name="name"
+      autocomplete="name"
+      placeholder="怎么称呼你"
+      [value]="name()"
+      (input)="onNameChange($event)"
+      required
+    />
+  </label>
+
+  <label class="field">
+    <span class="field__label">邮箱</span>
+    <input
+      class="field__control"
+      type="email"
+      name="email"
+      autocomplete="email"
+      placeholder="you@example.com"
+      [value]="email()"
+      (input)="onEmailChange($event)"
+      required
+    />
+  </label>
+
+  <label class="field">
+    <span class="field__label">密码</span>
+    <input
+      class="field__control"
+      type="password"
+      name="password"
+      autocomplete="new-password"
+      placeholder="至少 8 位字符"
+      [value]="password()"
+      (input)="onPasswordChange($event)"
+      required
+    />
+  </label>
+
+  <label class="field">
+    <span class="field__label">确认密码</span>
+    <input
+      class="field__control"
+      type="password"
+      name="confirmPassword"
+      autocomplete="new-password"
+      placeholder="再次输入密码"
+      [value]="confirmPassword()"
+      (input)="onConfirmPasswordChange($event)"
+      required
+    />
+  </label>
+
+  <button class="auth-card__submit" type="submit" [disabled]="submitting()">
+    {{ submitting() ? '注册中…' : '注册并登录' }}
+  </button>
+
+  <p class="auth-card__footer">
+    已有账号？<a routerLink="/login">直接登录</a>
+  </p>
+</form>

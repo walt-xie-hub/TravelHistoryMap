@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using User.Domain.Abstractions;
-using User.Domain.Common;
 using User.Domain.Entities;
 using User.Infrastructure.Persistence;
 
@@ -15,24 +14,14 @@ public class UserRepository : IUserRepository
 
     public UserRepository(AppDbContext db) => _db = db;
 
-    public async Task<IEnumerable<AppUser>> GetAllAsync(CancellationToken ct = default)
-        => await _db.Users.AsNoTracking().ToListAsync(ct);
-
-    public async Task<PagedResult<AppUser>> GetPagedAsync(int page, int pageSize, CancellationToken ct = default)
-    {
-        var query = _db.Users.AsNoTracking().OrderBy(u => u.Id);
-        var totalCount = await query.CountAsync(ct);
-        var items = await query
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync(ct);
-        var totalPages = totalCount == 0 ? 1 : (int)Math.Ceiling(totalCount / (double)pageSize);
-
-        return new PagedResult<AppUser>(items, page, pageSize, totalCount, totalPages);
-    }
-
     public async Task<AppUser?> GetByIdAsync(int id, CancellationToken ct = default)
         => await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == id, ct);
+
+    public async Task<AppUser?> GetByEmailAsync(string email, CancellationToken ct = default)
+        => await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Email == email, ct);
+
+    public async Task<bool> AnyByEmailAsync(string email, int excludeUserId, CancellationToken ct = default)
+        => await _db.Users.AnyAsync(u => u.Email == email && u.Id != excludeUserId, ct);
 
     public async Task<AppUser> AddAsync(AppUser user, CancellationToken ct = default)
     {
@@ -58,18 +47,5 @@ public class UserRepository : IUserRepository
 
         await _db.SaveChangesAsync(ct);
         return existing;
-    }
-
-    public async Task<bool> DeleteAsync(int id, CancellationToken ct = default)
-    {
-        var existing = await _db.Users.FindAsync(new object[] { id }, ct);
-        if (existing is null)
-        {
-            return false;
-        }
-
-        _db.Users.Remove(existing);
-        await _db.SaveChangesAsync(ct);
-        return true;
     }
 }

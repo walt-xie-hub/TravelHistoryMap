@@ -16,6 +16,55 @@
         </a>
       }
     </nav>
+
+    <div class="user">
+      <button
+        type="button"
+        class="user__toggle"
+        (click)="toggleUserMenu()"
+        aria-haspopup="menu"
+        [attr.aria-expanded]="userMenuOpen()"
+      >
+        @if (user()?.avatarUrl; as avatarUrl) {
+          <img
+            class="user__avatar"
+            [src]="avatarUrl"
+            alt="头像"
+            referrerpolicy="no-referrer"
+          />
+        } @else {
+          <span class="user__avatar user__avatar--fallback">
+            {{ userAvatarInitial() }}
+          </span>
+        }
+        <span class="user__name">{{ user()?.name ?? '未登录' }}</span>
+        <span class="user__chevron" aria-hidden="true">▾</span>
+      </button>
+
+      @if (userMenuOpen()) {
+        <div class="user__backdrop" (click)="closeUserMenu()"></div>
+        <div class="user__menu" role="menu">
+          <button
+            type="button"
+            class="user__menu-item"
+            role="menuitem"
+            (click)="openProfile()"
+          >
+            <span aria-hidden="true">✏️</span>
+            <span>修改用户信息</span>
+          </button>
+          <button
+            type="button"
+            class="user__menu-item user__menu-item--danger"
+            role="menuitem"
+            (click)="logout()"
+          >
+            <span aria-hidden="true">⏻</span>
+            <span>登出</span>
+          </button>
+        </div>
+      }
+    </div>
   </header>
 
   <main class="layout__content">
