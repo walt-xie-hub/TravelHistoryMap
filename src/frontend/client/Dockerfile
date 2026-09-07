@@ -9,6 +9,8 @@ RUN npx ng test --watch=false
 
 FROM nginx:alpine
 COPY --from=build /app/dist/client/browser /usr/share/nginx/html
+# SPA history 回退（/login、/home 等深链直接访问/刷新返回 index.html，而非 404）
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
 
