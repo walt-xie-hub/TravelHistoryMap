@@ -1,12 +1,13 @@
 # 网关路由模板（对应 K8s base/client/ingress.yaml 的路径分流逻辑）
 # 运行时由 nginx 官方镜像 envsubst 替换 ${USER_SERVICE_URL} / ${TRAVEL_SERVICE_URL} / ${CLIENT_URL}
 #
-# 传输安全（HTTPS）：
+# 传输安全与内网调用约定：
 # - TLS 与 http→https 跳转统一由边缘层完成（Azure Container Apps 外部入口
-#   transport=Auto，或 K8s nginx Ingress），网关容器自身只监听 80（HTTP），
-#   因此这里不做容器内 301 强制跳转，避免在边缘层未转发
-#   X-Forwarded-Proto=https 时产生重定向循环。
-# - 附加 HSTS 等安全响应头，让浏览器长期只走 HTTPS。
+#   transport=Auto，或 K8s nginx Ingress），网关容器自身只监听 80（HTTP）。
+# - 到内部服务的调用统一走 https://<内部FQDN>（ACA 内部入口以 https 提供），
+#   因此 ${*_URL} 配置为 https://…；不显式覆盖 Host，nginx 会以 proxy_pass 的
+#   目标 FQDN 作为 Host/SNI（proxy_ssl_server_name on），让 ACA 正确路由并完成 TLS。
+#   proxy_ssl_verify off：内网环境内信任边缘 CA，避免证书链依赖。
 # - $host / $request_uri 是 nginx 内置变量，envsubst 不会替换它们。
 server {
     listen 80;
@@ -17,10 +18,12 @@ server {
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 
-    # More specific travel routes must precede the generic API route.
-    location /api/travels/ {
+    # 旅行 API：/api/travels、/api/travels/、/api/travels/{id}/... 全部转 travel-service。
+    # 前缀刻意不带尾斜杠，避免 nginx 对 /api/travels 补斜杠 301，也防止列表端点漏落到 user-service。
+    location /api/travels {
         proxy_pass ${TRAVEL_SERVICE_URL};
-        proxy_set_header Host $host;
+        proxy_ssl_server_name on;
+        proxy_ssl_verify off;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
@@ -28,7 +31,8 @@ server {
     # /api/* -> user-service (the /api prefix is preserved)
     location /api/ {
         proxy_pass ${USER_SERVICE_URL};
-        proxy_set_header Host $host;
+        proxy_ssl_server_name on;
+        proxy_ssl_verify off;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
@@ -36,7 +40,8 @@ server {
     # 其余 → 前端 client（SPA，client 内部 nginx 处理 history fallback）
     location / {
         proxy_pass ${CLIENT_URL};
-        proxy_set_header Host $host;
+        proxy_ssl_server_name on;
+        proxy_ssl_verify off;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
