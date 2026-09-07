@@ -49,9 +49,6 @@ env:
   SERVER_IMAGE: ghcr.io/${{ github.repository_owner }}/travelmap-user-service
   TRAVEL_IMAGE: ghcr.io/${{ github.repository_owner }}/travelmap-travel-service
   GATEWAY_IMAGE: ghcr.io/${{ github.repository_owner }}/travelmap-gateway
-  # 容器应用环境名与区域 —— 内部服务域名格式：<app>.internal.<env-name>.<region>.azurecontainerapps.io
-  CAE_NAME: cae-travelmap
-  CAE_REGION: eastus
   RESOURCE_GROUP: travelMap
 
 jobs:
@@ -170,48 +167,16 @@ jobs:
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_A2B2CD6D4C5C4A77B27AE5DA70E292AE }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_12264A5C94164B61945E7CA2E9EEE253 }}
 
-      # 更新已有 Container App 的镜像（应用需已创建，deploy action 不负责创建）。
-      # GHCR 镜像为私有，必须提供 registry 凭据，否则 Azure 拉镜像报 UNAUTHORIZED。
-      - name: Deploy user-service
-        uses: azure/container-apps-deploy-action@v1
-        with:
-          containerAppName: user-service
-          resourceGroup: ${{ env.RESOURCE_GROUP }}
-          imageToDeploy: ${{ env.SERVER_IMAGE }}:${{ needs.docker-build.outputs.tag }}
-          registryUrl: ghcr.io
-          registryUsername: ${{ secrets.GHCR_USERNAME }}
-          registryPassword: ${{ secrets.GHCR_PASSWORD }}
-
-      - name: Deploy client
-        uses: azure/container-apps-deploy-action@v1
-        with:
-          containerAppName: client
-          resourceGroup: ${{ env.RESOURCE_GROUP }}
-          imageToDeploy: ${{ env.CLIENT_IMAGE }}:${{ needs.docker-build.outputs.tag }}
-          registryUrl: ghcr.io
-          registryUsername: ${{ secrets.GHCR_USERNAME }}
-          registryPassword: ${{ secrets.GHCR_PASSWORD }}
-
-      - name: Deploy travel-service
-        uses: azure/container-apps-deploy-action@v1
-        with:
-          containerAppName: travel-service
-          resourceGroup: ${{ env.RESOURCE_GROUP }}
-          imageToDeploy: ${{ env.TRAVEL_IMAGE }}:${{ needs.docker-build.outputs.tag }}
-          registryUrl: ghcr.io
-          registryUsername: ${{ secrets.GHCR_USERNAME }}
-          registryPassword: ${{ secrets.GHCR_PASSWORD }}
-
-      - name: Deploy gateway
-        uses: azure/container-apps-deploy-action@v1
-        with:
-          containerAppName: gateway
-          resourceGroup: ${{ env.RESOURCE_GROUP }}
-          imageToDeploy: ${{ env.GATEWAY_IMAGE }}:${{ needs.docker-build.outputs.tag }}
-          registryUrl: ghcr.io
-          registryUsername: ${{ secrets.GHCR_USERNAME }}
-          registryPassword: ${{ secrets.GHCR_PASSWORD }}
-          environmentVariables: |
-            USER_SERVICE_URL=http://user-service.internal.${{ env.CAE_NAME }}.${{ env.CAE_REGION }}.azurecontainerapps.io
-            TRAVEL_SERVICE_URL=http://travel-service.internal.${{ env.CAE_NAME }}.${{ env.CAE_REGION }}.azurecontainerapps.io
-            CLIENT_URL=http://client.internal.${{ env.CAE_NAME }}.${{ env.CAE_REGION }}.azurecontainerapps.io
+      # 更新已有 Container App 的镜像（仅更新镜像，不动运行配置）。
+      # 应用的 env/secrets（数据库连接串、JWT、内部服务地址等）在 ACA 上一次性配置，
+      # 由 deploy-azure.sh / 手动 az 维护；CI 用 az containerapp update 只替换镜像，
+      # 避免整段配置替换清空 user-service / travel-service 的启动参数。
+      # 镜像为 ghcr public，无需 registry 凭据即可拉取。
+      - name: Update app images
+        run: |
+          tag="${{ needs.docker-build.outputs.tag }}"
+          ns="${{ github.repository_owner }}"
+          az containerapp update -n user-service   -g "${{ env.RESOURCE_GROUP }}" --image "ghcr.io/$ns/travelmap-user-service:$tag"
+          az containerapp update -n client        -g "${{ env.RESOURCE_GROUP }}" --image "ghcr.io/$ns/travelmap-client:$tag"
+          az containerapp update -n travel-service -g "${{ env.RESOURCE_GROUP }}" --image "ghcr.io/$ns/travelmap-travel-service:$tag"
+          az containerapp update -n gateway       -g "${{ env.RESOURCE_GROUP }}" --image "ghcr.io/$ns/travelmap-gateway:$tag"
