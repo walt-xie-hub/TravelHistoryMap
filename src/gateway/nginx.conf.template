@@ -2,20 +2,14 @@
 # 运行时由 nginx 官方镜像 envsubst 替换 ${USER_SERVICE_URL} / ${TRAVEL_SERVICE_URL} / ${CLIENT_URL}
 #
 # 传输安全（HTTPS）：
-# - TLS 由边缘层终结（Azure Container Apps 外部入口 / K8s nginx Ingress），
-#   网关容器本身只监听 80（HTTP），边缘层会把原始协议写入 X-Forwarded-Proto。
-# - 收到明文 HTTP（X-Forwarded-Proto != https）时一律 301 跳转 https，
-#   保证注册/登录等含敏感信息的请求始终走加密通道。
+# - TLS 与 http→https 跳转统一由边缘层完成（Azure Container Apps 外部入口
+#   transport=Auto，或 K8s nginx Ingress），网关容器自身只监听 80（HTTP），
+#   因此这里不做容器内 301 强制跳转，避免在边缘层未转发
+#   X-Forwarded-Proto=https 时产生重定向循环。
 # - 附加 HSTS 等安全响应头，让浏览器长期只走 HTTPS。
-# - $host / $request_uri / $http_x_forwarded_proto 是 nginx 内置变量，
-#   envsubst 不会替换它们（只替换已定义的容器环境变量）。
+# - $host / $request_uri 是 nginx 内置变量，envsubst 不会替换它们。
 server {
     listen 80;
-
-    # 明文 HTTP → 强制 HTTPS（边缘层未提供 X-Forwarded-Proto 的直连请求也按非 https 处理）
-    if ($http_x_forwarded_proto != 'https') {
-        return 301 https://$host$request_uri;
-    }
 
     # 安全响应头：HSTS 要求浏览器后续只用 HTTPS；其余为常见 XSS/嗅探防护
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;

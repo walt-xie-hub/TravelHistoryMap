@@ -217,7 +217,7 @@ push 到 main（或 PR / 手动触发）
 | `if: github.event_name != 'pull_request'` | PR 只验证不部署 |
 | `permissions: id-token: write` | OIDC 登录 Azure 需要请求短期 JWT（无密码） |
 | `azure/login@v2` | 用 client-id / tenant-id / subscription-id 三个 secret 无密码登录 Azure |
-| `azure/container-apps-deploy-action@v1` × 4 | 更新 user-service / travel-service / client / gateway 的镜像；gateway 额外注入 `USER_SERVICE_URL` / `TRAVEL_SERVICE_URL` / `CLIENT_URL` 环境变量 |
+| `Update app images` | 用 `az containerapp update --image` 更新 user-service / client / travel-service / gateway 的镜像（**仅镜像**，保留应用已配置的 env/secrets；运行配置在 ACA 上一次性配置） |
 
 部署所需的三个 secrets（Azure 部署向导创建时自动生成，存在仓库 Settings → Secrets）：
 
