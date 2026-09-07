@@ -29,6 +29,15 @@
             "stopAtEntry": false
         },
         {
+            "name": "Angular: Chrome",
+            "type": "chrome",
+            "request": "launch",
+            "preLaunchTask": "client: start",
+            "url": "http://localhost:4200/",
+            "webRoot": "${workspaceFolder}/src/frontend/client",
+            "sourceMaps": true
+        },
+        {
             "name": ".NET Core Attach",
             "type": "coreclr",
             "request": "attach"

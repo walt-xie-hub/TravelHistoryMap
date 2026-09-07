@@ -2,6 +2,23 @@
     "version": "2.0.0",
     "tasks": [
         {
+            "label": "client: start",
+            "type": "shell",
+            "command": "npm --prefix src/frontend/client run start",
+            "isBackground": true,
+            "problemMatcher": {
+                "owner": "angular",
+                "pattern": {
+                    "regexp": ".*"
+                },
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": "(ng serve|Angular Live Development Server)",
+                    "endsPattern": "(Application bundle generation complete|Local:)"
+                }
+            }
+        },
+        {
             "label": "build",
             "command": "dotnet",
             "type": "process",
