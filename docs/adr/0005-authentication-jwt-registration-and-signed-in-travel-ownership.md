@@ -13,7 +13,7 @@
 - **dev 密钥共享**：user-service（签发+验证）与 travel-history（仅验证）在 compose/本地通过同一组 `Jwt__*` 环境变量共享签名密钥。生产（k8s/Azure）由部署 secret 注入，不在代码库。
 
 ### 2. 注册是创建用户的唯一途径；users CRUD 端点下线
-- 新增 `POST /api/auth/register`（name/email/password）与 `POST /api/auth/login`（email/password）；注册成功**直接签发 token**（自动登录）。
+- 新增 `POST /api/auth/register`（name/email/password）与 `POST /api/auth/login`（email/password）；注册成功只写入用户并返回用户信息，不签发 token，前端引导用户重新登录。
 - 移除公开的 `POST /api/users`（创建）、`PUT /api/users/{id}`（任意改人）、`DELETE /api/users/{id}`；移除与列表页配套的 `GET /api/users` 分页端点（无人再消费，且会暴露全部账号）。
 - 领域约束保持：`Email` 唯一索引兜底，应用层预检冲突返回 409 语义。
 
@@ -35,7 +35,7 @@
 - 地图页**移除用户下拉与记忆**，足迹只属于当前登录用户（覆盖 ADR-0003 的「下拉选用户」与 ADR-0004 的「展示任意用户」展示语义）；users CRUD 列表页从导航与路由下线。
 
 ### 6. dev 演示数据
-- `DatabaseInitializer`（user-service，仅 Development）幂等种子演示账号 `demo@travel.local` / `Demo@123456`（密码以 PBKDF2 哈希存储，不硬编码明文可登录路径之外）。
+- `DatabaseInitializer`（user-service，仅 Development）根据外部配置幂等种子演示账号 `demo@travel.local`；密码以 PBKDF2 哈希存储，不进入代码库。
 - 如需地图演示，为其归属的 travel 记录另行 seed（Development only，幂等）。
 
 ## Consequences

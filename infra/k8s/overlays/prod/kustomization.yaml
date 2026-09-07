@@ -12,6 +12,9 @@ images:
   - name: user-service
     newName: registry.example.com/travel-map/user-service
     newTag: 1.0.0
+  - name: travel-service
+    newName: registry.example.com/travel-map/travel-service
+    newTag: 1.0.0
   - name: client-app
     newName: registry.example.com/travel-map/client-app
     newTag: 1.0.0
@@ -19,6 +22,8 @@ images:
 # 生产环境多副本，保证高可用
 replicas:
   - name: user-service
+    count: 3
+  - name: travel-service
     count: 3
   - name: client
     count: 3

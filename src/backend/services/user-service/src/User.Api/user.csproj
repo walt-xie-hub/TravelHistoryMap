@@ -19,6 +19,10 @@
     <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUi" Version="9.0.4" />
     <!-- JWT Bearer 认证（ADR-0005） -->
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.9" />
+    <!-- 图形验证码渲染：SkiaSharp 纯托管 API + 平台 native（Linux 容器 NoDependencies 无需系统依赖/字体） -->
+    <PackageReference Include="SkiaSharp" Version="2.88.9" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="2.88.9" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Win32" Version="2.88.9" />
   </ItemGroup>
 
 </Project>

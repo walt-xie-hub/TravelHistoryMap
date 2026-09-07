@@ -24,8 +24,15 @@ public record ChangePasswordDto(string CurrentPassword, string NewPassword);
 /// <summary>注册请求。</summary>
 public record RegisterRequestDto(string Name, string Email, string Password);
 
-/// <summary>登录请求。</summary>
-public record LoginRequestDto(string Email, string Password);
+/// <summary>
+/// 登录请求。captchaId/captchaAnswer 为图片验证码凭证：
+/// 前端先 GET /api/auth/captcha 获取验证码，再随登录一并提交（一次性、5 分钟过期）。
+/// </summary>
+public record LoginRequestDto(
+    string Email,
+    string Password,
+    string? CaptchaId = null,
+    string? CaptchaAnswer = null);
 
 /// <summary>认证成功响应（JWT + 用户档案）。注册与登录共用。</summary>
 public record AuthResponseDto(string Token, UserDto User);

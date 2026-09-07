@@ -6,8 +6,12 @@ collect the location of travel
 ## 启动开发环境
 
 ```bash
+copy .env.example .env
+# 编辑 .env，设置 DB_PASSWORD 和 JWT_KEY
 docker compose -f docker-compose.dev.yml up -d
 ```
+
+`.env`、Kubernetes Secret 和前端运行时配置均不提交到 Git。ASP.NET 配置键保持不变，Compose 通过环境变量覆盖连接串和 JWT 配置。
 
 ---
 
@@ -15,10 +19,10 @@ docker compose -f docker-compose.dev.yml up -d
 
 应用**只有登录用户才能进入主界面**：`/login`、`/register` 为公开页，其余路由由 `authGuard` 保护，业务请求自动携带 JWT（见 `docs/adr/0005`）。
 
-- **注册**：注册是创建账号的唯一途径，注册成功即自动登录。
+- **注册**：注册是创建账号的唯一途径，注册成功后跳转登录页；登录时需要输入图片验证码。
 - **开发种子账号**（`user-service` 以 Development 启动时幂等创建）：
   - 邮箱：`demo@travel.local`
-  - 密码：`Demo@123456`
+   - 密码：由 `.env` 中的 `DEMO_USER_PASSWORD` 提供
 - 登录后右上角显示用户名与头像（头像可填图片 URL，留空则显示姓名首字母），点击后出现菜单，可进入「我的资料」（`/profile`，修改姓名/邮箱/电话/头像与登录密码）或「登出」。
 
 ---
@@ -30,9 +34,13 @@ docker compose -f docker-compose.dev.yml up -d
 1. 打开 https://lbs.amap.com ，注册/登录并完成个人实名认证。
 2. 控制台 → 应用管理 → 我的应用 → **创建新应用** → 添加 key：服务平台选 **“Web端(JS API)”**，类型 “JavaScript API”。
 3. 在 key 的**域名白名单**中加入本页地址（本地开发为 `http://localhost:4200`；生产为部署域名）。
-4. 把 key 与配套的 **securityJsCode** 填入 `src/frontend/client/src/environments/environment.ts`（dev）或 `environment.prod.ts`（prod）的 `amap` 字段。
+4. 复制 `src/frontend/client/public/runtime-config.example.js` 为 `runtime-config.js`，再把 key 与配套的 **securityJsCode** 填入其中。该文件已被 Git 忽略。
 
 未配置密钥时地图页会显示指引而不是崩溃；填入后刷新页面即可。
+
+CI/CD 发布时，在 GitHub Actions Secrets 中配置 `AMAP_KEY` 和 `AMAP_SECURITY_JS_CODE`，工作流会在构建前生成运行时配置文件。
+
+Kubernetes 部署前请使用部署平台的 Secret 管理功能创建 `app-secret`，字段模板见 `infra/k8s/base/secret.example.yaml`；不要把真实的 `secret.yaml` 放回仓库。
 
 前端启动：`cd src/frontend/client && npm install && npm start`（默认 http://localhost:4200）。
 后端 dev 端口：user-service `http://localhost:8080`，travel-history `http://localhost:8081`（由 docker-compose.dev.yml 暴露）。
@@ -209,7 +217,7 @@ push 到 main（或 PR / 手动触发）
 | `if: github.event_name != 'pull_request'` | PR 只验证不部署 |
 | `permissions: id-token: write` | OIDC 登录 Azure 需要请求短期 JWT（无密码） |
 | `azure/login@v2` | 用 client-id / tenant-id / subscription-id 三个 secret 无密码登录 Azure |
-| `azure/container-apps-deploy-action@v1` × 3 | 更新 user-service / client / gateway 的镜像；gateway 额外注入 `USER_SERVICE_URL` / `CLIENT_URL` 环境变量 |
+| `azure/container-apps-deploy-action@v1` × 4 | 更新 user-service / travel-service / client / gateway 的镜像；gateway 额外注入 `USER_SERVICE_URL` / `TRAVEL_SERVICE_URL` / `CLIENT_URL` 环境变量 |
 
 部署所需的三个 secrets（Azure 部署向导创建时自动生成，存在仓库 Settings → Secrets）：
 

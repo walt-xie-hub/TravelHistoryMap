@@ -176,6 +176,30 @@
 }
 
 .record-list {
+
+  .pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding-top: 10px;
+    color: var(--text-muted, #6b7280);
+    font-size: 12px;
+  }
+
+  .pagination__button {
+    padding: 5px 9px;
+    border: 1px solid var(--border-color, #d1d5db);
+    border-radius: 6px;
+    background: var(--surface, #ffffff);
+    color: var(--text, #111827);
+    cursor: pointer;
+
+    &:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+  }
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -215,6 +239,42 @@
   align-items: center;
   gap: 8px;
   width: 100%;
+}
+
+.record-delete {
+  margin-left: auto;
+  padding: 3px 7px;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  background: #fff1f2;
+  color: #be123c;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+
+  &:hover {
+    background: #ffe4e6;
+  }
+}
+
+.record-detail {
+  margin-left: auto;
+  padding: 3px 7px;
+  border: 1px solid var(--border-color, #d1d5db);
+  border-radius: 6px;
+  background: var(--surface, #ffffff);
+  color: var(--primary, #2563eb);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--primary-soft, #eff6ff);
+  }
+
+  + .record-delete {
+    margin-left: 0;
+  }
 }
 
 .record-name {

@@ -29,6 +29,9 @@ public class TravelRecord
     /// <summary>离开时间（UTC 时刻；为空 = 停留仍在进行中，离开后补录）</summary>
     public DateTimeOffset? DepartedAt { get; set; }
 
+    /// <summary>这次停留的文字描述，可为空。</summary>
+    public string? Description { get; set; }
+
     /// <summary>创建时间（UTC）</summary>
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 

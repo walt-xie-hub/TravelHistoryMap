@@ -4,8 +4,6 @@ kind: Ingress
 metadata:
   name: myapp-ingress
   namespace: myapp
-  annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
 spec:
   ingressClassName: nginx
   rules:
@@ -18,6 +16,13 @@ spec:
           service:
             # 与后端服务（base/user-service）名称保持一致
             name: user-service
+            port:
+              number: 8080
+      - path: /api/travels
+        pathType: Prefix
+        backend:
+          service:
+            name: travel-service
             port:
               number: 8080
       - path: /

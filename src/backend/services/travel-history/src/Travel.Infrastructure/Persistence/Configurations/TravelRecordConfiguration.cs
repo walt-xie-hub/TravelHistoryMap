@@ -41,6 +41,10 @@ public class TravelRecordConfiguration : IEntityTypeConfiguration<TravelRecord>
             .IsRequired(false)
             .HasColumnType("timestamptz");
 
+        builder.Property(t => t.Description)
+            .IsRequired(false)
+            .HasMaxLength(4000);
+
         builder.Property(t => t.CreatedAt)
             .IsRequired();
 

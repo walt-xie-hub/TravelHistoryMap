@@ -27,3 +27,15 @@ _Avoid_: place 表, POI, 外键地点引用, PostGIS
 **Referenced user**:
 Travel record 的归属者，由 `user_id` 外键引用 `users.Id`。travel-history 与 user-service 在代码层零耦合（不引用 `User.Domain`），完整性由数据库级外键保证。
 _Avoid_: 跨服务同步调用验证用户存在性
+
+**Travel detail**:
+Travel record 的可选文字描述，直接属于该次停留；没有描述不影响 Travel record 的存在。
+_Avoid_: 独立行程、游记聚合
+
+**Travel image**:
+与 Travel record 关联的图片资源。数据库保存文件元数据和原图/缩略图路径，文件内容保存在可配置的持久化媒体存储中；图片访问必须继承所属 Travel record 的用户权限。
+_Avoid_: 将图片二进制塞入 TravelRecords、公开图片 URL
+
+**Client application**:
+访问 Travel Map 能力的客户端，包括浏览器和未来的手机端应用。客户端通过同一组面向资源的公共 API 操作登录用户自己的数据，不依赖具体后端服务地址或存储实现。
+_Avoid_: 将 Web 页面视为唯一客户端、把微服务内部地址暴露给客户端

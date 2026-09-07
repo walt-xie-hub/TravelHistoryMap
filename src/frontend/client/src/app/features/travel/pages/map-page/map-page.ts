@@ -10,6 +10,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { EmptyState } from '@shared/components/empty-state/empty-state';
+import { Router, RouterLink } from '@angular/router';
 import { LoadingSpinner } from '@shared/components/loading-spinner/loading-spinner';
 import { PageHeader } from '@shared/components/page-header/page-header';
 import type {
@@ -17,10 +18,12 @@ import type {
   AmapMap,
   AmapMarker,
   AmapNamespace,
+  AmapLngLat,
+  AmapPlaceResult,
 } from '../../../../../types/amap';
 import { MapSidePanel } from '../../components/map-side-panel/map-side-panel';
-import { AmapLoaderService } from '../../services/amap-loader.service';
-import { TravelHistoryService } from '../../services/travel-history.service';
+import { AmapLoaderService } from '../../data-access/amap-loader.service';
+import { TravelHistoryService } from '../../data-access/travel-history.service';
 import type { TravelRangeRequest, TravelRecord } from '../../models/travel-record.model';
 import { wgs84ToGcj02 } from '../../utils/coord';
 import { TravelMarkerGroup, fmtDateTime, groupRecords } from '../../utils/travel-display';
@@ -29,7 +32,7 @@ const DEFAULT_CENTER = [104.1954, 35.8617] as const; // 中国全国视野
 const DEFAULT_ZOOM = 5;
 const FOCUS_ZOOM = 10;
 const FIT_PADDING: number[] = [70, 70, 70, 70];
-const PAGE_SIZE = 100;
+const PAGE_SIZE = 20;
 
 type MapState = 'idle' | 'ready' | 'missing-key' | 'error';
 
@@ -41,12 +44,13 @@ type MapState = 'idle' | 'ready' | 'missing-key' | 'error';
 @Component({
   selector: 'app-map-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [EmptyState, LoadingSpinner, MapSidePanel, PageHeader],
+  imports: [EmptyState, LoadingSpinner, MapSidePanel, PageHeader, RouterLink],
   templateUrl: './map-page.html',
   styleUrl: './map-page.scss',
 })
 export class MapPage implements AfterViewInit, OnDestroy {
   private readonly travelService = inject(TravelHistoryService);
+  private readonly router = inject(Router);
   private readonly amapLoader = inject(AmapLoaderService);
 
   private readonly mapContainer =
@@ -58,6 +62,13 @@ export class MapPage implements AfterViewInit, OnDestroy {
   readonly mapState = signal<MapState>('idle');
   readonly mapErrorMsg = signal('');
   readonly selectedRecordId = signal<number | null>(null);
+  readonly page = signal(1);
+  readonly totalPages = signal(1);
+  readonly totalCount = signal(0);
+  readonly searchKeyword = signal('');
+  readonly searchResults = signal<AmapPlaceResult[]>([]);
+  readonly searchLoading = signal(false);
+  readonly searchError = signal('');
 
   /** 进行中/过去 的标注计数徽标（legend 用） */
   readonly hasRecords = computed(() => this.records().length > 0);
@@ -66,6 +77,7 @@ export class MapPage implements AfterViewInit, OnDestroy {
   private map: AmapMap | null = null;
   private infoWindow: AmapInfoWindow | null = null;
   private markers: AmapMarker[] = [];
+  private searchMarker: AmapMarker | null = null;
   private markerPositionByGroupKey = new Map<string, [number, number]>();
   private groupByRecord = new Map<number, TravelMarkerGroup>();
   private range: TravelRangeRequest = { kind: 'all' };
@@ -81,6 +93,7 @@ export class MapPage implements AfterViewInit, OnDestroy {
     this.map = null;
     this.infoWindow = null;
     this.markers = [];
+    this.searchMarker = null;
   }
 
   // ---------- 地图初始化 ----------
@@ -134,13 +147,14 @@ export class MapPage implements AfterViewInit, OnDestroy {
 
   onFilterChange(request: TravelRangeRequest): void {
     this.range = request;
+    this.page.set(1);
     this.selectedRecordId.set(null);
     this.infoWindow?.close();
     void this.refreshRecords();
   }
 
   private currentKey(): string {
-    return `${this.range.kind}|${this.range.from ?? ''}|${this.range.to ?? ''}`;
+    return `${this.range.kind}|${this.range.from ?? ''}|${this.range.to ?? ''}|${this.page()}`;
   }
 
   private async refreshRecords(): Promise<void> {
@@ -151,18 +165,24 @@ export class MapPage implements AfterViewInit, OnDestroy {
     this.travelLoading.set(true);
     this.travelError.set(null);
     try {
-      const rows = await this.travelService.getAll({
-        from: this.range.from,
-        to: this.range.to,
-      });
+      const result = await this.travelService.getPaged(
+        this.page(),
+        PAGE_SIZE,
+        this.range.from,
+        this.range.to,
+      );
       if (seq !== this.fetchSeq) return;
-      this.records.set(rows);
+      this.records.set(result.items);
+      this.totalPages.set(result.totalPages);
+      this.totalCount.set(result.totalCount);
       this.loadedKey = key;
       this.renderMarkers();
       this.fitView();
     } catch {
       if (seq === this.fetchSeq) {
         this.records.set([]);
+        this.totalPages.set(1);
+        this.totalCount.set(0);
         this.travelError.set('加载旅行记录失败，请检查服务后重试。');
         this.renderMarkers();
         this.fitView();
@@ -192,16 +212,41 @@ export class MapPage implements AfterViewInit, OnDestroy {
       const position: [number, number] = [gcjLng, gcjLat];
       const count = group.records.length;
       const ongoing = group.records.some((r) => r.departedAt === null);
+      const markerKind = count > 1 ? 'merged' : ongoing ? 'ongoing' : 'ordinary';
 
       const content = document.createElement('div');
       content.className = [
         'tm-marker',
-        count > 1 ? 'tm-marker--merged' : '',
-        ongoing ? 'tm-marker--ongoing' : '',
+        `tm-marker--${markerKind}`,
       ]
         .filter(Boolean)
         .join(' ');
-      if (count > 1) content.textContent = String(count);
+      content.setAttribute(
+        'aria-label',
+        count > 1 ? `多次到访，共 ${count} 次` : ongoing ? '进行中' : '普通停留',
+      );
+
+      const earLeft = document.createElement('span');
+      earLeft.className = 'tm-marker__ear tm-marker__ear--left';
+      const earRight = document.createElement('span');
+      earRight.className = 'tm-marker__ear tm-marker__ear--right';
+      const face = document.createElement('span');
+      face.className = 'tm-marker__face';
+      const eyeLeft = document.createElement('span');
+      eyeLeft.className = 'tm-marker__eye tm-marker__eye--left';
+      const eyeRight = document.createElement('span');
+      eyeRight.className = 'tm-marker__eye tm-marker__eye--right';
+      const muzzle = document.createElement('span');
+      muzzle.className = 'tm-marker__muzzle';
+      face.append(eyeLeft, eyeRight, muzzle);
+      content.append(earLeft, earRight, face);
+
+      if (count > 1) {
+        const countBadge = document.createElement('span');
+        countBadge.className = 'tm-marker__count';
+        countBadge.textContent = String(count);
+        content.appendChild(countBadge);
+      }
 
       const marker = new amap.Marker({
         position,
@@ -216,6 +261,77 @@ export class MapPage implements AfterViewInit, OnDestroy {
       this.markers.push(marker);
       this.markerPositionByGroupKey.set(group.key, position);
     }
+  }
+
+  async searchPlace(): Promise<void> {
+    const keyword = this.searchKeyword().trim();
+    if (!keyword) return;
+    const amap = this.amap;
+    if (!amap || !this.map) {
+      this.searchError.set('地图正在加载，请稍后再搜索。');
+      return;
+    }
+    if (!amap.plugin) {
+      this.searchError.set('地点搜索服务不可用，请检查高德地图配置。');
+      return;
+    }
+    this.searchLoading.set(true);
+    this.searchError.set('');
+    this.searchResults.set([]);
+    try {
+      await new Promise<void>((resolve) => {
+        amap.plugin!(['AMap.PlaceSearch'], () => {
+          if (!amap.PlaceSearch) {
+            this.searchError.set('地点搜索插件加载失败，请刷新页面后重试。');
+            resolve();
+            return;
+          }
+          const searcher = new amap.PlaceSearch!({ pageSize: 8 });
+          searcher.search(keyword, (status, result) => {
+            const places = status === 'complete' ? result.poiList?.pois ?? [] : [];
+            this.searchResults.set(places);
+            if (!places.length) this.searchError.set('没有找到匹配的位置。');
+            resolve();
+          });
+        });
+      });
+    } finally {
+      this.searchLoading.set(false);
+    }
+  }
+
+  selectSearchPlace(place: AmapPlaceResult): void {
+    const position = this.placeCoordinates(place.location);
+    if (!position || !this.map || !this.amap) return;
+    this.searchResults.set([]);
+    this.searchKeyword.set(place.name ?? this.searchKeyword());
+    if (this.searchMarker) this.map.remove(this.searchMarker);
+    this.searchMarker = new this.amap.Marker({
+      position,
+      title: place.name ?? '搜索位置',
+      zIndex: 1200,
+    });
+    this.map.add(this.searchMarker);
+    this.map.setZoomAndCenter(15, position);
+
+    const content = document.createElement('div');
+    content.className = 'tm-search-info';
+    const title = document.createElement('strong');
+    title.textContent = place.name ?? '搜索位置';
+    content.appendChild(title);
+    const address = document.createElement('span');
+    address.textContent = place.address ?? '地址信息暂无';
+    content.appendChild(address);
+    const coordinates = document.createElement('span');
+    coordinates.textContent = `坐标：${position[1].toFixed(6)}, ${position[0].toFixed(6)}`;
+    content.appendChild(coordinates);
+    this.infoWindow?.setContent(content);
+    this.infoWindow?.open(this.map, position);
+  }
+
+  private placeCoordinates(location: AmapPlaceResult['location']): AmapLngLat | null {
+    if (!location) return null;
+    return Array.isArray(location) ? location : [location.getLng(), location.getLat()];
   }
 
   private fitView(): void {
@@ -281,6 +397,15 @@ export class MapPage implements AfterViewInit, OnDestroy {
       list.appendChild(row);
     }
     root.appendChild(list);
+    const detail = document.createElement('button');
+    detail.type = 'button';
+    detail.className = 'tm-info__detail';
+    detail.textContent = '查看旅游详情';
+    detail.addEventListener('click', () => {
+      this.infoWindow?.close();
+      void this.router.navigate(['/travels', group.records[0]!.id]);
+    });
+    root.appendChild(detail);
     return root;
   }
 
@@ -293,6 +418,43 @@ export class MapPage implements AfterViewInit, OnDestroy {
     map.setCenter([...position]);
     if (map.getZoom() < FOCUS_ZOOM) map.setZoom(FOCUS_ZOOM);
     this.openInfo(group!, position);
+  }
+
+  async onRecordDelete(recordId: number): Promise<void> {
+    const record = this.records().find((item) => item.id === recordId);
+    if (!record) return;
+    const confirmed = window.confirm(
+      `确定要删除“${record.locationName}”这条停留记录吗？描述、图片及相关数据也会一并删除。`,
+    );
+    if (!confirmed) return;
+
+    this.travelLoading.set(true);
+    this.travelError.set(null);
+    try {
+      await this.travelService.delete(recordId);
+      if (this.selectedRecordId() === recordId) this.selectedRecordId.set(null);
+      this.infoWindow?.close();
+      if (this.records().length === 1 && this.page() > 1) {
+        this.page.update(value => value - 1);
+      }
+      await this.refreshRecords();
+    } catch {
+      this.travelError.set('删除停留记录失败，请稍后重试。');
+    } finally {
+      this.travelLoading.set(false);
+    }
+  }
+
+  onRecordDetail(recordId: number): void {
+    void this.router.navigate(['/travels', recordId]);
+  }
+
+  onPageChange(nextPage: number): void {
+    if (nextPage < 1 || nextPage > this.totalPages() || nextPage === this.page()) return;
+    this.page.set(nextPage);
+    this.selectedRecordId.set(null);
+    this.infoWindow?.close();
+    void this.refreshRecords();
   }
 
   onFitAll(): void {

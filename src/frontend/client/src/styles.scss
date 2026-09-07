@@ -43,43 +43,118 @@ body {
 
 .tm-marker {
   position: relative;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: var(--primary);
-  border: 2px solid #ffffff;
-  box-shadow: 0 2px 6px rgb(0 0 0 / 0.28);
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1;
-  color: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transform: translate(-50%, -50%);
+  width: 42px;
+  height: 42px;
   cursor: pointer;
-  transition: transform 0.15s ease;
+  filter: drop-shadow(0 2px 2px rgb(15 23 42 / 0.28));
+  transform: translate(-50%, -50%);
+  transition: transform 160ms ease;
 
   &:hover {
     transform: translate(-50%, -50%) scale(1.12);
   }
 
-  &--merged {
-    width: auto;
-    min-width: 22px;
-    height: 22px;
-    padding: 0 6px;
-    border-radius: 999px;
-    background: var(--primary-strong);
+  &--ordinary {
+    --marker-color: #2563eb;
+    --marker-light: #dbeafe;
   }
 
   &--ongoing {
-    background: var(--success);
+    --marker-color: #16a34a;
+    --marker-light: #dcfce7;
   }
 
-  &--merged.tm-marker--ongoing {
-    background: var(--success);
+  &--merged {
+    --marker-color: #d97706;
+    --marker-light: #ffedd5;
   }
+}
+
+.tm-marker__ear {
+  position: absolute;
+  top: 1px;
+  width: 16px;
+  height: 16px;
+  border: 3px solid #111827;
+  border-radius: 50%;
+  background: var(--marker-color);
+
+  &--left {
+    left: 2px;
+  }
+
+  &--right {
+    right: 2px;
+  }
+}
+
+.tm-marker__face {
+  position: absolute;
+  left: 5px;
+  top: 7px;
+  width: 32px;
+  height: 31px;
+  border: 3px solid #111827;
+  border-radius: 48% 48% 46% 46%;
+  background: var(--marker-light);
+}
+
+.tm-marker__eye {
+  position: absolute;
+  top: 8px;
+  width: 9px;
+  height: 13px;
+  border-radius: 60% 40% 60% 40%;
+  background: #111827;
+  transform: rotate(35deg);
+
+  &--left {
+    left: 5px;
+  }
+
+  &--right {
+    right: 5px;
+    transform: rotate(-35deg);
+  }
+}
+
+.tm-marker__muzzle {
+  position: absolute;
+  left: 11px;
+  bottom: 4px;
+  width: 8px;
+  height: 6px;
+  border-radius: 50%;
+  background: #111827;
+
+  &::after {
+    content: '';
+    position: absolute;
+    left: 3px;
+    top: 4px;
+    width: 2px;
+    height: 6px;
+    background: #111827;
+    box-shadow: -3px 5px 0 -1px #111827, 3px 5px 0 -1px #111827;
+  }
+}
+
+.tm-marker__count {
+  position: absolute;
+  top: -7px;
+  right: -8px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border: 2px solid #ffffff;
+  border-radius: 999px;
+  background: #d97706;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 14px;
+  text-align: center;
+  box-shadow: 0 1px 3px rgb(15 23 42 / 0.3);
 }
 
 /* 进行中停留：脉冲光环 */
@@ -88,7 +163,7 @@ body {
   position: absolute;
   inset: -3px;
   border-radius: inherit;
-  border: 2px solid var(--success);
+  border: 2px solid #16a34a;
   opacity: 0.7;
   animation: tm-pulse 1.6s ease-out infinite;
   pointer-events: none;
@@ -185,6 +260,27 @@ body {
   font-weight: 600;
   line-height: 16px;
   flex: none;
+}
+
+.tm-search-info {
+  display: grid;
+  gap: 4px;
+  min-width: 180px;
+  max-width: 260px;
+  color: var(--text-strong);
+  font-family: inherit;
+  font-size: 12px;
+}
+
+.tm-search-info strong {
+  font-size: 14px;
+}
+
+.tm-search-info span {
+  overflow: hidden;
+  color: var(--text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* 高德默认 InfoWindow 箭头在缩放时位置即可；这里统一收窄内容内边距 */

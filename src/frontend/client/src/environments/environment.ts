@@ -1,3 +1,5 @@
+import { runtimeConfig } from './runtime-config';
+
 /**
  * 开发环境配置（默认）。
  * 生产构建时由 angular.json 的 fileReplacements 替换为 environment.prod.ts。
@@ -12,9 +14,9 @@ export const environment = {
    *  未配置时地图页会提示而非崩溃。填入后无需重启即可生效（刷新页面）。 */
   amap: {
     /** Web 端(JS API) 的 key */
-    key: '',
+    key: runtimeConfig.amapKey ?? '',
     /** 配套安全密钥 securityJsCode */
-    securityJsCode: '',
+    securityJsCode: runtimeConfig.amapSecurityJsCode ?? '',
   },
   appName: 'Travel Map',
 };

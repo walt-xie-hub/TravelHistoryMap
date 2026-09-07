@@ -18,6 +18,7 @@ builder.Services.AddObservability("travel-service");
 
 // 组合根：在唯一能引用所有层的地方完成装配
 builder.Services.AddScoped<ITravelService, TravelService>();
+builder.Services.AddScoped<ITravelImageService, TravelImageService>();
 builder.Services.AddInfrastructure(builder.Configuration);
 
 // JWT 验证（ADR-0005）：与 user-service 共享同一组 Jwt 配置（签名密钥/签发者/受众），
@@ -41,6 +42,8 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 builder.Services.AddAuthorization();
+builder.Services.AddAntiforgery();
+builder.Services.ConfigureHttpJsonOptions(options => options.SerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase);
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
@@ -130,6 +133,7 @@ app.UseCors("DevCors");
 // 认证/授权（JWT 校验须在业务端点映射前启用）
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseAntiforgery();
 
 // 暴露 /metrics 端点供 Prometheus 抓取（必须在 UseCors 之后、Map 之前）
 app.UseObservability();

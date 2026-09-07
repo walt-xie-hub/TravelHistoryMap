@@ -1,9 +1,37 @@
 # 网关路由模板（对应 K8s base/client/ingress.yaml 的路径分流逻辑）
-# 运行时由 nginx 官方镜像 envsubst 替换 ${USER_SERVICE_URL} / ${CLIENT_URL}
+# 运行时由 nginx 官方镜像 envsubst 替换 ${USER_SERVICE_URL} / ${TRAVEL_SERVICE_URL} / ${CLIENT_URL}
+#
+# 传输安全（HTTPS）：
+# - TLS 由边缘层终结（Azure Container Apps 外部入口 / K8s nginx Ingress），
+#   网关容器本身只监听 80（HTTP），边缘层会把原始协议写入 X-Forwarded-Proto。
+# - 收到明文 HTTP（X-Forwarded-Proto != https）时一律 301 跳转 https，
+#   保证注册/登录等含敏感信息的请求始终走加密通道。
+# - 附加 HSTS 等安全响应头，让浏览器长期只走 HTTPS。
+# - $host / $request_uri / $http_x_forwarded_proto 是 nginx 内置变量，
+#   envsubst 不会替换它们（只替换已定义的容器环境变量）。
 server {
     listen 80;
 
-    # /api/* → 后端 user-service（保留 /api 前缀，后端路由挂载在 /api）
+    # 明文 HTTP → 强制 HTTPS（边缘层未提供 X-Forwarded-Proto 的直连请求也按非 https 处理）
+    if ($http_x_forwarded_proto != 'https') {
+        return 301 https://$host$request_uri;
+    }
+
+    # 安全响应头：HSTS 要求浏览器后续只用 HTTPS；其余为常见 XSS/嗅探防护
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    # More specific travel routes must precede the generic API route.
+    location /api/travels/ {
+        proxy_pass ${TRAVEL_SERVICE_URL};
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # /api/* -> user-service (the /api prefix is preserved)
     location /api/ {
         proxy_pass ${USER_SERVICE_URL};
         proxy_set_header Host $host;

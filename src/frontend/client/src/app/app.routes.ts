@@ -32,12 +32,22 @@ export const routes: Routes = [
       {
         path: 'map',
         loadChildren: () =>
-          import('@features/map/map.routes').then((m) => m.MAP_ROUTES),
+          import('@features/travel/travel.routes').then((m) => m.TRAVEL_ROUTES),
       },
       {
         path: 'profile',
         loadChildren: () =>
           import('@features/profile/profile.routes').then((m) => m.PROFILE_ROUTES),
+      },
+      {
+        path: 'travels/new',
+        loadComponent: () =>
+          import('@features/travel/pages/travel-create/travel-create-page').then((m) => m.TravelCreatePage),
+      },
+      {
+        path: 'travels/:id',
+        loadComponent: () =>
+          import('@features/travel/pages/travel-detail/travel-detail-page').then((m) => m.TravelDetailPage),
       },
       {
         path: '**',

@@ -1,10 +1,13 @@
-<form class="auth-card" (ngSubmit)="submit()" novalidate>
+<form class="auth-card" (submit)="submit($event)" novalidate>
   <div class="auth-card__brand">
     <div class="auth-card__logo" aria-hidden="true">🧭</div>
     <h1 class="auth-card__title">创建账号</h1>
     <p class="auth-card__subtitle">注册 {{ appName }} 并记录你的足迹</p>
   </div>
 
+  @if (successMessage(); as message) {
+    <div class="auth-card__success" role="status">{{ message }}</div>
+  }
   @if (errorMessage(); as message) {
     <div class="auth-card__error" role="alert">{{ message }}</div>
   }
@@ -19,8 +22,12 @@
       placeholder="怎么称呼你"
       [value]="name()"
       (input)="onNameChange($event)"
+      (blur)="onNameBlur()"
       required
     />
+    @if (hints().name; as hint) {
+      <span class="field__hint field__hint--error">{{ hint }}</span>
+    }
   </label>
 
   <label class="field">
@@ -33,8 +40,12 @@
       placeholder="you@example.com"
       [value]="email()"
       (input)="onEmailChange($event)"
+      (blur)="onEmailBlur()"
       required
     />
+    @if (hints().email; as hint) {
+      <span class="field__hint field__hint--error">{{ hint }}</span>
+    }
   </label>
 
   <label class="field">
@@ -47,8 +58,12 @@
       placeholder="至少 8 位字符"
       [value]="password()"
       (input)="onPasswordChange($event)"
+      (blur)="onPasswordBlur()"
       required
     />
+    @if (hints().password; as hint) {
+      <span class="field__hint field__hint--error">{{ hint }}</span>
+    }
   </label>
 
   <label class="field">
@@ -61,12 +76,20 @@
       placeholder="再次输入密码"
       [value]="confirmPassword()"
       (input)="onConfirmPasswordChange($event)"
+      (blur)="onConfirmPasswordBlur()"
       required
     />
+    @if (hints().confirmPassword; as hint) {
+      <span class="field__hint field__hint--error">{{ hint }}</span>
+    }
   </label>
 
-  <button class="auth-card__submit" type="submit" [disabled]="submitting()">
-    {{ submitting() ? '注册中…' : '注册并登录' }}
+  <button
+    class="auth-card__submit"
+    type="submit"
+    [disabled]="submitting() || !!successMessage()"
+  >
+    {{ submitting() ? '注册中…' : successMessage() ? '注册成功' : '注 册' }}
   </button>
 
   <p class="auth-card__footer">

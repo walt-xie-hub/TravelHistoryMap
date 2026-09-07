@@ -50,13 +50,13 @@ services:
       # 注意：.NET 用 GetConnectionString("DefaultConnection")，
       # 所以 env 必须命名为 ConnectionStrings__DefaultConnection
       # （__ 映射为 :，对应配置键 ConnectionStrings:DefaultConnection）
-      - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=appdb;Username=appuser;Password=123456;Pooling=true;
-      # 与 k8s secret 的 Db__Password 对齐（这里直接明文，仅 dev 用）
-      - Db__Password=123456
+      - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=appdb;Username=appuser;Password=${DB_PASSWORD:?DB_PASSWORD is required};Pooling=true;
+      - Db__Password=${DB_PASSWORD:?DB_PASSWORD is required}
       # JWT（ADR-0005）：travel-server 用同一组值做验证；生产由 k8s secret 注入
-      - Jwt__Key=travel-map-dev-jwt-signing-key-0123456789abcdef
+      - Jwt__Key=${JWT_KEY:?JWT_KEY is required}
       - Jwt__Issuer=travel-map
       - Jwt__Audience=travel-map-client
+      - DemoUser__Password=${DEMO_USER_PASSWORD:?DEMO_USER_PASSWORD is required}
       # OpenTelemetry OTLP 导出目标：Collector → Jaeger
       # 使用 gRPC 协议 (:4317)，先经过 Collector 做批量/过滤/路由处理
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
@@ -97,15 +97,18 @@ services:
       - ASPNETCORE_URLS=http://+:8080
       - DOTNET_USE_POLLING_FILE_WATCHER=true
       # 连接本服务的 db（与 k8s 共享同一份数据目录）。
-      - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=appdb;Username=appuser;Password=123456;Pooling=true;
-      - Db__Password=123456
+      - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=appdb;Username=appuser;Password=${DB_PASSWORD:?DB_PASSWORD is required};Pooling=true;
+      - Db__Password=${DB_PASSWORD:?DB_PASSWORD is required}
       # JWT（ADR-0005）：与 user-service 共享签名密钥，仅做验证不签发
-      - Jwt__Key=travel-map-dev-jwt-signing-key-0123456789abcdef
+      - Jwt__Key=${JWT_KEY:?JWT_KEY is required}
       - Jwt__Issuer=travel-map
       - Jwt__Audience=travel-map-client
       # OpenTelemetry OTLP 导出目标：Collector → Jaeger
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
       - OTEL_SERVICE_NAME=travel-service
+      - TravelMedia__RootPath=/app/media
+    volumes:
+      - ./data/travel-media:/app/media
     # 等到 db 健康（Postgres 真正可连接）后才启动，避免启动竞态。
     # user-service 同时也在引导共享库 schema；travel 侧 DatabaseInitializer 自带重试，
     # 可容忍 Users 表/外键尚未就绪的启动顺序问题。
@@ -138,7 +141,7 @@ services:
     environment:
       POSTGRES_DB: appdb
       POSTGRES_USER: appuser
-      POSTGRES_PASSWORD: 123456
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
     volumes:
       - ./database/postgres:/var/lib/postgresql/data
     # 健康检查：Postgres 完成 init 并监听 5432 后才算 healthy

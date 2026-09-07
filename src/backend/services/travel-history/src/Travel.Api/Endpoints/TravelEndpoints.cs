@@ -33,6 +33,55 @@ public static class TravelEndpoints
             return record is null ? Results.NotFound() : Results.Ok(record);
         });
 
+        group.MapGet("/{id:int}/images", async (int id, ClaimsPrincipal principal, ITravelImageService imageService, CancellationToken ct) =>
+        {
+            var images = await imageService.GetImagesAsync(CurrentUserId(principal), id, ct);
+            return images is null ? Results.NotFound() : Results.Ok(images);
+        });
+
+        group.MapPost("/{id:int}/images", async (
+            int id,
+            IFormFile file,
+            ClaimsPrincipal principal,
+            ITravelImageService imageService,
+            CancellationToken ct) =>
+        {
+            await using var input = file.OpenReadStream();
+            try
+            {
+                var image = await imageService.UploadAsync(
+                    CurrentUserId(principal),
+                    id,
+                    new TravelImageUpload(input, file.FileName, file.ContentType, file.Length),
+                    ct);
+                return image is null ? Results.NotFound() : Results.Ok(image);
+            }
+            catch (ArgumentException ex)
+            {
+                return Results.BadRequest(new { error = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.BadRequest(new { error = ex.Message });
+            }
+            catch (InvalidDataException)
+            {
+                return Results.BadRequest(new { error = "The uploaded file is not a valid image." });
+            }
+        }).DisableAntiforgery();
+
+        group.MapGet("/{id:int}/images/{imageId:int}/{variant}", async (
+            int id,
+            int imageId,
+            string variant,
+            ClaimsPrincipal principal,
+            ITravelImageService imageService,
+            CancellationToken ct) =>
+        {
+            var image = await imageService.OpenAsync(CurrentUserId(principal), id, imageId, variant, ct);
+            return image is null ? Results.NotFound() : Results.File(image.Content, image.ContentType);
+        });
+
         group.MapPost("/", async (CreateTravelDto dto, ClaimsPrincipal principal, ITravelService svc, CancellationToken ct) =>
         {
             // 领域校验：离开时间不得早于到达时间（到达未结束时应省略 departedAt）
@@ -52,8 +101,14 @@ public static class TravelEndpoints
             return updated is null ? Results.NotFound() : Results.Ok(updated);
         });
 
-        group.MapDelete("/{id:int}", async (int id, ClaimsPrincipal principal, ITravelService svc, CancellationToken ct) =>
+        group.MapDelete("/{id:int}", async (
+            int id,
+            ClaimsPrincipal principal,
+            ITravelService svc,
+            ITravelImageService imageService,
+            CancellationToken ct) =>
         {
+            await imageService.DeleteForRecordAsync(CurrentUserId(principal), id, ct);
             var deleted = await svc.DeleteAsync(CurrentUserId(principal), id, ct);
             return deleted ? Results.NoContent() : Results.NotFound();
         });
@@ -63,4 +118,5 @@ public static class TravelEndpoints
 
     private static int CurrentUserId(ClaimsPrincipal principal)
         => int.TryParse(principal.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : 0;
+
 }

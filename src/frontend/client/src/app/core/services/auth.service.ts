@@ -3,9 +3,11 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { lastValueFrom } from 'rxjs';
 import {
   AuthResponse,
+  CaptchaResponse,
   ChangePasswordRequest,
   LoginRequest,
   RegisterRequest,
+  RegisterResponse,
   UpdateProfileRequest,
   User,
 } from '@core/models/user.model';
@@ -36,7 +38,7 @@ export class AuthService {
 
   /**
    * 应用启动 / 路由守卫时恢复会话：
-   * 无本地 token 直接返回 false；有 token 则请求 /users/me 校验，
+   * 无本地 token 直接返回 false；有 token 则请求 users/me 校验，
    * token 失效（401）时自动清理本地会话。
    */
   async initialize(): Promise<boolean> {
@@ -58,24 +60,34 @@ export class AuthService {
   /** 登录：成功后保存 token 并写入 currentUser。 */
   async login(credentials: LoginRequest): Promise<User> {
     const response = await lastValueFrom(
-      this.http.post<AuthResponse>('/api/auth/login', credentials),
+      this.http.post<AuthResponse>('auth/login', credentials),
     );
     this.applyAuth(response);
     return response.user;
   }
 
-  /** 注册：注册成功即视为已登录（后端直接签发 token）。 */
+  /**
+   * 注册：用户信息写入数据库后返回 user，不签发 token、不建立会话。
+   * 注册成功由页面引导跳转登录页，让用户携带图片验证码重新登录。
+   */
   async register(payload: RegisterRequest): Promise<User> {
     const response = await lastValueFrom(
-      this.http.post<AuthResponse>('/api/auth/register', payload),
+      this.http.post<RegisterResponse>('auth/register', payload),
     );
-    this.applyAuth(response);
     return response.user;
+  }
+
+  /** 获取登录页图片验证码（服务端一次性凭证，5 分钟过期）。
+   * 附加时间戳避免浏览器缓存旧的失败响应或图片。 */
+  async getCaptcha(): Promise<CaptchaResponse> {
+    return lastValueFrom(
+      this.http.get<CaptchaResponse>(`auth/captcha?t=${Date.now()}`),
+    );
   }
 
   /** 重新拉取当前用户资料并刷新 currentUser。 */
   async loadProfile(): Promise<User> {
-    const user = await lastValueFrom(this.http.get<User>('/api/users/me'));
+    const user = await lastValueFrom(this.http.get<User>('users/me'));
     this._currentUser.set(user);
     return user;
   }
@@ -83,7 +95,7 @@ export class AuthService {
   /** 修改当前用户资料（姓名/邮箱/电话/头像）。 */
   async updateProfile(payload: UpdateProfileRequest): Promise<User> {
     const user = await lastValueFrom(
-      this.http.put<User>('/api/users/me', payload),
+      this.http.put<User>('users/me', payload),
     );
     this._currentUser.set(user);
     return user;
@@ -92,7 +104,7 @@ export class AuthService {
   /** 修改当前用户密码。 */
   async changePassword(currentPassword: string, newPassword: string): Promise<void> {
     const body: ChangePasswordRequest = { currentPassword, newPassword };
-    await lastValueFrom(this.http.put<void>('/api/users/me/password', body));
+    await lastValueFrom(this.http.put<void>('users/me/password', body));
   }
 
   /** 登出：清除本地 token 与内存中的用户资料。 */

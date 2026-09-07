@@ -11,7 +11,17 @@ public record TravelRecordDto(
     decimal Latitude,
     decimal Longitude,
     DateTimeOffset ArrivedAt,
-    DateTimeOffset? DepartedAt);
+    DateTimeOffset? DepartedAt,
+    string? Description = null,
+    IReadOnlyList<TravelImageDto>? Images = null);
+
+public record TravelImageDto(
+    int Id,
+    string OriginalFileName,
+    string ContentType,
+    long FileSize,
+    string ThumbnailUrl,
+    string OriginalUrl);
 
 /// <summary>
 /// 创建旅行记录请求模型（ADR-0005）。归属用户不再由客户端传入：
@@ -22,7 +32,8 @@ public record CreateTravelDto(
     decimal Latitude,
     decimal Longitude,
     DateTimeOffset ArrivedAt,
-    DateTimeOffset? DepartedAt = null);
+    DateTimeOffset? DepartedAt = null,
+    string? Description = null);
 
 /// <summary>
 /// 更新旅行记录请求模型（不允许改归属用户）。
@@ -32,4 +43,5 @@ public record UpdateTravelDto(
     decimal Latitude,
     decimal Longitude,
     DateTimeOffset ArrivedAt,
-    DateTimeOffset? DepartedAt = null);
+    DateTimeOffset? DepartedAt = null,
+    string? Description = null);

@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 
-export const MAP_ROUTES: Routes = [
+export const TRAVEL_ROUTES: Routes = [
   {
     path: '',
     title: '地图 · Travel Map',

@@ -1,8 +1,9 @@
 # ──────────────────────────────────────────────
 # 网关容器：在 Azure Container Apps 里复刻 K8s 的 nginx Ingress 角色
 # 唯一外部入口，按路径分流：
-#   /api/*  → user-service（后端）
-#   /*      → client（前端静态站）
+#   /api/travels/* → travel-service
+#   /api/*        → user-service
+#   /*            → client（前端静态站）
 # 配置通过环境变量 USER_SERVICE_URL / CLIENT_URL 注入，
 # 因此镜像无需在构建期写死后端地址。
 #

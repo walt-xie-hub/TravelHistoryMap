@@ -74,6 +74,7 @@ public class TravelRepository : ITravelRepository
         existing.Longitude = record.Longitude;
         existing.ArrivedAt = record.ArrivedAt;
         existing.DepartedAt = record.DepartedAt;
+        existing.Description = record.Description;
         existing.UpdatedAt = record.UpdatedAt;
 
         await _db.SaveChangesAsync(ct);
@@ -95,4 +96,27 @@ public class TravelRepository : ITravelRepository
 
     private static bool IsForeignKeyViolation(DbUpdateException ex)
         => ex.InnerException is PostgresException { SqlState: "23503" };
+
+    public async Task<IReadOnlyList<TravelImage>> GetImagesAsync(int recordId, CancellationToken ct = default)
+        => await _db.TravelImages.AsNoTracking().Where(image => image.TravelRecordId == recordId)
+            .OrderBy(image => image.Id).ToListAsync(ct);
+
+    public Task<TravelImage?> GetImageAsync(int imageId, CancellationToken ct = default)
+        => _db.TravelImages.AsNoTracking().FirstOrDefaultAsync(image => image.Id == imageId, ct);
+
+    public async Task<TravelImage> AddImageAsync(TravelImage image, CancellationToken ct = default)
+    {
+        _db.TravelImages.Add(image);
+        await _db.SaveChangesAsync(ct);
+        return image;
+    }
+
+    public async Task<bool> DeleteImageAsync(int imageId, CancellationToken ct = default)
+    {
+        var image = await _db.TravelImages.FindAsync([imageId], ct);
+        if (image is null) return false;
+        _db.TravelImages.Remove(image);
+        await _db.SaveChangesAsync(ct);
+        return true;
+    }
 }

@@ -11,6 +11,7 @@ public class TravelDbContext : DbContext
     public TravelDbContext(DbContextOptions<TravelDbContext> options) : base(options) { }
 
     public DbSet<TravelRecord> TravelRecords => Set<TravelRecord>();
+    public DbSet<TravelImage> TravelImages => Set<TravelImage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -5,7 +5,19 @@ GET {{UserApi_HostAddress}}/health
 
 ###
 
-### 注册（注册是创建用户的唯一途径；成功即签发 token 自动登录，ADR-0005）
+### 获取图片验证码（登录前置：返回 captchaId + 图片 data URI）
+GET {{UserApi_HostAddress}}/api/auth/captcha
+
+> {%
+    const body = JSON.parse(response.body);
+    client.global.set("captchaId", body.captchaId);
+    // 图片为 data:image/png;base64,...，可在浏览器/图片查看器中打开，人工读取 4 位数字后填入下方 answer
+    console.log("captchaImage(data uri) 长度:", body.captchaImage.length);
+%}
+
+###
+
+### 注册（唯一创建用户途径，写入数据库；成功后不签发 token，前端引导跳转登录页重新登录）
 POST {{UserApi_HostAddress}}/api/auth/register
 Content-Type: application/json
 
@@ -17,13 +29,16 @@ Content-Type: application/json
 
 ###
 
-### 登录（dev 种子账号：demo@travel.local / Demo@123456）
+### 登录（需携带图片验证码：captchaId 来自上方 GET，answer 请人工填写图片中的 4 位数字）
+# dev 种子账号：demo@travel.local / 使用本地 DEMO_USER_PASSWORD
 POST {{UserApi_HostAddress}}/api/auth/login
 Content-Type: application/json
 
 {
   "email": "demo@travel.local",
-  "password": "Demo@123456"
+  "password": "replace-with-DEMO_USER_PASSWORD",
+  "captchaId": "{{captchaId}}",
+  "captchaAnswer": "请填写图片上的4位数字"
 }
 
 > {%
@@ -58,6 +73,6 @@ Content-Type: application/json
 Authorization: Bearer {{accessToken}}
 
 {
-  "currentPassword": "Demo@123456",
-  "newPassword": "NewPass@123456"
+  "currentPassword": "replace-with-DEMO_USER_PASSWORD",
+  "newPassword": "replace-with-a-new-local-password"
 }

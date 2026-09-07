@@ -40,9 +40,15 @@ export class MapSidePanel {
   readonly records = input<TravelRecord[]>([]);
   readonly travelLoading = input(false);
   readonly selectedRecordId = input<number | null>(null);
+  readonly page = input(1);
+  readonly totalPages = input(1);
+  readonly totalCount = input(0);
 
   readonly filterChange = output<TravelRangeRequest>();
   readonly recordSelect = output<number>();
+  readonly recordDetail = output<number>();
+  readonly recordDelete = output<number>();
+  readonly pageChange = output<number>();
 
   readonly kind = signal<TravelRangeKind>('all');
   readonly customFrom = signal<string>(STORAGE_NONE);
@@ -106,6 +112,20 @@ export class MapSidePanel {
 
   onRecordSelect(id: number): void {
     this.recordSelect.emit(id);
+  }
+
+  onRecordDelete(event: Event, id: number): void {
+    event.stopPropagation();
+    this.recordDelete.emit(id);
+  }
+
+  onRecordDetail(event: Event, id: number): void {
+    event.stopPropagation();
+    this.recordDetail.emit(id);
+  }
+
+  onPageChange(page: number): void {
+    this.pageChange.emit(page);
   }
 
   private emitFilter(): void {
