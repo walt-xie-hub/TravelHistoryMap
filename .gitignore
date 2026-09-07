@@ -1,5 +1,6 @@
-# ===== 环境数据：切勿提交（compose 与 k8s 共用的 Postgres 物理数据）=====
+# ===== 环境数据：切勿提交（compose 与 k8s 共用的 Postgres 物理数据 / 运行媒体）=====
 /database/
+/data/
 
 # ===== .NET 生成物 =====
 **/bin/
