@@ -87,9 +87,9 @@ az containerapp create \
   --image "ghcr.io/$ORG/travelmap-gateway:latest" \
   --target-port 80 --ingress external --min-replicas 0 --max-replicas 3 \
   --env-vars \
-    "USER_SERVICE_URL=http://user-service.internal.$ENV_NAME.$REGION.azurecontainerapps.io" \
-    "TRAVEL_SERVICE_URL=http://travel-service.internal.$ENV_NAME.$REGION.azurecontainerapps.io" \
-    "CLIENT_URL=http://client.internal.$ENV_NAME.$REGION.azurecontainerapps.io" \
+    "USER_SERVICE_URL=https://user-service.internal.$ENV_NAME.$REGION.azurecontainerapps.io" \
+    "TRAVEL_SERVICE_URL=https://travel-service.internal.$ENV_NAME.$REGION.azurecontainerapps.io" \
+    "CLIENT_URL=https://client.internal.$ENV_NAME.$REGION.azurecontainerapps.io" \
   $( [ -n "$GHCR_USERNAME" ] && echo "--registry-server ghcr.io --registry-username $GHCR_USERNAME --registry-password $GHCR_PASSWORD" )
 
 # ── 5. 输出公网入口 ─────────────────────────────────────────
