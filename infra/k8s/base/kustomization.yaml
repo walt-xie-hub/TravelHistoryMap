@@ -8,7 +8,7 @@ namespace: myapp
 resources:
   - namespace.yaml
   - configmap.yaml
-  - secret.yaml
   - user-service
+  - travel-service
   - client
   - postgres

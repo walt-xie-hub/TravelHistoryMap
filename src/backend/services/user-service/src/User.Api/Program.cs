@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.IdentityModel.Tokens;
 using User.Api.Endpoints;
 using Swashbuckle.AspNetCore.SwaggerUI;
@@ -24,6 +25,9 @@ builder.Services.AddInfrastructure(builder.Configuration);
 // JWT 认证（ADR-0005）：自签发 HS256 access token；Key/Issuer/Audience 与 travel-history 共享同一组配置
 var jwtSection = builder.Configuration.GetSection("Jwt");
 builder.Services.AddSingleton<JwtTokenFactory>();
+// 图片验证码：内存缓存答案 + SkiaSharp 渲染（一次性、5 分钟过期）
+builder.Services.AddMemoryCache();
+builder.Services.AddSingleton<CaptchaService>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -46,17 +50,31 @@ builder.Services.AddAuthorization();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
-// 开发态 CORS：允许 Angular dev server（ng serve，默认 :4200）及旧 nginx 开发端口 :8082
-// 跨域调用本服务。演示/开发用途；生产应改为具体前端域名或走网关同源。
+// 开发态 CORS：允许 Angular dev server（ng serve，任意端口）及旧 nginx 开发端口。
+// 使用 localhost / 127.0.0.1 任意端口放行，避免用户通过 127.0.0.1:4200 访问时
+// 因 Origin 不匹配导致验证码/登录等请求被浏览器拦截。
+// 演示/开发用途；生产应改为具体前端域名或走网关同源。
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("DevCors", policy =>
-        policy.WithOrigins("http://localhost:4200", "http://localhost:8082")
+        policy.SetIsOriginAllowed(origin =>
+            origin is not null &&
+            (origin.StartsWith("http://localhost:", StringComparison.OrdinalIgnoreCase) ||
+             origin.StartsWith("http://127.0.0.1:", StringComparison.OrdinalIgnoreCase)))
               .AllowAnyHeader()
               .AllowAnyMethod());
 });
 
 var app = builder.Build();
+
+// 传输安全：生产流量在边缘层（Azure Container Apps 入口 / K8s nginx Ingress）终结 TLS，
+// 本服务收到的只是明文 HTTP。此中间件信任边缘层写入的 X-Forwarded-Proto /
+// X-Forwarded-For，使 request.Scheme 恢复为 https，保证 OpenAPI/Swagger 链接、
+// 绝对 URL 与日志中的协议正确。开发态直连（无该头）则不受影响。
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
+});
 
 // 请求日志中间件：为所有 HTTP 请求生成结构化日志 → OTel → Collector → Loki
 app.Use(async (context, next) =>
@@ -94,7 +112,7 @@ app.Use(async (context, next) =>
 // 库内可能已有 travel-history 建的表，裸 EnsureCreated 会整体跳过，必须走本引导器。
 app.Services.EnsureUserSchema();
 
-// dev 演示账号（ADR-0005）：仅 Development，幂等 seed demo@travel.local / Demo@123456
+// dev 演示账号（ADR-0005）：仅 Development，密码由 DemoUser:Password 提供
 if (app.Environment.IsDevelopment())
     await app.Services.SeedDevelopmentUserAsync();
 

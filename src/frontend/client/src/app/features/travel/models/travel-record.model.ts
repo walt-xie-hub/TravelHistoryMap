@@ -16,6 +16,26 @@ export interface TravelRecord {
   arrivedAt: string;
   /** 离开时间（UTC ISO 8601）；null = 仍在当地 */
   departedAt: string | null;
+  description: string | null;
+  images?: TravelImage[];
+}
+
+export interface TravelImage {
+  id: number;
+  originalFileName: string;
+  contentType: string;
+  fileSize: number;
+  thumbnailUrl: string;
+  originalUrl: string;
+}
+
+export interface CreateTravelRequest {
+  locationName: string;
+  latitude: number;
+  longitude: number;
+  arrivedAt: string;
+  departedAt?: string | null;
+  description?: string | null;
 }
 
 /** 分页结果，字段与后端 PagedResult<T> 序列化一致（camelCase） */

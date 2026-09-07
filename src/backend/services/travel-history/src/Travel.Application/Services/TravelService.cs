@@ -47,6 +47,7 @@ public class TravelService : ITravelService
             Longitude = dto.Longitude,
             ArrivedAt = dto.ArrivedAt.ToUniversalTime(),
             DepartedAt = dto.DepartedAt?.ToUniversalTime(),
+            Description = string.IsNullOrWhiteSpace(dto.Description) ? null : dto.Description.Trim(),
         };
         var created = await _repository.AddAsync(record, ct);
         return ToDto(created);
@@ -63,6 +64,7 @@ public class TravelService : ITravelService
         existing.Longitude = dto.Longitude;
         existing.ArrivedAt = dto.ArrivedAt.ToUniversalTime();
         existing.DepartedAt = dto.DepartedAt?.ToUniversalTime();
+        existing.Description = string.IsNullOrWhiteSpace(dto.Description) ? null : dto.Description.Trim();
         existing.UpdatedAt = DateTimeOffset.UtcNow;
 
         var updated = await _repository.UpdateAsync(existing, ct);
@@ -84,5 +86,6 @@ public class TravelService : ITravelService
         record.Latitude,
         record.Longitude,
         record.ArrivedAt,
-        record.DepartedAt);
+        record.DepartedAt,
+        record.Description);
 }

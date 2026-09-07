@@ -12,6 +12,9 @@ images:
   - name: user-service
     newName: user-service
     newTag: dev
+  - name: travel-service
+    newName: travel-service
+    newTag: dev
   - name: client-app
     newName: client-app
     newTag: dev
@@ -19,6 +22,8 @@ images:
 # 开发环境低副本
 replicas:
   - name: user-service
+    count: 1
+  - name: travel-service
     count: 1
   - name: client
     count: 1
@@ -28,6 +33,13 @@ patches:
   - target:
       kind: Deployment
       name: user-service
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Never
+  - target:
+      kind: Deployment
+      name: travel-service
     patch: |-
       - op: replace
         path: /spec/template/spec/containers/0/imagePullPolicy

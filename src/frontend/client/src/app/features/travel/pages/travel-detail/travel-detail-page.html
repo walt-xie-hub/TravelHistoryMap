@@ -1,0 +1,30 @@
+<section class="travel-detail-page">
+  <header class="page-heading">
+    <a routerLink="/map">返回地图</a>
+    @if (record(); as item) { <h1>{{ item.locationName }}</h1> }
+  </header>
+
+  @if (loading()) { <p>加载中…</p> }
+  @if (error()) { <p class="detail-error" role="alert">{{ error() }}</p> }
+  @if (record(); as item) {
+    <article class="detail-card">
+      <p class="detail-time">{{ item.arrivedAt | date:'yyyy-MM-dd HH:mm' }} → {{ item.departedAt ? (item.departedAt | date:'yyyy-MM-dd HH:mm') : '进行中' }}</p>
+      <p class="detail-coordinates">坐标：{{ item.latitude }}, {{ item.longitude }}</p>
+      @if (item.description) { <p class="detail-description">{{ item.description }}</p> } @else { <p class="detail-empty">暂无描述</p> }
+      @if (images().length) {
+        <div class="image-grid">@for (image of images(); track image.id) {
+          <button type="button" (click)="openOriginal(image)" [attr.aria-label]="'查看 ' + image.originalFileName">
+            <img [src]="image.thumbnailSrc" [alt]="image.originalFileName" />
+          </button>
+        }</div>
+      } @else { <p class="detail-empty">暂无图片</p> }
+    </article>
+  }
+
+  @if (selectedImage(); as image) {
+    <div class="image-modal" role="dialog" aria-modal="true" (click)="closeOriginal()">
+      <img [src]="image.originalSrc" [alt]="image.originalFileName" (click)="$event.stopPropagation()" />
+      <button type="button" class="close" (click)="closeOriginal()">关闭</button>
+    </div>
+  }
+</section>

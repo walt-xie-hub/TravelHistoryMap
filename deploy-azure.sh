@@ -60,7 +60,19 @@ az containerapp create \
     "Db__Password=secretref:db-password" \
   $( [ -n "$GHCR_USERNAME" ] && echo "--registry-server ghcr.io --registry-username $GHCR_USERNAME --registry-password $GHCR_PASSWORD" )
 
-# ② 前端 client：internal
+# ② travel-service：internal
+echo "==> 创建 travel-service（internal）"
+az containerapp create \
+  --name travel-service -g "$RESOURCE_GROUP" --environment "$ENV_NAME" \
+  --image "ghcr.io/$ORG/travelmap-travel-service:latest" \
+  --target-port 8080 --ingress internal --min-replicas 0 --max-replicas 3 \
+  --env-vars \
+    "ConnectionStrings__DefaultConnection=Host=$PG_HOST;Port=5432;Database=$PG_DATABASE;Username=$PG_USER;Password=secretref:db-password;Pooling=true" \
+    "Db__Password=secretref:db-password" \
+  --secrets db-password="$PG_PASSWORD" \
+  $( [ -n "$GHCR_USERNAME" ] && echo "--registry-server ghcr.io --registry-username $GHCR_USERNAME --registry-password $GHCR_PASSWORD" )
+
+# ③ 前端 client：internal
 echo "==> 创建 client（internal）"
 az containerapp create \
   --name client -g "$RESOURCE_GROUP" --environment "$ENV_NAME" \
@@ -68,7 +80,7 @@ az containerapp create \
   --target-port 80 --ingress internal --min-replicas 0 --max-replicas 3 \
   $( [ -n "$GHCR_USERNAME" ] && echo "--registry-server ghcr.io --registry-username $GHCR_USERNAME --registry-password $GHCR_PASSWORD" )
 
-# ③ 网关 gateway：external（唯一公网入口），转发到两个 internal 服务
+# ④ 网关 gateway：external（唯一公网入口），转发到三个 internal 服务
 echo "==> 创建 gateway（external）"
 az containerapp create \
   --name gateway -g "$RESOURCE_GROUP" --environment "$ENV_NAME" \
@@ -76,6 +88,7 @@ az containerapp create \
   --target-port 80 --ingress external --min-replicas 0 --max-replicas 3 \
   --env-vars \
     "USER_SERVICE_URL=http://user-service.internal.$ENV_NAME.$REGION.azurecontainerapps.io" \
+    "TRAVEL_SERVICE_URL=http://travel-service.internal.$ENV_NAME.$REGION.azurecontainerapps.io" \
     "CLIENT_URL=http://client.internal.$ENV_NAME.$REGION.azurecontainerapps.io" \
   $( [ -n "$GHCR_USERNAME" ] && echo "--registry-server ghcr.io --registry-username $GHCR_USERNAME --registry-password $GHCR_PASSWORD" )
 

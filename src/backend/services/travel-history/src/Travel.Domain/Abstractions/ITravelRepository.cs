@@ -29,4 +29,9 @@ public interface ITravelRepository
 
     /// <summary>按主键删除记录；不存在时返回 false。</summary>
     Task<bool> DeleteAsync(int id, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<TravelImage>> GetImagesAsync(int recordId, CancellationToken cancellationToken = default);
+    Task<TravelImage?> GetImageAsync(int imageId, CancellationToken cancellationToken = default);
+    Task<TravelImage> AddImageAsync(TravelImage image, CancellationToken cancellationToken = default);
+    Task<bool> DeleteImageAsync(int imageId, CancellationToken cancellationToken = default);
 }

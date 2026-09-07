@@ -30,7 +30,7 @@
 #
 # 部署前置条件（一次性，az CLI 完成）：
 #   rg-travelmap 资源组 / cae-travelmap 环境 / 三个 Container App 已创建；
-#   gateway 配置 USER_SERVICE_URL、CLIENT_URL（internal 服务地址）；
+#   gateway 配置 USER_SERVICE_URL、TRAVEL_SERVICE_URL、CLIENT_URL（internal 服务地址）；
 #   user-service 配置 db-password secret 与 PostgreSQL 连接串；
 #   PostgreSQL Flexible Server（B1ms 免费层）。
 # ──────────────────────────────────────────────
@@ -47,6 +47,7 @@ env:
   # 仓库已迁移到组织 walt-xie-hub，镜像命名空间跟随仓库 owner
   CLIENT_IMAGE: ghcr.io/${{ github.repository_owner }}/travelmap-client
   SERVER_IMAGE: ghcr.io/${{ github.repository_owner }}/travelmap-user-service
+  TRAVEL_IMAGE: ghcr.io/${{ github.repository_owner }}/travelmap-travel-service
   GATEWAY_IMAGE: ghcr.io/${{ github.repository_owner }}/travelmap-gateway
   # 容器应用环境名与区域 —— 内部服务域名格式：<app>.internal.<env-name>.<region>.azurecontainerapps.io
   CAE_NAME: cae-travelmap
@@ -84,6 +85,18 @@ jobs:
         id: meta
         run: echo "tag=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
+      - name: Configure frontend runtime secrets
+        env:
+          AMAP_KEY: ${{ secrets.AMAP_KEY }}
+          AMAP_SECURITY_JS_CODE: ${{ secrets.AMAP_SECURITY_JS_CODE }}
+        run: |
+          cat > src/frontend/client/public/runtime-config.js <<EOF
+          window.__TRAVEL_MAP_CONFIG__ = {
+            amapKey: '${AMAP_KEY}',
+            amapSecurityJsCode: '${AMAP_SECURITY_JS_CODE}',
+          };
+          EOF
+
       # 5. 前端镜像：npm ci → 生产构建 → 单测 → nginx 托管
       #    PR 只构建验证，push 到 main 才推送镜像
       - name: Build & push client
@@ -108,6 +121,16 @@ jobs:
           cache-from: type=gha,scope=backend
           cache-to: type=gha,mode=max,scope=backend
 
+      - name: Build & push travel-service
+        uses: docker/build-push-action@v7
+        with:
+          context: ./src/backend
+          file: ./src/backend/services/travel-history/Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ env.TRAVEL_IMAGE }}:${{ steps.meta.outputs.tag }},${{ env.TRAVEL_IMAGE }}:latest
+          cache-from: type=gha,scope=travel-backend
+          cache-to: type=gha,mode=max,scope=travel-backend
+
       # 7. 网关镜像：nginx 统一入口（配置经环境变量注入，见 src/gateway）
       - name: Build & push gateway
         uses: docker/build-push-action@v7
@@ -125,7 +148,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          for img in travelmap-client travelmap-user-service travelmap-gateway; do
+          for img in travelmap-client travelmap-user-service travelmap-travel-service travelmap-gateway; do
             gh api -X PATCH "orgs/${{ github.repository_owner }}/packages/container/$img" -f visibility=public
           done
 
@@ -169,6 +192,16 @@ jobs:
           registryUsername: ${{ secrets.GHCR_USERNAME }}
           registryPassword: ${{ secrets.GHCR_PASSWORD }}
 
+      - name: Deploy travel-service
+        uses: azure/container-apps-deploy-action@v1
+        with:
+          containerAppName: travel-service
+          resourceGroup: ${{ env.RESOURCE_GROUP }}
+          imageToDeploy: ${{ env.TRAVEL_IMAGE }}:${{ needs.docker-build.outputs.tag }}
+          registryUrl: ghcr.io
+          registryUsername: ${{ secrets.GHCR_USERNAME }}
+          registryPassword: ${{ secrets.GHCR_PASSWORD }}
+
       - name: Deploy gateway
         uses: azure/container-apps-deploy-action@v1
         with:
@@ -180,4 +213,5 @@ jobs:
           registryPassword: ${{ secrets.GHCR_PASSWORD }}
           environmentVariables: |
             USER_SERVICE_URL=http://user-service.internal.${{ env.CAE_NAME }}.${{ env.CAE_REGION }}.azurecontainerapps.io
+            TRAVEL_SERVICE_URL=http://travel-service.internal.${{ env.CAE_NAME }}.${{ env.CAE_REGION }}.azurecontainerapps.io
             CLIENT_URL=http://client.internal.${{ env.CAE_NAME }}.${{ env.CAE_REGION }}.azurecontainerapps.io

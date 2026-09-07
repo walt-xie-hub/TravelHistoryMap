@@ -9,7 +9,9 @@ import { Injectable, inject } from '@angular/core';
 import { lastValueFrom } from 'rxjs';
 import { environment } from '@env/environment';
 import {
+  CreateTravelRequest,
   TravelPagedResult,
+  TravelImage,
   TravelRecord,
 } from '../models/travel-record.model';
 
@@ -48,5 +50,35 @@ export class TravelHistoryService {
       page += 1;
     }
     return collected;
+  }
+
+  create(request: CreateTravelRequest): Promise<TravelRecord> {
+    return lastValueFrom(this.http.post<TravelRecord>(`${this.base}/travels`, request));
+  }
+
+  delete(id: number): Promise<void> {
+    return lastValueFrom(this.http.delete<void>(`${this.base}/travels/${id}`));
+  }
+
+  getById(id: number): Promise<TravelRecord> {
+    return lastValueFrom(this.http.get<TravelRecord>(`${this.base}/travels/${id}`));
+  }
+
+  getImages(id: number): Promise<TravelImage[]> {
+    return lastValueFrom(this.http.get<TravelImage[]>(`${this.base}/travels/${id}/images`));
+  }
+
+  async uploadImage(id: number, file: File): Promise<TravelImage> {
+    const body = new FormData();
+    body.append('file', file, file.name);
+    return lastValueFrom(this.http.post<TravelImage>(`${this.base}/travels/${id}/images`, body));
+  }
+
+  resolveMediaUrl(path: string): string {
+    return path.startsWith('http') ? path : `${this.base.replace(/\/api$/, '')}${path}`;
+  }
+
+  getMediaBlob(path: string): Promise<Blob> {
+    return lastValueFrom(this.http.get(this.resolveMediaUrl(path), { responseType: 'blob' }));
   }
 }

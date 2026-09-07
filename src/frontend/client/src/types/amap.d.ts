@@ -6,6 +6,8 @@
 /** 经纬度输入：高德接受 [经度, 纬度] 二元组 */
 export type AmapLngLat = [number, number];
 
+export type AmapCoordinate = AmapLngLat | AmapPlaceLocation;
+
 export interface AmapPixel {
   x: number;
   y: number;
@@ -33,11 +35,12 @@ export interface AmapInfoWindowOptions {
 }
 
 export interface AmapClickEvent {
-  lnglat: AmapLngLat;
+  lnglat: AmapCoordinate;
   target: unknown;
 }
 
 export interface AmapMap {
+  on(event: 'click', handler: (event: AmapClickEvent) => void): void;
   add(overlay: unknown): void;
   remove(overlay: unknown): void;
   setFitView(overlays?: readonly unknown[], immediately?: boolean, avoid?: readonly number[]): void;
@@ -46,6 +49,39 @@ export interface AmapMap {
   setCenter(center: AmapLngLat): void;
   getZoom(): number;
   destroy(): void;
+}
+
+export interface AmapPlaceResult {
+  name?: string;
+  address?: string;
+  location?: AmapLngLat | AmapPlaceLocation;
+}
+
+export interface AmapPlaceLocation {
+  getLng(): number;
+  getLat(): number;
+}
+
+export interface AmapPlaceSearch {
+  search(keyword: string, callback: (status: string, result: { poiList?: { pois?: AmapPlaceResult[] } }) => void): void;
+}
+
+export interface AmapGeocoderResult {
+  regeocode?: {
+    formattedAddress?: string;
+    addressComponent?: {
+      province?: string;
+      city?: string | string[];
+      district?: string;
+      township?: string;
+      street?: string;
+      streetNumber?: string;
+    };
+  };
+}
+
+export interface AmapGeocoder {
+  getAddress(position: AmapLngLat, callback: (status: string, result: AmapGeocoderResult) => void): void;
 }
 
 export interface AmapMarker {
@@ -65,6 +101,9 @@ export interface AmapNamespace {
   Marker: new (options: AmapMarkerOptions) => AmapMarker;
   InfoWindow: new (options: AmapInfoWindowOptions) => AmapInfoWindow;
   Pixel: new (x: number, y: number) => AmapPixel;
+  plugin?(names: string[], callback: () => void): void;
+  PlaceSearch?: new (options?: { pageSize?: number }) => AmapPlaceSearch;
+  Geocoder?: new (options?: { city?: string; radius?: number }) => AmapGeocoder;
 }
 
 declare global {

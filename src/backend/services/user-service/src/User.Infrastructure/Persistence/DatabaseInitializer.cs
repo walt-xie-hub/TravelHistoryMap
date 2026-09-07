@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace User.Infrastructure.Persistence;
@@ -73,7 +74,7 @@ public static class DatabaseInitializer
     }
 
     /// <summary>
-    /// 仅 Development 环境调用的演示账号种子（ADR-0005）：幂等创建 demo@travel.local / Demo@123456。
+    /// 仅 Development 环境调用的演示账号种子（ADR-0005）：密码由 DemoUser:Password 配置提供。
     /// 演示账号有 PBKDF2 密码哈希，可登录并看到自己的足迹；生产环境不调用。
     /// </summary>
     public static async Task SeedDevelopmentUserAsync(this IServiceProvider services, CancellationToken ct = default)
@@ -81,6 +82,10 @@ public static class DatabaseInitializer
         using var scope = services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var hasher = scope.ServiceProvider.GetRequiredService<User.Application.Abstractions.IPasswordHasher>();
+        var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
+        var demoPassword = configuration["DemoUser:Password"];
+        if (string.IsNullOrWhiteSpace(demoPassword))
+            return;
 
         const string email = "demo@travel.local";
         if (await db.Users.AnyAsync(u => u.Email == email, ct))
@@ -90,7 +95,7 @@ public static class DatabaseInitializer
         {
             Name = "Demo User",
             Email = email,
-            PasswordHash = hasher.Hash("Demo@123456"),
+            PasswordHash = hasher.Hash(demoPassword),
         });
         await db.SaveChangesAsync(ct);
     }

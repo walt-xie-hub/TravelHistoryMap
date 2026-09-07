@@ -1,7 +1,7 @@
 <aside class="side-panel">
   <div class="panel-block">
     <div class="stats-row">
-      <span class="stat"><strong>{{ total() }}</strong> 次停留</span>
+      <span class="stat"><strong>{{ totalCount() }}</strong> 次停留</span>
       @if (ongoingCount() > 0) {
         <span class="stat stat--ongoing"><strong>{{ ongoingCount() }}</strong> 进行中</span>
       }
@@ -70,8 +70,8 @@
   <div class="panel-block panel-block--list">
     <div class="list-heading">
       <span>停留记录</span>
-      @if (records().length > 0) {
-        <span class="list-count">{{ total() }}</span>
+      @if (totalCount() > 0) {
+        <span class="list-count">{{ totalCount() }}</span>
       }
     </div>
 
@@ -82,8 +82,7 @@
     } @else {
       <div class="record-list" role="list">
         @for (row of rows(); track row.record.id) {
-          <button
-            type="button"
+          <div
             role="listitem"
             class="record-row"
             [id]="'tm-record-' + row.record.id"
@@ -95,12 +94,41 @@
               @if (!row.record.departedAt) {
                 <span class="badge badge--ongoing">进行中</span>
               }
+              <button
+                type="button"
+                class="record-detail"
+                title="查看停留详情"
+                aria-label="查看停留详情"
+                (click)="onRecordDetail($event, row.record.id)"
+              >
+                详情
+              </button>
+              <button
+                type="button"
+                class="record-delete"
+                title="删除停留记录"
+                aria-label="删除停留记录"
+                (click)="onRecordDelete($event, row.record.id)"
+              >
+                删除
+              </button>
             </span>
             <span class="record-sub">{{ row.rangeLabel }}</span>
             <span class="record-sub record-sub--duration">停留 {{ row.durationLabel }}</span>
-          </button>
+          </div>
         }
       </div>
+      @if (totalPages() > 1) {
+        <nav class="pagination" aria-label="停留记录分页">
+          <button type="button" class="pagination__button" [disabled]="page() <= 1" (click)="onPageChange(page() - 1)">
+            上一页
+          </button>
+          <span>第 {{ page() }} / {{ totalPages() }} 页</span>
+          <button type="button" class="pagination__button" [disabled]="page() >= totalPages()" (click)="onPageChange(page() + 1)">
+            下一页
+          </button>
+        </nav>
+      }
     }
   </div>
 </aside>

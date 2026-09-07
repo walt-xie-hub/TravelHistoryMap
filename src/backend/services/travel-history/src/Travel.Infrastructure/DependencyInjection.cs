@@ -4,6 +4,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Travel.Domain.Abstractions;
 using Travel.Infrastructure.Persistence;
 using Travel.Infrastructure.Repositories;
+using Travel.Infrastructure.Media;
+using Travel.Application.Abstractions;
 
 namespace Travel.Infrastructure;
 
@@ -26,6 +28,7 @@ public static class DependencyInjection
 
         // 仓储实现注册到领域抽象
         services.AddScoped<ITravelRepository, TravelRepository>();
+        services.AddSingleton<ITravelImageStorage, TravelImageStorage>();
 
         return services;
     }

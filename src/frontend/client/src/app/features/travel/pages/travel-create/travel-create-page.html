@@ -1,0 +1,32 @@
+<section class="travel-form-page">
+  <header class="page-heading">
+    <div><a routerLink="/map">返回地图</a><h1>添加旅游记录</h1></div>
+  </header>
+  @if (error()) { <p class="form-error" role="alert">{{ error() }}</p> }
+  <section class="location-picker">
+    <div class="location-picker__header">
+      <strong>选择位置</strong>
+      <span>搜索后点击候选地点，或直接点击地图选点</span>
+    </div>
+    <div #mapContainer class="location-map" aria-label="选择旅游地点的地图"></div>
+  </section>
+  <form class="travel-form" (submit)="$event.preventDefault(); submit()">
+    <label>位置搜索
+      <div class="search-row">
+        <input name="keyword" [value]="keyword()" (input)="keyword.set($any($event.target).value)" placeholder="例如：上海东方明珠" required />
+        <button type="button" (click)="search()" [disabled]="searching()">{{ searching() ? '搜索中…' : '搜索' }}</button>
+      </div>
+    </label>
+    @if (results().length) {
+      <div class="place-results">@for (place of results(); track $index) {
+        <button type="button" (click)="choose(place)"><strong>{{ place.name }}</strong><span>{{ place.address }}</span></button>
+      }</div>
+    }
+    @if (selected(); as place) { <p class="selected-place">已选择：{{ place.name }}（{{ selectedCoordinates() }}）</p> }
+    <label>到达时间<input type="datetime-local" name="arrivedAt" [value]="arrivedAt()" (input)="arrivedAt.set($any($event.target).value)" required /></label>
+    <label>离开时间（可选）<input type="datetime-local" name="departedAt" [value]="departedAt()" (input)="departedAt.set($any($event.target).value)" /></label>
+    <label>出游描述<textarea name="description" rows="5" [value]="description()" (input)="description.set($any($event.target).value)" maxlength="4000"></textarea></label>
+    <label>图片（最多 9 张，每张不超过 10 MB）<input type="file" accept="image/jpeg,image/png,image/webp" multiple (change)="onFiles($event)" /></label>
+    <button class="submit" type="submit" [disabled]="loading()">{{ loading() ? '保存中…' : '保存旅游记录' }}</button>
+  </form>
+</section>
