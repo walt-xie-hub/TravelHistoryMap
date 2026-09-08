@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, effect, input, output, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { LoadingSpinner } from '@shared/components/loading-spinner/loading-spinner';
 import type {
   TravelRangeKind,
@@ -32,7 +33,7 @@ function localDayToIso(dateText: string, atEndOfDay: boolean): string {
 @Component({
   selector: 'app-map-side-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LoadingSpinner],
+  imports: [LoadingSpinner, RouterLink],
   templateUrl: './map-side-panel.html',
   styleUrl: './map-side-panel.scss',
 })
