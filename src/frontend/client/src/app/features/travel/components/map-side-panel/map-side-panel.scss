@@ -152,14 +152,19 @@
   color: #ffffff;
 }
 
-.list-actions {
+.panel-top {
   display: flex;
-  justify-content: flex-end;
-  margin-bottom: 10px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
 
-  .btn {
-    text-decoration: none;
-  }
+.add-travel-btn {
+  flex: none;
+  padding: 6px 12px;
+  font-size: 12px;
+  text-decoration: none;
+  white-space: nowrap;
 }
 
 .list-heading {

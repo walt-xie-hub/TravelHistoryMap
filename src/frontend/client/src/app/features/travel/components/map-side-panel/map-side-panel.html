@@ -1,10 +1,13 @@
 <aside class="side-panel">
   <div class="panel-block">
-    <div class="stats-row">
-      <span class="stat"><strong>{{ totalCount() }}</strong> 次停留</span>
-      @if (ongoingCount() > 0) {
-        <span class="stat stat--ongoing"><strong>{{ ongoingCount() }}</strong> 进行中</span>
-      }
+    <div class="panel-top">
+      <div class="stats-row">
+        <span class="stat"><strong>{{ totalCount() }}</strong> 次停留</span>
+        @if (ongoingCount() > 0) {
+          <span class="stat stat--ongoing"><strong>{{ ongoingCount() }}</strong> 进行中</span>
+        }
+      </div>
+      <a class="btn btn-primary add-travel-btn" routerLink="/travels/new">＋ 添加旅游记录</a>
     </div>
   </div>
 
@@ -68,16 +71,6 @@
   </div>
 
   <div class="panel-block panel-block--list">
-    <div class="list-actions">
-      <a
-        class="btn btn-primary"
-        routerLink="/travels/new"
-        title="新增一条旅游停留记录"
-      >
-        ＋ 添加旅游记录
-      </a>
-    </div>
-
     <div class="list-heading">
       <span>停留记录</span>
       @if (totalCount() > 0) {
