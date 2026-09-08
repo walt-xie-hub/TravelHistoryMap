@@ -152,6 +152,16 @@
   color: #ffffff;
 }
 
+.list-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+
+  .btn {
+    text-decoration: none;
+  }
+}
+
 .list-heading {
   display: flex;
   align-items: center;

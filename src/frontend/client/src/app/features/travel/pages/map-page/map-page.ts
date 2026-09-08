@@ -10,7 +10,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { EmptyState } from '@shared/components/empty-state/empty-state';
-import { Router, RouterLink } from '@angular/router';
+import { Router } from '@angular/router';
 import { LoadingSpinner } from '@shared/components/loading-spinner/loading-spinner';
 import { PageHeader } from '@shared/components/page-header/page-header';
 import type {
@@ -44,7 +44,7 @@ type MapState = 'idle' | 'ready' | 'missing-key' | 'error';
 @Component({
   selector: 'app-map-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [EmptyState, LoadingSpinner, MapSidePanel, PageHeader, RouterLink],
+  imports: [EmptyState, LoadingSpinner, MapSidePanel, PageHeader],
   templateUrl: './map-page.html',
   styleUrl: './map-page.scss',
 })
