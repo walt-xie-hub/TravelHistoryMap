@@ -56,6 +56,11 @@ export class TravelHistoryService {
     return lastValueFrom(this.http.post<TravelRecord>(`${this.base}/travels`, request));
   }
 
+  /** 全量更新旅行记录（PUT 全量替换：地点快照/时间/描述一并回传；本页仅编辑描述，其余沿用已加载值）。 */
+  update(id: number, request: CreateTravelRequest): Promise<TravelRecord> {
+    return lastValueFrom(this.http.put<TravelRecord>(`${this.base}/travels/${id}`, request));
+  }
+
   delete(id: number): Promise<void> {
     return lastValueFrom(this.http.delete<void>(`${this.base}/travels/${id}`));
   }
@@ -72,6 +77,11 @@ export class TravelHistoryService {
     const body = new FormData();
     body.append('file', file, file.name);
     return lastValueFrom(this.http.post<TravelImage>(`${this.base}/travels/${id}/images`, body));
+  }
+
+  /** 删除某条记录下的单张图片（后端清理媒体文件并删除数据库行）。 */
+  deleteImage(id: number, imageId: number): Promise<void> {
+    return lastValueFrom(this.http.delete<void>(`${this.base}/travels/${id}/images/${imageId}`));
   }
 
   resolveMediaUrl(path: string): string {

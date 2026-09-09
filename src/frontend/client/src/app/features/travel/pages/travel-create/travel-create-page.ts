@@ -15,11 +15,20 @@ import type { AmapClickEvent, AmapLngLat, AmapMap, AmapMarker, AmapPlaceResult, 
 import { AmapLoaderService } from '../../data-access/amap-loader.service';
 import { TravelHistoryService } from '../../data-access/travel-history.service';
 import { HttpErrorResponse } from '@angular/common/http';
+import { RichTextEditorComponent } from '../../components/rich-text-editor/rich-text-editor';
+import { visibleTextLength } from '../../utils/rich-text.util';
+
+/** 已选、待上传的本地图片：File 本体 + 预览用本地对象 URL。
+ *  尚未成为该记录的 Travel image——保存（create 成功并逐张上传）后才持久化。 */
+interface SelectedImage {
+  file: File;
+  url: string;
+}
 
 @Component({
   selector: 'app-travel-create-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, RichTextEditorComponent],
   templateUrl: './travel-create-page.html',
   styleUrl: './travel-create-page.scss',
 })
@@ -38,7 +47,8 @@ export class TravelCreatePage implements AfterViewInit, OnDestroy {
   protected readonly arrivedAt = signal('');
   protected readonly departedAt = signal('');
   protected readonly description = signal('');
-  protected readonly files = signal<File[]>([]);
+  protected readonly descriptionCount = computed(() => visibleTextLength(this.description()));
+  protected readonly files = signal<SelectedImage[]>([]);
   protected readonly loading = signal(false);
   protected readonly searching = signal(false);
   protected readonly error = signal('');
@@ -55,6 +65,7 @@ export class TravelCreatePage implements AfterViewInit, OnDestroy {
     this.map?.destroy();
     this.map = null;
     this.marker = null;
+    for (const item of this.files()) URL.revokeObjectURL(item.url);
   }
 
   private async initializeMap(): Promise<void> {
@@ -165,17 +176,46 @@ export class TravelCreatePage implements AfterViewInit, OnDestroy {
 
   protected onFiles(event: Event): void {
     const input = event.target as HTMLInputElement;
-    const selectedFiles = Array.from(input.files ?? []);
-    if (selectedFiles.length > 9) {
-      this.error.set('最多上传 9 张图片。');
-      this.files.set(selectedFiles.slice(0, 9));
+    const picked = Array.from(input.files ?? []);
+    input.value = ''; // 允许再次选择同一文件
+    if (picked.length === 0) return;
+
+    const capacity = this.remainingSlots();
+    if (capacity <= 0) {
+      this.error.set('每条旅游记录最多 9 张图片，已达上限。');
       return;
     }
-    if (selectedFiles.some((file) => file.size > 10 * 1024 * 1024 || !['image/jpeg', 'image/png', 'image/webp'].includes(file.type))) {
+    let accepted = picked;
+    if (accepted.length > capacity) {
+      this.error.set(`最多还能添加 ${capacity} 张图片。`);
+      accepted = accepted.slice(0, capacity);
+    }
+    if (accepted.some((file) => file.size > 10 * 1024 * 1024 || !['image/jpeg', 'image/png', 'image/webp'].includes(file.type))) {
       this.error.set('图片仅支持 JPEG、PNG、WebP，且单张不超过 10 MB。');
       return;
     }
-    this.files.set(selectedFiles);
+
+    // 累积追加到已选集合；逐张生成预览用对象 URL（提交成功上传后才成为该记录的 Travel image）
+    const additions = accepted.map((file) => ({ file, url: URL.createObjectURL(file) }));
+    this.files.update((current) => [...current, ...additions]);
+    this.error.set('');
+  }
+
+  protected removeImage(index: number): void {
+    const url = this.files()[index]?.url;
+    this.files.update((current) => current.filter((_, i) => i !== index));
+    if (url) URL.revokeObjectURL(url);
+    this.error.set('');
+  }
+
+  protected clearImages(): void {
+    for (const item of this.files()) URL.revokeObjectURL(item.url);
+    this.files.set([]);
+    this.error.set('');
+  }
+
+  private remainingSlots(): number {
+    return 9 - this.files().length;
   }
 
   protected async submit(): Promise<void> {
@@ -191,6 +231,10 @@ export class TravelCreatePage implements AfterViewInit, OnDestroy {
       this.error.set('请检查出游时间，离开时间不能早于到达时间。');
       return;
     }
+    if (this.descriptionCount() > 4000) {
+      this.error.set('出游描述最多 4000 字。');
+      return;
+    }
     this.loading.set(true);
     this.error.set('');
     try {
@@ -200,9 +244,14 @@ export class TravelCreatePage implements AfterViewInit, OnDestroy {
         latitude: coordinates[1],
         arrivedAt: arrived.toISOString(),
         departedAt: departed?.toISOString() ?? null,
-        description: this.description().trim() || null,
+        description: this.descriptionCount() > 0 ? this.description() : null,
       });
-      for (const file of this.files()) await this.travel.uploadImage(record.id, file);
+      // 逐张上传并即时从预览清单移除，成功后释放对象 URL；中途失败则剩余项留在清单便于重试
+      for (const item of [...this.files()]) {
+        await this.travel.uploadImage(record.id, item.file);
+        this.files.update((current) => current.filter((x) => x !== item));
+        URL.revokeObjectURL(item.url);
+      }
       await this.router.navigate(['/travels', record.id]);
     } catch (error) {
       this.error.set(

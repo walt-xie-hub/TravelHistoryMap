@@ -13,10 +13,13 @@ export function fmtDate(iso: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-/** UTC ISO → 本地 “yyyy-MM-dd HH:mm” */
+/** UTC ISO → 本地友好日期时间：同年省略年份，如 “9月6日 16:00”，跨年带年份 */
 export function fmtDateTime(iso: string): string {
   const d = new Date(iso);
-  return `${fmtDate(iso)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const date = d.getFullYear() === new Date().getFullYear()
+    ? `${d.getMonth() + 1}月${d.getDate()}日`
+    : `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+  return `${date} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 /** 一段停留的展示区间文案：同一天显示时刻，跨天显示日期 */

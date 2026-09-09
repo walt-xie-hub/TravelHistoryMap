@@ -43,7 +43,9 @@ public class TravelRecordConfiguration : IEntityTypeConfiguration<TravelRecord>
 
         builder.Property(t => t.Description)
             .IsRequired(false)
-            .HasMaxLength(4000);
+            // ADR-0009：正文改为富文本 HTML，不再以 4000 截断原始长度；
+            // 长度校验改在应用层按“可见字符 ≤4000”执行（见 TravelService/RichTextSanitizer）。
+            .HasColumnType("text");
 
         builder.Property(t => t.CreatedAt)
             .IsRequired();

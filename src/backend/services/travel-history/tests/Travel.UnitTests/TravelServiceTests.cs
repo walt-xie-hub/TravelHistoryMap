@@ -274,4 +274,67 @@ public class TravelServiceTests
         Assert.False(deleted);
         _repositoryMock.Verify(r => r.DeleteAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
+
+    [Fact]
+    public async Task UpdateAsync_DescriptionOver4000VisibleChars_ThrowsAndDoesNotPersist()
+    {
+        // Arrange（ADR-0009：正文长度按可见字符 ≤4000 校验）
+        _repositoryMock.Setup(r => r.GetByIdAsync(1, It.IsAny<CancellationToken>()))
+                       .ReturnsAsync(SampleRecord(userId: 10));
+
+        var dto = new UpdateTravelDto("Shanghai", 31.2304m, 121.4737m, Arrived, Departed,
+            Description: new string('字', 4001));
+
+        // Act & Assert
+        await Assert.ThrowsAsync<ArgumentException>(() => _sut.UpdateAsync(10, 1, dto));
+        _repositoryMock.Verify(r => r.UpdateAsync(It.IsAny<TravelRecord>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_BlankDescription_ClearedToNullAndPersisted()
+    {
+        // Arrange
+        var record = SampleRecord(userId: 10);
+        record.Description = "旧文本";
+        _repositoryMock.Setup(r => r.GetByIdAsync(1, It.IsAny<CancellationToken>()))
+                       .ReturnsAsync(record);
+        _repositoryMock.Setup(r => r.UpdateAsync(It.IsAny<TravelRecord>(), It.IsAny<CancellationToken>()))
+                       .ReturnsAsync((TravelRecord t, CancellationToken _) => t);
+
+        var dto = new UpdateTravelDto("Shanghai", 31.2304m, 121.4737m, Arrived, Departed,
+            Description: "   ");
+
+        // Act
+        var result = await _sut.UpdateAsync(10, 1, dto);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Null(result!.Description);
+        _repositoryMock.Verify(r => r.UpdateAsync(
+            It.Is<TravelRecord>(t => t.Description == null),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_DescriptionHtml_SanitizedBeforePersist()
+    {
+        // Arrange（ADR-0009：入库前 allow-list 消毒，脚本/事件属性剥离）
+        var record = SampleRecord(userId: 10);
+        _repositoryMock.Setup(r => r.GetByIdAsync(1, It.IsAny<CancellationToken>()))
+                       .ReturnsAsync(record);
+        _repositoryMock.Setup(r => r.UpdateAsync(It.IsAny<TravelRecord>(), It.IsAny<CancellationToken>()))
+                       .ReturnsAsync((TravelRecord t, CancellationToken _) => t);
+
+        var dto = new UpdateTravelDto("Shanghai", 31.2304m, 121.4737m, Arrived, Departed,
+            Description: "<p>你好 <strong>世界</strong></p><script>alert(1)</script>");
+
+        // Act
+        var result = await _sut.UpdateAsync(10, 1, dto);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Contains("<strong>世界</strong>", result!.Description);
+        Assert.DoesNotContain("script", result.Description);
+        Assert.DoesNotContain("alert", result.Description);
+    }
 }

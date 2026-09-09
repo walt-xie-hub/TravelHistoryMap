@@ -96,6 +96,30 @@ public sealed class TravelImageService(
                 : image.ContentType);
     }
 
+    public async Task<bool> DeleteAsync(
+        int userId,
+        int travelRecordId,
+        int imageId,
+        CancellationToken cancellationToken = default)
+    {
+        var record = await repository.GetByIdAsync(travelRecordId, cancellationToken);
+        var image = await repository.GetImageAsync(imageId, cancellationToken);
+        if (record is null || image is null || record.UserId != userId || image.TravelRecordId != travelRecordId)
+            return false;
+
+        try
+        {
+            storage.Delete(image.OriginalPath);
+            storage.Delete(image.ThumbnailPath);
+        }
+        catch (IOException)
+        {
+            // Database deletion remains authoritative when media cleanup fails.
+        }
+
+        return await repository.DeleteImageAsync(imageId, cancellationToken);
+    }
+
     public async Task DeleteForRecordAsync(
         int userId,
         int travelRecordId,

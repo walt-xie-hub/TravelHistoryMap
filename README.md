@@ -5,13 +5,80 @@ collect the location of travel
 
 ## 启动开发环境
 
+### 1) 准备环境变量
+
 ```bash
+# Windows CMD
 copy .env.example .env
-# 编辑 .env，设置 DB_PASSWORD 和 JWT_KEY
+# macOS / Linux / PowerShell
+cp .env.example .env
+```
+
+编辑 `.env`，设置以下变量（`docker-compose.dev.yml` 用 `${VAR:?VAR is required}` 强制校验，缺失会直接报错）：
+
+| 变量 | 说明 |
+|------|------|
+| `DB_PASSWORD` | PostgreSQL 密码。注意 `./database/postgres` 数据目录被 Compose 与 k8s PV 共用，改动会影响两边 |
+| `JWT_KEY` | JWT 签名密钥，user-service 与 travel-history 共用同一组（签发 / 校验） |
+| `DEMO_USER_PASSWORD` | 开发演示账号 `demo@travel.local` 的密码（user-service 以 Development 启动时幂等创建） |
+
+`.env`、Kubernetes Secret 和前端运行时配置均不提交到 Git。ASP.NET 配置键保持不变，Compose 通过环境变量覆盖连接串和 JWT 配置。
+
+### 2) 首次启动（一次性）
+
+```bash
 docker compose -f docker-compose.dev.yml up -d
 ```
 
-`.env`、Kubernetes Secret 和前端运行时配置均不提交到 Git。ASP.NET 配置键保持不变，Compose 通过环境变量覆盖连接串和 JWT 配置。
+等待 Postgres 健康检查通过后，user-service / travel-history 会自动建库建表并写入共享 schema 与种子数据。启动后：
+
+| 服务 | URL |
+|------|-----|
+| 前端 client | http://localhost:4200 |
+| user-service | http://localhost:8080/swagger |
+| travel-history | http://localhost:8081/swagger |
+| Grafana（可观测性） | http://localhost:3000 |
+
+> `up -d` 只是把服务跑起来，**不会**把工作区改动实时同步进容器。client / server / travel-server 没有挂 volume，容器里跑的是**构建镜像那一刻的代码快照**；想改完源码即时生效请用下面的 watch 模式。
+
+### 3) 开发模式：`docker compose watch`（推荐，源码热同步）
+
+client、server（user-service）、travel-server 三个服务在 `docker-compose.dev.yml` 里配置了 `develop.watch` 规则。运行 `docker compose watch` 后，**改动源码保存即自动同步进容器**，由容器内的 `ng serve` / `dotnet watch` 重新编译并热重载，无需手动重建镜像或重启容器。
+
+> `watch` 本身**不会**创建 / 启动容器，只负责监听与同步。请先 `up -d` 把服务启动起来：
+
+```bash
+# ① 首次：先启动全部服务（只需一次）
+docker compose -f docker-compose.dev.yml up -d
+
+# ② 开发：保持前台运行 watch（阻塞命令，不要加 -d；退出按 Ctrl+C）
+docker compose -f docker-compose.dev.yml watch
+```
+
+`watch` 生效规则（对应 `docker-compose.dev.yml` 中各服务的 `develop.watch`）：
+
+| 改动的文件 | watch 动作 | 效果 |
+|------------|-----------|------|
+| `src/frontend/client/**` 源码 / 静态文件 | `sync` → 容器 `/app`（忽略 `node_modules` / `dist` / `.angular`） | Angular dev server 热重载（http://localhost:4200） |
+| `src/backend/**` 源码（含 `shared/`、两个 service） | `sync` → 容器 `/src`（忽略 `bin` / `obj`） | `dotnet watch` 自动重新编译并重启 |
+| `src/frontend/client/package.json` / `package-lock.json` | `rebuild` | 重新构建 client 镜像后再同步 |
+| `src/backend/services/*/Dockerfile.dev` | `rebuild` | 重新构建对应后端镜像后再同步 |
+
+常用变体：
+
+```bash
+# 只想重建并重启某一个服务（例如改了依赖后）
+docker compose -f docker-compose.dev.yml up -d --build client
+
+# 停掉整个开发环境
+docker compose -f docker-compose.dev.yml down
+```
+
+> 提示：
+> - `docker compose watch` 是前台阻塞命令，建议单独开一个终端运行。
+> - 需要 Docker Compose v2.22.0+。client 已设 `CHOKIDAR_USEPOLLING=true`、后端已设 `DOTNET_USE_POLLING_FILE_WATCHER=true`，在同步 / 挂载文件系统上也能可靠检测变更。
+> - 若容器里仍是旧代码快照（例如页面还是旧 UI、或前端 `runtime-config.js` 还是旧高德 key），重跑一次 `docker compose -f docker-compose.dev.yml up -d --build <service>`（或进入 watch 模式）即可让容器与工作区一致。
+> - 端口冲突：`client` 固定占用 `4200:4200`，与下方「前端启动」的本地 `npm start` 互斥，二者只能择一。
 
 ---
 

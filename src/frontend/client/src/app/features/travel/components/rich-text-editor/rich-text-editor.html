@@ -1,0 +1,69 @@
+<div class="rich-text-editor">
+  <div class="rich-text-editor__toolbar" role="toolbar" aria-label="正文排版工具栏">
+    <div class="rte-group" role="group" aria-label="字符样式">
+      <button type="button" [class.active]="bold()" title="加粗" aria-label="加粗"
+        (mousedown)="preventDefault($event)" (click)="exec('bold')"><strong>B</strong></button>
+      <button type="button" [class.active]="italic()" title="斜体" aria-label="斜体"
+        (mousedown)="preventDefault($event)" (click)="exec('italic')"><em>I</em></button>
+      <button type="button" [class.active]="underline()" title="下划线" aria-label="下划线"
+        (mousedown)="preventDefault($event)" (click)="exec('underline')"><u>U</u></button>
+      <button type="button" [class.active]="strike()" title="删除线" aria-label="删除线"
+        (mousedown)="preventDefault($event)" (click)="exec('strike')"><s>S</s></button>
+    </div>
+
+    <div class="rte-group" role="group" aria-label="字体与字号">
+      <select class="rte-select rte-select--font" [value]="fontFamily()" (change)="onFontFamily($event)" aria-label="字体"
+        (mousedown)="$event.stopPropagation()">
+        @for (font of fonts; track font.value) { <option [value]="font.value">{{ font.label }}</option> }
+      </select>
+      <select class="rte-select rte-select--size" [value]="fontSize()" (change)="onFontSize($event)" aria-label="字号"
+        (mousedown)="$event.stopPropagation()">
+        @for (size of sizes; track size.value) { <option [value]="size.value">{{ size.label }}</option> }
+      </select>
+    </div>
+
+    <div class="rte-group" role="group" aria-label="文字颜色">
+      <span class="rte-color" title="文字颜色">
+        <span class="rte-color__label">A</span>
+        <input type="color" [value]="color()" (input)="onColor($event)" aria-label="文字颜色"
+          (mousedown)="$event.stopPropagation()" />
+      </span>
+      <span class="rte-color" title="背景高亮">
+        <span class="rte-color__label">高亮</span>
+        <input type="color" [value]="highlight()" (input)="onHighlight($event)" aria-label="背景高亮"
+          (mousedown)="$event.stopPropagation()" />
+      </span>
+    </div>
+
+    <div class="rte-group" role="group" aria-label="段落样式">
+      <button type="button" [class.active]="heading2()" title="二级标题" aria-label="二级标题"
+        (mousedown)="preventDefault($event)" (click)="exec('h2')">H2</button>
+      <button type="button" [class.active]="heading3()" title="三级标题" aria-label="三级标题"
+        (mousedown)="preventDefault($event)" (click)="exec('h3')">H3</button>
+      <button type="button" [class.active]="bullet()" title="无序列表" aria-label="无序列表"
+        (mousedown)="preventDefault($event)" (click)="exec('bulletList')">• 列表</button>
+      <button type="button" [class.active]="ordered()" title="有序列表" aria-label="有序列表"
+        (mousedown)="preventDefault($event)" (click)="exec('orderedList')">1. 列表</button>
+      <button type="button" [class.active]="quote()" title="引用" aria-label="引用"
+        (mousedown)="preventDefault($event)" (click)="exec('blockquote')">“”</button>
+    </div>
+
+    <div class="rte-group" role="group" aria-label="对齐与工具">
+      <button type="button" [class.active]="alignLeft()" title="左对齐" aria-label="左对齐"
+        (mousedown)="preventDefault($event)" (click)="exec('alignLeft')">左</button>
+      <button type="button" [class.active]="alignCenter()" title="居中" aria-label="居中"
+        (mousedown)="preventDefault($event)" (click)="exec('alignCenter')">中</button>
+      <button type="button" [class.active]="alignRight()" title="右对齐" aria-label="右对齐"
+        (mousedown)="preventDefault($event)" (click)="exec('alignRight')">右</button>
+      <button type="button" [class.active]="link()" title="链接" aria-label="链接"
+        (mousedown)="preventDefault($event)" (click)="setLink()">🔗</button>
+      <button type="button" title="清除格式" aria-label="清除格式"
+        (mousedown)="preventDefault($event)" (click)="exec('clearFormat')">⌫ 清除</button>
+      <button type="button" title="撤销" aria-label="撤销"
+        (mousedown)="preventDefault($event)" (click)="exec('undo')">↶</button>
+      <button type="button" title="重做" aria-label="重做"
+        (mousedown)="preventDefault($event)" (click)="exec('redo')">↷</button>
+    </div>
+  </div>
+  <div #host class="rich-text-editor__content" aria-label="正文编辑区"></div>
+</div>

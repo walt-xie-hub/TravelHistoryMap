@@ -82,14 +82,34 @@ public static class TravelEndpoints
             return image is null ? Results.NotFound() : Results.File(image.Content, image.ContentType);
         });
 
+        // 删除单张图片：清理媒体文件并删除数据库行；非本人/不存在一律 404（不泄露存在性）。
+        group.MapDelete("/{id:int}/images/{imageId:int}", async (
+            int id,
+            int imageId,
+            ClaimsPrincipal principal,
+            ITravelImageService imageService,
+            CancellationToken ct) =>
+        {
+            var deleted = await imageService.DeleteAsync(CurrentUserId(principal), id, imageId, ct);
+            return deleted ? Results.NoContent() : Results.NotFound();
+        });
+
         group.MapPost("/", async (CreateTravelDto dto, ClaimsPrincipal principal, ITravelService svc, CancellationToken ct) =>
         {
             // 领域校验：离开时间不得早于到达时间（到达未结束时应省略 departedAt）
             if (dto.DepartedAt is { } departed && departed < dto.ArrivedAt)
                 return Results.BadRequest(new { error = "departedAt must not be earlier than arrivedAt." });
 
-            var created = await svc.CreateAsync(CurrentUserId(principal), dto, ct);
-            return Results.Created($"/api/travels/{created.Id}", created);
+            try
+            {
+                var created = await svc.CreateAsync(CurrentUserId(principal), dto, ct);
+                return Results.Created($"/api/travels/{created.Id}", created);
+            }
+            catch (ArgumentException ex)
+            {
+                // 正文过长等字段校验失败（如超过 4000 可见字符）→ 400
+                return Results.BadRequest(new { error = ex.Message });
+            }
         });
 
         group.MapPut("/{id:int}", async (int id, UpdateTravelDto dto, ClaimsPrincipal principal, ITravelService svc, CancellationToken ct) =>
@@ -97,8 +117,15 @@ public static class TravelEndpoints
             if (dto.DepartedAt is { } departed && departed < dto.ArrivedAt)
                 return Results.BadRequest(new { error = "departedAt must not be earlier than arrivedAt." });
 
-            var updated = await svc.UpdateAsync(CurrentUserId(principal), id, dto, ct);
-            return updated is null ? Results.NotFound() : Results.Ok(updated);
+            try
+            {
+                var updated = await svc.UpdateAsync(CurrentUserId(principal), id, dto, ct);
+                return updated is null ? Results.NotFound() : Results.Ok(updated);
+            }
+            catch (ArgumentException ex)
+            {
+                return Results.BadRequest(new { error = ex.Message });
+            }
         });
 
         group.MapDelete("/{id:int}", async (

@@ -25,8 +25,38 @@
     @if (selected(); as place) { <p class="selected-place">已选择：{{ place.name }}（{{ selectedCoordinates() }}）</p> }
     <label>到达时间<input type="datetime-local" name="arrivedAt" [value]="arrivedAt()" (input)="arrivedAt.set($any($event.target).value)" required /></label>
     <label>离开时间（可选）<input type="datetime-local" name="departedAt" [value]="departedAt()" (input)="departedAt.set($any($event.target).value)" /></label>
-    <label>出游描述<textarea name="description" rows="5" [value]="description()" (input)="description.set($any($event.target).value)" maxlength="4000"></textarea></label>
-    <label>图片（最多 9 张，每张不超过 10 MB）<input type="file" accept="image/jpeg,image/png,image/webp" multiple (change)="onFiles($event)" /></label>
+    <div class="description-editor">
+      <div class="description-editor__head">
+        <strong>出游描述</strong>
+        <span class="description-editor__count" [class.over]="descriptionCount() > 4000">{{ descriptionCount() }}/4000</span>
+      </div>
+      <app-rich-text-editor [value]="description()" (valueChange)="description.set($event)"
+        [placeholder]="'记录这段旅行的见闻（可选），支持加粗、标题、列表等排版'" />
+    </div>
+    <section class="image-picker">
+      <div class="image-picker__head">
+        <strong class="image-picker__title">图片（{{ files().length }}/9）</strong>
+        <label class="image-picker__choose" [class.disabled]="loading() || files().length >= 9">
+          <span>{{ files().length >= 9 ? '已达 9 张上限' : '选择图片' }}</span>
+          <input type="file" accept="image/jpeg,image/png,image/webp" multiple
+            [disabled]="loading() || files().length >= 9"
+            (change)="onFiles($event)" />
+        </label>
+      </div>
+      <p class="image-picker__hint">支持 JPEG / PNG / WebP，单张不超过 10 MB；已选图片在保存旅游记录后上传为该记录的图片，可逐张移除。</p>
+      @if (files().length) {
+        <ul class="image-picker__grid">
+          @for (image of files(); track image.url) {
+            <li class="image-picker__cell">
+              <img [src]="image.url" [alt]="image.file.name" />
+              <button type="button" class="image-picker__remove" [attr.aria-label]="'移除 ' + image.file.name"
+                [disabled]="loading()" (click)="removeImage($index)">✕</button>
+            </li>
+          }
+        </ul>
+        <button type="button" class="clear-images" [disabled]="loading()" (click)="clearImages()">清空全部</button>
+      }
+    </section>
     <button class="submit" type="submit" [disabled]="loading()">{{ loading() ? '保存中…' : '保存旅游记录' }}</button>
   </form>
 </section>

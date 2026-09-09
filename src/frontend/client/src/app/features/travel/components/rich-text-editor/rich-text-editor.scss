@@ -1,0 +1,55 @@
+:host { display: block; }
+.rich-text-editor { display: grid; gap: 8px; }
+
+.rich-text-editor__toolbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  padding: 6px 8px; border: 1px solid var(--border-color); border-radius: 8px;
+  background: var(--surface);
+}
+.rte-group { display: inline-flex; align-items: center; gap: 4px; }
+.rte-group + .rte-group { padding-left: 8px; border-left: 1px solid var(--border-color); }
+
+.rich-text-editor__toolbar button,
+.rich-text-editor__toolbar select {
+  border: 0; border-radius: 6px; background: transparent; color: var(--text);
+  font: inherit; font-size: 13px; cursor: pointer; padding: 4px 7px; line-height: 1.2;
+}
+.rich-text-editor__toolbar button:hover { background: color-mix(in srgb, var(--primary) 16%, var(--surface)); }
+.rich-text-editor__toolbar button.active { background: var(--primary); color: #fff; }
+.rich-text-editor__toolbar button strong { font-weight: 800; }
+.rich-text-editor__toolbar select { border: 1px solid var(--border-color); background: var(--surface); max-width: 150px; }
+.rich-text-editor__toolbar select.rte-select--size { max-width: 96px; }
+
+.rte-color { position: relative; display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; border: 1px solid var(--border-color); border-radius: 6px; }
+.rte-color__label { font-size: 12px; font-weight: 700; color: var(--text); }
+.rte-color input[type='color'] { width: 22px; height: 22px; padding: 0; border: 0; border-radius: 4px; background: none; cursor: pointer; }
+
+.rich-text-editor__content {
+  border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 14px; min-height: 150px;
+  background: var(--surface);
+}
+/* 编辑态不出现黑边/粗框：TipTap(ProseMirror) 内容区由编辑器运行时动态插入，
+ * 不含 Angular scoping 属性，须用 ::ng-deep 才能命中。 */
+:host ::ng-deep .rich-text-editor__content .tiptap,
+:host ::ng-deep .rich-text-editor__content .ProseMirror,
+:host ::ng-deep .rich-text-editor__content .ProseMirror-focused {
+  min-height: 120px;
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+/* 编辑区正文排版（动态节点同样走 ::ng-deep） */
+:host ::ng-deep .rich-text-editor__content p { margin: 0 0 8px; line-height: 1.7; }
+:host ::ng-deep .rich-text-editor__content h2 { font-size: 1.3rem; margin: 14px 0 8px; }
+:host ::ng-deep .rich-text-editor__content h3 { font-size: 1.1rem; margin: 12px 0 6px; }
+:host ::ng-deep .rich-text-editor__content ul,
+:host ::ng-deep .rich-text-editor__content ol { margin: 4px 0 10px; padding-left: 24px; line-height: 1.7; }
+:host ::ng-deep .rich-text-editor__content li { margin: 2px 0; }
+:host ::ng-deep .rich-text-editor__content blockquote {
+  margin: 8px 0; padding: 4px 14px; border-left: 3px solid var(--primary); color: var(--text-muted);
+}
+:host ::ng-deep .rich-text-editor__content a { color: var(--primary); }
+:host ::ng-deep .rich-text-editor__content p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder); color: var(--text-muted); float: left; height: 0; pointer-events: none;
+}

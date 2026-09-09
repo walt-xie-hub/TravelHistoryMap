@@ -1,6 +1,10 @@
 <section class="travel-detail-page">
   <header class="page-heading">
-    <a routerLink="/map">返回地图</a>
+    @if (editing()) {
+      <button type="button" class="back-link" (click)="leaveWhileEditing()">返回地图</button>
+    } @else {
+      <a routerLink="/map">返回地图</a>
+    }
     @if (record(); as item) { <h1>{{ item.locationName }}</h1> }
   </header>
 
@@ -8,16 +12,83 @@
   @if (error()) { <p class="detail-error" role="alert">{{ error() }}</p> }
   @if (record(); as item) {
     <article class="detail-card">
-      <p class="detail-time">{{ item.arrivedAt | date:'yyyy-MM-dd HH:mm' }} → {{ item.departedAt ? (item.departedAt | date:'yyyy-MM-dd HH:mm') : '进行中' }}</p>
+      <div class="detail-head">
+        <p class="detail-time">{{ item.arrivedAt | date:'yyyy-MM-dd HH:mm' }} → {{ item.departedAt ? (item.departedAt | date:'yyyy-MM-dd HH:mm') : '进行中' }}</p>
+        @if (!editing()) {
+          <button type="button" class="edit-toggle" (click)="startEdit()">编辑详情</button>
+        }
+      </div>
       <p class="detail-coordinates">坐标：{{ item.latitude }}, {{ item.longitude }}</p>
-      @if (item.description) { <p class="detail-description">{{ item.description }}</p> } @else { <p class="detail-empty">暂无描述</p> }
-      @if (images().length) {
-        <div class="image-grid">@for (image of images(); track image.id) {
-          <button type="button" (click)="openOriginal(image)" [attr.aria-label]="'查看 ' + image.originalFileName">
-            <img [src]="image.thumbnailSrc" [alt]="image.originalFileName" />
-          </button>
-        }</div>
-      } @else { <p class="detail-empty">暂无图片</p> }
+
+      @if (editing()) {
+        <div class="edit-field">
+          <div class="edit-field__head">
+            <strong>文字描述</strong>
+            <span class="edit-field__count" [class.over]="descriptionCount() > 4000">{{ descriptionCount() }}/4000</span>
+          </div>
+          <app-rich-text-editor [value]="editDescription()" (valueChange)="editDescription.set($event)"
+            [placeholder]="'补充这段停留的文字描述（可选），支持加粗、标题、列表等排版'" />
+        </div>
+      } @else if (item.description && isRichDescription(item.description)) {
+        <div class="rich-text-view" [innerHTML]="safeHtml(item.description)"></div>
+      } @else if (item.description) {
+        <p class="detail-description">{{ item.description }}</p>
+      } @else {
+        <p class="detail-empty">暂无描述</p>
+      }
+
+      <section class="image-section">
+        <div class="image-section__head">
+          <h2>图片</h2>
+          @if (editing()) {
+            <label class="add-images" [class.disabled]="saving() || remainingSlots() <= 0">
+              <span>添加图片（还可添加 {{ remainingSlots() }} 张）</span>
+              <input type="file" accept="image/jpeg,image/png,image/webp" multiple
+                [disabled]="saving() || remainingSlots() <= 0"
+                (change)="onAddFiles($event)" />
+            </label>
+          }
+        </div>
+
+        @if (images().length) {
+          <div class="image-grid">
+            @for (image of images(); track image.id) {
+              <div class="thumbnail-cell">
+                <button type="button" class="thumbnail" (click)="openOriginal(image)" [disabled]="saving()"
+                  [attr.aria-label]="'查看 ' + image.originalFileName">
+                  @if (image.thumbnailSrc) { <img [src]="image.thumbnailSrc" [alt]="image.originalFileName" /> }
+                </button>
+                @if (editing()) {
+                  <button type="button" class="remove-image" [disabled]="saving()"
+                    [attr.aria-label]="'删除 ' + image.originalFileName"
+                    (click)="removeImage(image)">✕</button>
+                }
+              </div>
+            }
+          </div>
+        } @else {
+          <p class="detail-empty">{{ editing() ? '暂无图片，点击“添加图片”上传。' : '暂无图片' }}</p>
+        }
+
+        @if (editing() && pendingFiles().length) {
+          <p class="pending-hint">保存时将上传以下 {{ pendingFiles().length }} 张图片：</p>
+          <ul class="pending-list">
+            @for (file of pendingFiles(); track $index) {
+              <li>
+                <span class="pending-name">{{ file.name }}</span>
+                <button type="button" class="pending-remove" [disabled]="saving()" (click)="removeStaged($index)">移除</button>
+              </li>
+            }
+          </ul>
+        }
+      </section>
+
+      @if (editing()) {
+        <div class="edit-actions">
+          <button type="button" class="save" [disabled]="saving()" (click)="save()">{{ saving() ? '保存中…' : '保存' }}</button>
+          <button type="button" class="cancel" [disabled]="saving()" (click)="cancelEdit()">取消</button>
+        </div>
+      }
     </article>
   }
 
