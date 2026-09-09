@@ -32,6 +32,11 @@ public class TravelRecordConfiguration : IEntityTypeConfiguration<TravelRecord>
             .IsRequired()
             .HasPrecision(9, 6);   // WGS84，-180 ~ 180
 
+        // ADR-0015：城市快照（短名，≤40）
+        builder.Property(t => t.City)
+            .IsRequired(false)
+            .HasMaxLength(40);
+
         // 时间以 UTC 时刻存储（timestamptz）
         builder.Property(t => t.ArrivedAt)
             .IsRequired()

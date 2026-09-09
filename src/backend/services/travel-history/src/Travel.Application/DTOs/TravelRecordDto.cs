@@ -15,6 +15,7 @@ public record TravelRecordDto(
     string? Description = null,
     IReadOnlyList<string>? Tags = null,
     bool IsFavorite = false,
+    string? City = null,
     IReadOnlyList<TravelImageDto>? Images = null);
 
 public record TravelImageDto(
@@ -37,7 +38,8 @@ public record CreateTravelDto(
     DateTimeOffset? DepartedAt = null,
     string? Description = null,
     IReadOnlyList<string>? Tags = null,
-    bool IsFavorite = false);
+    bool IsFavorite = false,
+    string? City = null);
 
 /// <summary>
 /// 更新旅行记录请求模型（不允许改归属用户）。
@@ -50,4 +52,5 @@ public record UpdateTravelDto(
     DateTimeOffset? DepartedAt = null,
     string? Description = null,
     IReadOnlyList<string>? Tags = null,
-    bool IsFavorite = false);
+    bool IsFavorite = false,
+    string? City = null);

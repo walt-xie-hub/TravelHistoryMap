@@ -226,6 +226,35 @@ public class TravelServiceTests
     }
 
     [Fact]
+    public async Task CreateAsync_WithCity_NormalizesAndPersists()
+    {
+        // Arrange（ADR-0015：城市快照 trim 后落库并透出 DTO）
+        _repositoryMock.Setup(r => r.AddAsync(It.IsAny<TravelRecord>(), It.IsAny<CancellationToken>()))
+                       .ReturnsAsync((TravelRecord t, CancellationToken _) => t);
+        var dto = new CreateTravelDto("Shanghai", 31.2304m, 121.4737m, Arrived, Departed, City: " 上海 ");
+
+        // Act
+        var result = await _sut.CreateAsync(10, dto);
+
+        // Assert
+        Assert.Equal("上海", result.City);
+        _repositoryMock.Verify(r => r.AddAsync(
+            It.Is<TravelRecord>(t => t.City == "上海"),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task CreateAsync_CityTooLong_ThrowsAndDoesNotPersist()
+    {
+        // Arrange（ADR-0015：城市名 ≤40）
+        var dto = new CreateTravelDto("Shanghai", 31.2304m, 121.4737m, Arrived, City: new string('城', 41));
+
+        // Act / Assert
+        await Assert.ThrowsAsync<ArgumentException>(() => _sut.CreateAsync(10, dto));
+        _repositoryMock.Verify(r => r.AddAsync(It.IsAny<TravelRecord>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task UpdateAsync_TogglesFavoriteAndStoresTags()
     {
         // Arrange
