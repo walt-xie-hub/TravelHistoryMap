@@ -53,6 +53,11 @@ public class TravelRecordConfiguration : IEntityTypeConfiguration<TravelRecord>
         builder.Property(t => t.UpdatedAt)
             .IsRequired(false);
 
+        // ADR-0013：软删除时间戳；null = 未删除。
+        builder.Property(t => t.DeletedAt)
+            .IsRequired(false)
+            .HasColumnType("timestamptz");
+
         // 主查询：按用户取历史并按到达时间倒序，因此建 (UserId, ArrivedAt) 复合索引
         builder.HasIndex(t => new { t.UserId, t.ArrivedAt });
 

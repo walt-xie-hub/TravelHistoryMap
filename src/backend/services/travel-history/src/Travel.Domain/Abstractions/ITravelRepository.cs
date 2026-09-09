@@ -9,13 +9,22 @@ namespace Travel.Domain.Abstractions;
 public interface ITravelRepository
 {
     /// <summary>
-    /// 按用户分页查询旅行记录。page 从 1 开始；可按到达时间窗 [from, to] 过滤；
+    /// 按用户分页查询旅行记录（仅活动记录：未移入回收站）。page 从 1 开始；可按到达时间窗 [from, to] 过滤；
     /// 按到达时间倒序（最新在前）。返回本页数据、总条数与总页数。
     /// </summary>
     Task<PagedResult<TravelRecord>> GetPagedAsync(
         int userId,
         DateTimeOffset? from,
         DateTimeOffset? to,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 回收站：按用户分页查询已软删除记录（DeletedAt 非空），按删除时间倒序（最近删除在前）。
+    /// </summary>
+    Task<PagedResult<TravelRecord>> GetTrashPagedAsync(
+        int userId,
         int page,
         int pageSize,
         CancellationToken cancellationToken = default);
@@ -27,8 +36,13 @@ public interface ITravelRepository
     /// <summary>更新已有记录（EF 会基于 xmin 做乐观锁校验）。</summary>
     Task<TravelRecord?> UpdateAsync(TravelRecord record, CancellationToken cancellationToken = default);
 
-    /// <summary>按主键删除记录；不存在时返回 false。</summary>
+    /// <summary>按主键删除记录；不存在时返回 false（彻底删除用）。</summary>
     Task<bool> DeleteAsync(int id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 设置软删除时间戳（ADR-0013）：非空 = 移入回收站，null = 恢复。记录不存在返回 false。
+    /// </summary>
+    Task<bool> SetDeletedAtAsync(int id, DateTimeOffset? deletedAt, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<TravelImage>> GetImagesAsync(int recordId, CancellationToken cancellationToken = default);
     Task<TravelImage?> GetImageAsync(int imageId, CancellationToken cancellationToken = default);

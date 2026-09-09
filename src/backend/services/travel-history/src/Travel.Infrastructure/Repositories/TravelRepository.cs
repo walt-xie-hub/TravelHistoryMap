@@ -24,14 +24,36 @@ public class TravelRepository : ITravelRepository
         int pageSize,
         CancellationToken ct = default)
     {
-        // 主查询：按用户 + 可选到达时间窗过滤，按到达时间倒序（最新在前）
-        var query = _db.TravelRecords.AsNoTracking().Where(t => t.UserId == userId);
+        // 主查询：按用户 + 仅活动记录（未移入回收站）+ 可选到达时间窗过滤，按到达时间倒序（最新在前）
+        var query = _db.TravelRecords.AsNoTracking()
+            .Where(t => t.UserId == userId && t.DeletedAt == null);
         if (from.HasValue)
             query = query.Where(t => t.ArrivedAt >= from.Value);
         if (to.HasValue)
             query = query.Where(t => t.ArrivedAt <= to.Value);
 
         query = query.OrderByDescending(t => t.ArrivedAt);
+
+        var totalCount = await query.CountAsync(ct);
+        var items = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(ct);
+        var totalPages = totalCount == 0 ? 1 : (int)Math.Ceiling(totalCount / (double)pageSize);
+
+        return new PagedResult<TravelRecord>(items, page, pageSize, totalCount, totalPages);
+    }
+
+    public async Task<PagedResult<TravelRecord>> GetTrashPagedAsync(
+        int userId,
+        int page,
+        int pageSize,
+        CancellationToken ct = default)
+    {
+        // 回收站：仅已软删除记录，按删除时间倒序（最近删除在前）
+        var query = _db.TravelRecords.AsNoTracking()
+            .Where(t => t.UserId == userId && t.DeletedAt != null)
+            .OrderByDescending(t => t.DeletedAt);
 
         var totalCount = await query.CountAsync(ct);
         var items = await query
@@ -94,6 +116,18 @@ public class TravelRepository : ITravelRepository
         return true;
     }
 
+    public async Task<bool> SetDeletedAtAsync(int id, DateTimeOffset? deletedAt, CancellationToken ct = default)
+    {
+        var existing = await _db.TravelRecords.FindAsync([id], ct);
+        if (existing is null)
+            return false;
+
+        existing.DeletedAt = deletedAt;
+        existing.UpdatedAt = DateTimeOffset.UtcNow;
+        await _db.SaveChangesAsync(ct);
+        return true;
+    }
+
     private static bool IsForeignKeyViolation(DbUpdateException ex)
         => ex.InnerException is PostgresException { SqlState: "23503" };
 
@@ -122,7 +156,7 @@ public class TravelRepository : ITravelRepository
 
     public async Task<IReadOnlyList<TravelRecord>> GetByIdsAsync(int userId, IReadOnlyList<int> ids, CancellationToken ct = default)
         => await _db.TravelRecords.AsNoTracking()
-            .Where(t => t.UserId == userId && ids.Contains(t.Id))
+            .Where(t => t.UserId == userId && ids.Contains(t.Id) && t.DeletedAt == null)
             .ToListAsync(ct);
 
     public Task<TravelShareSnapshot?> GetShareByTokenAsync(string token, CancellationToken ct = default)

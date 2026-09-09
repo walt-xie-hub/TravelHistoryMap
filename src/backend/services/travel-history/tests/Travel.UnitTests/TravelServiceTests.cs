@@ -232,20 +232,39 @@ public class TravelServiceTests
     }
 
     [Fact]
-    public async Task DeleteAsync_WhenRecordOwnedByUser_ReturnsTrue()
+    public async Task DeleteAsync_WhenRecordOwnedByUser_MovesToTrash()
     {
-        // Arrange
+        // Arrange（ADR-0013：删除=软删除，仅置 DeletedAt）
+        var record = SampleRecord(userId: 10);
         _repositoryMock.Setup(r => r.GetByIdAsync(1, It.IsAny<CancellationToken>()))
-                       .ReturnsAsync(SampleRecord(userId: 10));
-        _repositoryMock.Setup(r => r.DeleteAsync(1, It.IsAny<CancellationToken>()))
+                       .ReturnsAsync(record);
+        _repositoryMock.Setup(r => r.SetDeletedAtAsync(1, It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()))
                        .ReturnsAsync(true);
 
         // Act
         var deleted = await _sut.DeleteAsync(10, 1);
 
-        // Assert
+        // Assert：软删除写入非空 DeletedAt，不物理删除
         Assert.True(deleted);
-        _repositoryMock.Verify(r => r.DeleteAsync(1, It.IsAny<CancellationToken>()), Times.Once);
+        _repositoryMock.Verify(r => r.SetDeletedAtAsync(1, It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()), Times.Once);
+        _repositoryMock.Verify(r => r.DeleteAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_WhenRecordAlreadyTrashed_ReturnsFalse()
+    {
+        // Arrange：已在回收站，再次删除应失败
+        var record = SampleRecord(userId: 10);
+        record.DeletedAt = DateTimeOffset.UtcNow;
+        _repositoryMock.Setup(r => r.GetByIdAsync(1, It.IsAny<CancellationToken>()))
+                       .ReturnsAsync(record);
+
+        // Act
+        var deleted = await _sut.DeleteAsync(10, 1);
+
+        // Assert
+        Assert.False(deleted);
+        _repositoryMock.Verify(r => r.SetDeletedAtAsync(It.IsAny<int>(), It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -258,6 +277,7 @@ public class TravelServiceTests
         var deleted = await _sut.DeleteAsync(10, 1);
 
         Assert.False(deleted);
+        _repositoryMock.Verify(r => r.SetDeletedAtAsync(It.IsAny<int>(), It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()), Times.Never);
         _repositoryMock.Verify(r => r.DeleteAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -273,7 +293,94 @@ public class TravelServiceTests
 
         // Assert
         Assert.False(deleted);
+        _repositoryMock.Verify(r => r.SetDeletedAtAsync(It.IsAny<int>(), It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()), Times.Never);
         _repositoryMock.Verify(r => r.DeleteAsync(It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetByIdAsync_WhenRecordTrashed_ReturnsNull()
+    {
+        // Arrange（ADR-0013：回收站记录对普通详情不可见）
+        var record = SampleRecord(userId: 10);
+        record.DeletedAt = DateTimeOffset.UtcNow;
+        _repositoryMock.Setup(r => r.GetByIdAsync(1, It.IsAny<CancellationToken>()))
+                       .ReturnsAsync(record);
+
+        // Act
+        var dto = await _sut.GetByIdAsync(10, 1);
+
+        // Assert
+        Assert.Null(dto);
+    }
+
+    [Fact]
+    public async Task GetTrashAsync_ReturnsMappedPagedResult()
+    {
+        // Arrange
+        var trashed = SampleRecord(id: 3, userId: 10);
+        trashed.DeletedAt = DateTimeOffset.UtcNow;
+        var paged = new PagedResult<TravelRecord>(
+            new List<TravelRecord> { trashed }, 1, 10, TotalCount: 1, TotalPages: 1);
+        _repositoryMock.Setup(r => r.GetTrashPagedAsync(10, 1, 10, It.IsAny<CancellationToken>()))
+                       .ReturnsAsync(paged);
+
+        // Act
+        var result = await _sut.GetTrashAsync(10, 1, 10);
+
+        // Assert
+        Assert.Single(result.Items);
+        Assert.Equal("Shanghai", result.Items[0].LocationName);
+    }
+
+    [Fact]
+    public async Task RestoreAsync_WhenTrashedOwnedByUser_ReturnsTrue()
+    {
+        // Arrange
+        var record = SampleRecord(userId: 10);
+        record.DeletedAt = DateTimeOffset.UtcNow;
+        _repositoryMock.Setup(r => r.GetByIdAsync(1, It.IsAny<CancellationToken>()))
+                       .ReturnsAsync(record);
+        _repositoryMock.Setup(r => r.SetDeletedAtAsync(1, It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()))
+                       .ReturnsAsync(true);
+
+        // Act
+        var restored = await _sut.RestoreAsync(10, 1);
+
+        // Assert：恢复 = 写 null
+        Assert.True(restored);
+        _repositoryMock.Verify(r => r.SetDeletedAtAsync(1, null, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task RestoreAsync_WhenRecordActive_ReturnsFalse()
+    {
+        // Arrange：未在回收站，恢复应失败
+        _repositoryMock.Setup(r => r.GetByIdAsync(1, It.IsAny<CancellationToken>()))
+                       .ReturnsAsync(SampleRecord(userId: 10));
+
+        // Act
+        var restored = await _sut.RestoreAsync(10, 1);
+
+        // Assert
+        Assert.False(restored);
+        _repositoryMock.Verify(r => r.SetDeletedAtAsync(It.IsAny<int>(), It.IsAny<DateTimeOffset?>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task DeletePermanentlyAsync_WhenOwnedByUser_HardDeletes()
+    {
+        // Arrange
+        _repositoryMock.Setup(r => r.GetByIdAsync(1, It.IsAny<CancellationToken>()))
+                       .ReturnsAsync(SampleRecord(userId: 10));
+        _repositoryMock.Setup(r => r.DeleteAsync(1, It.IsAny<CancellationToken>()))
+                       .ReturnsAsync(true);
+
+        // Act
+        var deleted = await _sut.DeletePermanentlyAsync(10, 1);
+
+        // Assert
+        Assert.True(deleted);
+        _repositoryMock.Verify(r => r.DeleteAsync(1, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

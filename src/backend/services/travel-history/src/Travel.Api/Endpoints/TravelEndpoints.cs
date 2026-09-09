@@ -33,6 +33,16 @@ public static class TravelEndpoints
             return record is null ? Results.NotFound() : Results.Ok(record);
         });
 
+        // 回收站（ADR-0013）：已软删除记录，按删除时间倒序
+        group.MapGet("/trash", async (ClaimsPrincipal principal, ITravelService svc, CancellationToken ct,
+            int page = 1,
+            int pageSize = 10) =>
+        {
+            page = page < 1 ? 1 : page;
+            pageSize = pageSize is < 1 or > 100 ? 10 : pageSize;
+            return Results.Ok(await svc.GetTrashAsync(CurrentUserId(principal), page, pageSize, ct));
+        });
+
         group.MapGet("/{id:int}/images", async (int id, ClaimsPrincipal principal, ITravelImageService imageService, CancellationToken ct) =>
         {
             var images = await imageService.GetImagesAsync(CurrentUserId(principal), id, ct);
@@ -128,7 +138,30 @@ public static class TravelEndpoints
             }
         });
 
+        // 移入回收站（软删除，ADR-0013）：仅置 DeletedAt，不清理图片，可恢复
         group.MapDelete("/{id:int}", async (
+            int id,
+            ClaimsPrincipal principal,
+            ITravelService svc,
+            CancellationToken ct) =>
+        {
+            var moved = await svc.DeleteAsync(CurrentUserId(principal), id, ct);
+            return moved ? Results.NoContent() : Results.NotFound();
+        });
+
+        // 从回收站恢复
+        group.MapPost("/{id:int}/restore", async (
+            int id,
+            ClaimsPrincipal principal,
+            ITravelService svc,
+            CancellationToken ct) =>
+        {
+            var restored = await svc.RestoreAsync(CurrentUserId(principal), id, ct);
+            return restored ? Results.NoContent() : Results.NotFound();
+        });
+
+        // 彻底删除：先清理媒体文件与图片行，再物理删除记录
+        group.MapDelete("/{id:int}/permanent", async (
             int id,
             ClaimsPrincipal principal,
             ITravelService svc,
@@ -136,7 +169,7 @@ public static class TravelEndpoints
             CancellationToken ct) =>
         {
             await imageService.DeleteForRecordAsync(CurrentUserId(principal), id, ct);
-            var deleted = await svc.DeleteAsync(CurrentUserId(principal), id, ct);
+            var deleted = await svc.DeletePermanentlyAsync(CurrentUserId(principal), id, ct);
             return deleted ? Results.NoContent() : Results.NotFound();
         });
 

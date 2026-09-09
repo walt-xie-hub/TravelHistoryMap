@@ -37,7 +37,8 @@ public class TravelService : ITravelService
     public async Task<TravelRecordDto?> GetByIdAsync(int userId, int id, CancellationToken ct = default)
     {
         var record = await _repository.GetByIdAsync(id, ct);
-        return record is null || record.UserId != userId ? null : ToDto(record);
+        // 已移入回收站视同不存在（ADR-0013），普通详情/更新均不可见
+        return record is null || record.UserId != userId || record.DeletedAt is not null ? null : ToDto(record);
     }
 
     public async Task<TravelRecordDto> CreateAsync(int userId, CreateTravelDto dto, CancellationToken ct = default)
@@ -59,7 +60,7 @@ public class TravelService : ITravelService
     public async Task<TravelRecordDto?> UpdateAsync(int userId, int id, UpdateTravelDto dto, CancellationToken ct = default)
     {
         var existing = await _repository.GetByIdAsync(id, ct);
-        if (existing is null || existing.UserId != userId)
+        if (existing is null || existing.UserId != userId || existing.DeletedAt is not null)
             return null;
 
         existing.LocationName = dto.LocationName.Trim();
@@ -74,7 +75,37 @@ public class TravelService : ITravelService
         return updated is null ? null : ToDto(updated);
     }
 
+    /// <summary>移入回收站（软删除，ADR-0013）：仅置 DeletedAt，不清理图片。</summary>
     public async Task<bool> DeleteAsync(int userId, int id, CancellationToken ct = default)
+    {
+        var existing = await _repository.GetByIdAsync(id, ct);
+        if (existing is null || existing.UserId != userId || existing.DeletedAt is not null)
+            return false;
+        return await _repository.SetDeletedAtAsync(id, DateTimeOffset.UtcNow, ct);
+    }
+
+    public async Task<PagedResult<TravelRecordDto>> GetTrashAsync(
+        int userId,
+        int page,
+        int pageSize,
+        CancellationToken ct = default)
+    {
+        var result = await _repository.GetTrashPagedAsync(userId, page, pageSize, ct);
+        var items = result.Items.Select(ToDto).ToList();
+        return new PagedResult<TravelRecordDto>(items, result.Page, result.PageSize, result.TotalCount, result.TotalPages);
+    }
+
+    /// <summary>从回收站恢复：清空 DeletedAt。</summary>
+    public async Task<bool> RestoreAsync(int userId, int id, CancellationToken ct = default)
+    {
+        var existing = await _repository.GetByIdAsync(id, ct);
+        if (existing is null || existing.UserId != userId || existing.DeletedAt is null)
+            return false;
+        return await _repository.SetDeletedAtAsync(id, null, ct);
+    }
+
+    /// <summary>彻底删除：物理删除记录行（图片媒体与图片行由表现层先行清理）。</summary>
+    public async Task<bool> DeletePermanentlyAsync(int userId, int id, CancellationToken ct = default)
     {
         var existing = await _repository.GetByIdAsync(id, ct);
         if (existing is null || existing.UserId != userId)

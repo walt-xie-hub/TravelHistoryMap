@@ -38,6 +38,12 @@ public class TravelRecord
     /// <summary>最后更新时间（UTC，可选）</summary>
     public DateTimeOffset? UpdatedAt { get; set; }
 
+    /// <summary>
+    /// 软删除时间（UTC，可选；ADR-0013）。
+    /// 非空 = 已移入回收站：默认列表/详情/分享均不可见，可由回收站恢复或彻底删除。
+    /// </summary>
+    public DateTimeOffset? DeletedAt { get; set; }
+
     // 注：乐观锁行版本（PostgreSQL xmin 系统列）不放在领域实体里，原因是 EF Core 内置
     // 约定会把任何叫 RowVersion 的属性强制识别为 byte[]（SQL Server [Timestamp] 语义），
     // 无法在 CLR 层用 uint 表示。该属性在 TravelRecordConfiguration 中作为 shadow property 配置：

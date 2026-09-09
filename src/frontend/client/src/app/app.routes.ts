@@ -61,6 +61,11 @@ export const routes: Routes = [
           import('@features/travel/pages/photo-wall/photo-wall-page').then((m) => m.PhotoWallPage),
       },
       {
+        path: 'trash',
+        loadComponent: () =>
+          import('@features/travel/pages/trash/trash-page').then((m) => m.TrashPage),
+      },
+      {
         path: '**',
         loadComponent: () =>
           import('@features/not-found/not-found').then((m) => m.NotFound),

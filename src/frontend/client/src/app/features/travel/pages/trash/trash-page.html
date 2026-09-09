@@ -1,0 +1,39 @@
+<section class="trash-page">
+  <header class="page-heading">
+    <div class="page-heading__row">
+      <a routerLink="/map">返回地图</a>
+      <h1>回收站</h1>
+    </div>
+    <p class="page-heading__sub">已移入回收站的旅行记录 · 可随时恢复，或彻底删除（连同图片，不可恢复）</p>
+  </header>
+
+  @if (error()) { <p class="form-error" role="alert">{{ error() }}</p> }
+
+  @if (loading()) {
+    <p class="state-text">正在加载回收站…</p>
+  } @else if (items().length === 0) {
+    <div class="empty">
+      <p class="empty__icon" aria-hidden="true">🗑️</p>
+      <h2>回收站是空的</h2>
+      <p>在地图上删除的旅行记录会先到这里，误删也可找回。</p>
+      <a class="empty__cta" routerLink="/map">去地图看看</a>
+    </div>
+  } @else {
+    <ul class="trash-list">
+      @for (record of items(); track record.id) {
+        <li class="trash-item">
+          <div class="trash-item__info">
+            <strong class="trash-item__name">{{ record.locationName }}</strong>
+            <span class="trash-item__time">{{ fmt(record.arrivedAt) }}{{ record.departedAt ? ' → ' + fmt(record.departedAt) : ' · 进行中' }}</span>
+          </div>
+          <div class="trash-item__actions">
+            <button type="button" class="btn-restore" [disabled]="busyId() !== null"
+              (click)="restore(record)">恢复</button>
+            <button type="button" class="btn-purge" [disabled]="busyId() !== null"
+              (click)="purge(record)">彻底删除</button>
+          </div>
+        </li>
+      }
+    </ul>
+  }
+</section>
