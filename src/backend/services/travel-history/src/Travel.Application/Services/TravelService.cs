@@ -54,6 +54,7 @@ public class TravelService : ITravelService
             Description = PrepareDescription(dto.Description),
             TagsJson = NormalizeTags(dto.Tags),
             IsFavorite = dto.IsFavorite,
+            City = NormalizeCity(dto.City),
         };
         var created = await _repository.AddAsync(record, ct);
         return ToDto(created);
@@ -73,6 +74,7 @@ public class TravelService : ITravelService
         existing.Description = PrepareDescription(dto.Description);
         existing.TagsJson = NormalizeTags(dto.Tags);
         existing.IsFavorite = dto.IsFavorite;
+        existing.City = NormalizeCity(dto.City);
         existing.UpdatedAt = DateTimeOffset.UtcNow;
 
         var updated = await _repository.UpdateAsync(existing, ct);
@@ -173,7 +175,21 @@ public class TravelService : ITravelService
         record.DepartedAt,
         record.Description,
         ParseTags(record.TagsJson),
-        record.IsFavorite);
+        record.IsFavorite,
+        record.City);
+
+    private const int MaxCityLength = 40;
+
+    /// <summary>城市快照归一化（ADR-0015）：trim、空→null、>40 抛 400。</summary>
+    private static string? NormalizeCity(string? city)
+    {
+        if (string.IsNullOrWhiteSpace(city))
+            return null;
+        var value = city.Trim();
+        if (value.Length > MaxCityLength)
+            throw new ArgumentException($"城市名称长度不能超过 {MaxCityLength} 个字符。");
+        return value;
+    }
 
     private const int MaxTags = 8;
     private const int MaxTagLength = 20;

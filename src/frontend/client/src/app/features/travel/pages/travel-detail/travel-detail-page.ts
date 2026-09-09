@@ -139,6 +139,7 @@ export class TravelDetailPage implements OnInit, OnDestroy {
         description: item.description,
         tags: item.tags ?? [],
         isFavorite: !item.isFavorite,
+        city: item.city ?? null,
       });
       this.record.set(updated);
     } catch (err) {
@@ -229,9 +230,10 @@ export class TravelDetailPage implements OnInit, OnDestroy {
         arrivedAt: item.arrivedAt,
         departedAt: item.departedAt,
         description,
-        // ADR-0014：PUT 全量替换，须回传标签/收藏，否则会被清空
+        // ADR-0014：PUT 全量替换，须回传标签/收藏，否则会被清空；城市同（ADR-0015）
         tags: item.tags ?? [],
         isFavorite: item.isFavorite ?? false,
+        city: item.city ?? null,
       });
       this.record.set(updated);
       this.editDescription.set(updated.description ?? '');

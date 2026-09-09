@@ -21,6 +21,8 @@ export interface TravelRecord {
   tags?: string[];
   /** 精选收藏（ADR-0014） */
   isFavorite?: boolean;
+  /** 城市快照（ADR-0015）：地级市短名，可为空 */
+  city?: string | null;
   images?: TravelImage[];
 }
 
@@ -44,6 +46,8 @@ export interface CreateTravelRequest {
   tags?: string[];
   /** 精选收藏（ADR-0014） */
   isFavorite?: boolean;
+  /** 城市快照（ADR-0015） */
+  city?: string | null;
 }
 
 /** 分页结果，字段与后端 PagedResult<T> 序列化一致（camelCase） */

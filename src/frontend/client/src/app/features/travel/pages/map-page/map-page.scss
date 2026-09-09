@@ -2,8 +2,8 @@
   display: flex;
   gap: 16px;
   align-items: stretch;
-  height: calc(100dvh - var(--map-chrome));
-  min-height: 520px;
+  height: calc(100dvh - var(--map-chrome) - 108px);
+  min-height: 420px;
 }
 
 .map-stage {

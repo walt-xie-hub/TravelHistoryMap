@@ -22,7 +22,9 @@
         <button type="button" (click)="choose(place)"><strong>{{ place.name }}</strong><span>{{ place.address }}</span></button>
       }</div>
     }
-    @if (selected(); as place) { <p class="selected-place">已选择：{{ place.name }}（{{ selectedCoordinates() }}）</p> }
+    @if (selected(); as place) {
+      <p class="selected-place">已选择：{{ place.name }}（{{ selectedCoordinates() }}）@if (city()) { · 城市：{{ city() }} }</p>
+    }
     <label>到达时间<input type="datetime-local" name="arrivedAt" [value]="arrivedAt()" (input)="arrivedAt.set($any($event.target).value)" required /></label>
     <label>离开时间（可选）<input type="datetime-local" name="departedAt" [value]="departedAt()" (input)="departedAt.set($any($event.target).value)" /></label>
     <div class="description-editor">

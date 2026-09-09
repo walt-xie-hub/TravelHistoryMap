@@ -23,6 +23,12 @@ public class TravelRecord
     /// <summary>经度快照（WGS84，-180 ~ 180）</summary>
     public decimal Longitude { get; set; }
 
+    /// <summary>
+    /// 城市快照（ADR-0015，可选）：写入记录时由客户端经 AMap 派生的地级市短名（如 上海）。
+    /// 历史快照，非实时引用；用于地图时光轴按“同城连续停留”归并。
+    /// </summary>
+    public string? City { get; set; }
+
     /// <summary>到达时间（UTC 时刻，必填）</summary>
     public DateTimeOffset ArrivedAt { get; set; }
 
