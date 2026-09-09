@@ -6,6 +6,8 @@ import { TravelHistoryService } from '../../data-access/travel-history.service';
 import type { TravelImage, TravelRecord } from '../../models/travel-record.model';
 import { RichTextEditorComponent } from '../../components/rich-text-editor/rich-text-editor';
 import { TravelShareDialog } from '../../components/travel-share-dialog/travel-share-dialog';
+import { ImageLightbox } from '../../components/image-lightbox/image-lightbox';
+import type { LightboxItem } from '../../components/image-lightbox/image-lightbox';
 import { isRichHtml, sanitizeRichTextToTrusted, visibleTextLength } from '../../utils/rich-text.util';
 import { acceptImageFiles, pastedImageFiles } from '../../utils/staged-images.util';
 import { createMediaUrlHandle } from '../../utils/media-url.util';
@@ -14,7 +16,6 @@ import type { SafeHtml } from '@angular/platform-browser';
 
 interface DisplayImage extends TravelImage {
   thumbnailSrc: string;
-  originalSrc?: string;
 }
 
 const MAX_IMAGES = 9;
@@ -22,7 +23,7 @@ const MAX_IMAGES = 9;
 @Component({
   selector: 'app-travel-detail-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, RouterLink, RichTextEditorComponent, TravelShareDialog],
+  imports: [DatePipe, RouterLink, RichTextEditorComponent, TravelShareDialog, ImageLightbox],
   templateUrl: './travel-detail-page.html',
   styleUrl: './travel-detail-page.scss',
 })
@@ -38,10 +39,11 @@ export class TravelDetailPage implements OnInit, OnDestroy {
 
   protected readonly record = signal<TravelRecord | null>(null);
   protected readonly images = signal<DisplayImage[]>([]);
-  protected readonly selectedImage = signal<DisplayImage | null>(null);
   protected readonly loading = signal(true);
   protected readonly error = signal('');
   protected readonly favoriteBusy = signal(false);
+  /** 全屏灯箱（architecture #2）：在该记录整组图片上查看，原图懒加载走 media 句柄 */
+  protected readonly viewer = signal<{ items: LightboxItem[]; index: number } | null>(null);
 
   // —— 编辑态：仅“正文 + 图片增删”可编辑；地点快照与到达/离开边界保持只读（见 ADR-0008/0009）——
   protected readonly editing = signal(false);
@@ -274,27 +276,28 @@ export class TravelDetailPage implements OnInit, OnDestroy {
     }
   }
 
-  // —— 原图灯箱 ——
+  // —— 全屏灯箱（architecture #2）：点缩略图在该记录整组图片上打开；原图懒加载走 media 句柄 ——
 
-  protected async openOriginal(image: DisplayImage): Promise<void> {
+  protected openViewer(index: number): void {
     if (this.saving()) return;
-    if (!image.originalSrc) {
-      image.originalSrc = await this.toObjectUrl(image.originalUrl);
-      this.images.update(items => [...items]);
-    }
-    this.selectedImage.set(image);
+    const items: LightboxItem[] = this.images().map((image) => ({
+      key: image.id,
+      title: image.originalFileName,
+      load: () => this.media.urlFor(image.originalUrl),
+    }));
+    const last = items.length - 1;
+    this.viewer.set({ items, index: Math.min(Math.max(index, 0), Math.max(last, 0)) });
   }
 
-  protected closeOriginal(): void {
-    this.selectedImage.set(null);
+  protected closeViewer(): void {
+    this.viewer.set(null);
   }
 
   // —— 工具 ——
 
   private removeDisplayImage(image: DisplayImage): void {
     this.images.update(items => items.filter(x => x !== image));
-    if (this.selectedImage() === image) this.selectedImage.set(null);
-    // 对象 URL 由 media 句柄缓存并在页面销毁时统一回收；不做逐张 evict
+    this.closeViewer(); // 灯箱可能正引用已删项，保守关闭
   }
 
   private async toObjectUrl(path: string): Promise<string> {

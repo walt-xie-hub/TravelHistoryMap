@@ -67,9 +67,6 @@
 .edit-actions .cancel { background: var(--surface-hover); color: var(--text); }
 
 .detail-error { padding: 12px; background: var(--danger-soft); color: var(--danger); border-radius: 8px; }
-.image-modal { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 32px; background: rgb(15 23 42 / .82); }
-.image-modal img { max-width: min(100%, 1000px); max-height: 85dvh; object-fit: contain; }
-.image-modal .close { position: absolute; top: 20px; right: 20px; padding: 8px 12px; border: 0; border-radius: 8px; background: #fff; cursor: pointer; }
 
 /* —— ADR-0014 标签 + 精选收藏 —— */
 .detail-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 4px; }

@@ -84,9 +84,9 @@
 
         @if (images().length) {
           <div class="image-grid">
-            @for (image of images(); track image.id) {
+            @for (image of images(); track image.id; let index = $index) {
               <div class="thumbnail-cell">
-                <button type="button" class="thumbnail" (click)="openOriginal(image)" [disabled]="saving()"
+                <button type="button" class="thumbnail" (click)="openViewer(index)" [disabled]="saving()"
                   [attr.aria-label]="'查看 ' + image.originalFileName">
                   @if (image.thumbnailSrc) { <img [src]="image.thumbnailSrc" [alt]="image.originalFileName" /> }
                 </button>
@@ -128,10 +128,7 @@
     }
   }
 
-  @if (selectedImage(); as image) {
-    <div class="image-modal" role="dialog" aria-modal="true" (click)="closeOriginal()">
-      <img [src]="image.originalSrc" [alt]="image.originalFileName" (click)="$event.stopPropagation()" />
-      <button type="button" class="close" (click)="closeOriginal()">关闭</button>
-    </div>
+  @if (viewer(); as v) {
+    <app-image-lightbox [items]="v.items" [startIndex]="v.index" (close)="closeViewer()" />
   }
 </section>
