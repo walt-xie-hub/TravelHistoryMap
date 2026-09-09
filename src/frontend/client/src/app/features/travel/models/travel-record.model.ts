@@ -55,3 +55,25 @@ export interface TravelRangeRequest {
   from?: string;
   to?: string;
 }
+
+/** 分享（ADR-0012）：创建返回 token 与相对路径 */
+export interface ShareCreated {
+  token: string;
+  url: string;
+}
+
+/** 公开只读快照的单行（地点/时间/已消毒正文；无图片/坐标） */
+export interface ShareSnapshotRow {
+  locationName: string;
+  arrivedAt: string;
+  departedAt: string | null;
+  description: string | null;
+}
+
+export interface PublicShareSnapshot {
+  title: string;
+  createdAt: string;
+  recordCount: number;
+  rows: ShareSnapshotRow[];
+}
+

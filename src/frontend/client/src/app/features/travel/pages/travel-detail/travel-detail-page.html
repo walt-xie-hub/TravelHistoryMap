@@ -15,7 +15,10 @@
       <div class="detail-head">
         <p class="detail-time">{{ item.arrivedAt | date:'yyyy-MM-dd HH:mm' }} → {{ item.departedAt ? (item.departedAt | date:'yyyy-MM-dd HH:mm') : '进行中' }}</p>
         @if (!editing()) {
-          <button type="button" class="edit-toggle" (click)="startEdit()">编辑详情</button>
+          <div class="detail-actions">
+            <button type="button" class="share-toggle" (click)="shareOpen.set(true)">分享</button>
+            <button type="button" class="edit-toggle" (click)="startEdit()">编辑详情</button>
+          </div>
         }
       </div>
       <p class="detail-coordinates">坐标：{{ item.latitude }}, {{ item.longitude }}</p>
@@ -90,6 +93,10 @@
         </div>
       }
     </article>
+
+    @if (shareOpen()) {
+      <app-travel-share-dialog [records]="[item]" (close)="shareOpen.set(false)" />
+    }
   }
 
   @if (selectedImage(); as image) {

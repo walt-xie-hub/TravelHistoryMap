@@ -18,6 +18,12 @@ export const routes: Routes = [
       import('@features/auth/pages/register/register-page').then((m) => m.RegisterPage),
   },
   {
+    // 公开只读分享页（ADR-0012）：无需登录，仅凭不可猜测的 token 读取快照
+    path: 's/:token',
+    loadComponent: () =>
+      import('@features/travel/pages/share-view/share-view-page').then((m) => m.ShareViewPage),
+  },
+  {
     path: '',
     canActivate: [authGuard],
     loadComponent: () =>

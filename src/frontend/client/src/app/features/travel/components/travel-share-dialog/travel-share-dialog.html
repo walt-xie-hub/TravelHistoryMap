@@ -1,0 +1,41 @@
+<div class="share-backdrop" (click)="close.emit()">
+  <div class="share-dialog" role="dialog" aria-modal="true" aria-label="分享足迹" (click)="$event.stopPropagation()">
+    <div class="share-dialog__head">
+      <h2>分享足迹</h2>
+      <button type="button" class="icon-btn" aria-label="关闭" (click)="close.emit()">✕</button>
+    </div>
+
+    <section class="share-dialog__body">
+      <div class="card-panel">
+        <div class="card-panel__title">足迹分享卡</div>
+        @if (cardUrl()) {
+          <img class="card-panel__img" [src]="cardUrl()" alt="足迹分享卡预览" />
+        } @else {
+          <p class="hint">没有可分享的足迹。</p>
+        }
+        <div class="actions">
+          <button type="button" class="btn btn-primary" (click)="download()" [disabled]="!cardUrl()">下载图片</button>
+          <button type="button" class="btn" (click)="copyCaption()" [disabled]="!caption()">复制文案</button>
+        </div>
+      </div>
+
+      <div class="link-panel">
+        <div class="link-panel__title">只读分享链接</div>
+        <p class="hint">生成一个只读链接，朋友无需登录即可查看这份足迹清单。</p>
+        @if (!link()) {
+          <button type="button" class="btn btn-primary" (click)="generateLink()" [disabled]="busy() || !records().length">
+            {{ busy() ? '生成中…' : '生成分享链接' }}
+          </button>
+        } @else {
+          <input class="link-input" readonly [value]="link()" aria-label="分享链接" />
+          <div class="actions">
+            <button type="button" class="btn btn-primary" (click)="copyLink()">复制链接</button>
+            <a class="btn" [href]="link()" target="_blank" rel="noopener">打开预览</a>
+          </div>
+        }
+        @if (error()) { <p class="error" role="alert">{{ error() }}</p> }
+        @if (copied()) { <p class="ok">{{ copied() }}</p> }
+      </div>
+    </section>
+  </div>
+</div>

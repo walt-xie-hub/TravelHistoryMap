@@ -5,6 +5,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TravelHistoryService } from '../../data-access/travel-history.service';
 import type { TravelImage, TravelRecord } from '../../models/travel-record.model';
 import { RichTextEditorComponent } from '../../components/rich-text-editor/rich-text-editor';
+import { TravelShareDialog } from '../../components/travel-share-dialog/travel-share-dialog';
 import { isRichHtml, sanitizeRichTextToTrusted, visibleTextLength } from '../../utils/rich-text.util';
 import { DomSanitizer } from '@angular/platform-browser';
 import type { SafeHtml } from '@angular/platform-browser';
@@ -19,7 +20,7 @@ const MAX_IMAGES = 9;
 @Component({
   selector: 'app-travel-detail-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, RouterLink, RichTextEditorComponent],
+  imports: [DatePipe, RouterLink, RichTextEditorComponent, TravelShareDialog],
   templateUrl: './travel-detail-page.html',
   styleUrl: './travel-detail-page.scss',
 })
@@ -38,6 +39,7 @@ export class TravelDetailPage implements OnInit, OnDestroy {
 
   // —— 编辑态：仅“正文 + 图片增删”可编辑；地点快照与到达/离开边界保持只读（见 ADR-0008/0009）——
   protected readonly editing = signal(false);
+  protected readonly shareOpen = signal(false);
   protected readonly editDescription = signal('');
   protected readonly descriptionCount = computed(() => visibleTextLength(this.editDescription()));
   /** 已选但尚未上传（点“保存”才逐张上传）的图片 */

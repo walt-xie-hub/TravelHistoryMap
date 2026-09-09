@@ -3,8 +3,11 @@
 .page-heading h1 { margin: 12px 0 0; }
 .page-heading .back-link { padding: 0; background: none; color: var(--link, var(--text)); font: inherit; text-decoration: underline; }
 .detail-card { padding: 24px; background: var(--surface); border: 1px solid var(--border-color); border-radius: 12px; }
-.detail-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.detail-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
 .detail-time { font-weight: 700; margin: 0; }
+.detail-actions { display: flex; gap: 10px; align-items: center; }
+.share-toggle { padding: 8px 14px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--surface); color: var(--text); font-weight: 700; cursor: pointer; }
+.share-toggle:hover { background: var(--surface-hover); border-color: var(--primary); color: var(--primary-strong); }
 .detail-coordinates, .detail-empty { color: var(--text-muted); }
 .detail-description { white-space: pre-wrap; line-height: 1.7; }
 

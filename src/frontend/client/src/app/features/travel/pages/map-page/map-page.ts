@@ -22,6 +22,7 @@ import type {
   AmapPlaceResult,
 } from '../../../../../types/amap';
 import { MapSidePanel } from '../../components/map-side-panel/map-side-panel';
+import { TravelShareDialog } from '../../components/travel-share-dialog/travel-share-dialog';
 import { AmapLoaderService } from '../../data-access/amap-loader.service';
 import { TravelHistoryService } from '../../data-access/travel-history.service';
 import type { TravelRangeRequest, TravelRecord } from '../../models/travel-record.model';
@@ -44,7 +45,7 @@ type MapState = 'idle' | 'ready' | 'missing-key' | 'error';
 @Component({
   selector: 'app-map-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [EmptyState, LoadingSpinner, MapSidePanel, PageHeader],
+  imports: [EmptyState, LoadingSpinner, MapSidePanel, PageHeader, TravelShareDialog],
   templateUrl: './map-page.html',
   styleUrl: './map-page.scss',
 })
@@ -57,6 +58,7 @@ export class MapPage implements AfterViewInit, OnDestroy {
     viewChild.required<ElementRef<HTMLDivElement>>('mapContainer');
 
   readonly records = signal<TravelRecord[]>([]);
+  readonly shareOpen = signal(false);
   readonly travelLoading = signal(false);
   readonly travelError = signal<string | null>(null);
   readonly mapState = signal<MapState>('idle');

@@ -10,6 +10,8 @@ import { lastValueFrom } from 'rxjs';
 import { environment } from '@env/environment';
 import {
   CreateTravelRequest,
+  PublicShareSnapshot,
+  ShareCreated,
   TravelPagedResult,
   TravelImage,
   TravelRecord,
@@ -82,6 +84,16 @@ export class TravelHistoryService {
   /** 删除某条记录下的单张图片（后端清理媒体文件并删除数据库行）。 */
   deleteImage(id: number, imageId: number): Promise<void> {
     return lastValueFrom(this.http.delete<void>(`${this.base}/travels/${id}/images/${imageId}`));
+  }
+
+  /** 创建只读分享快照（ADR-0012），返回 token 与相对路径 /s/{token}。 */
+  shareTravels(travelIds: number[]): Promise<ShareCreated> {
+    return lastValueFrom(this.http.post<ShareCreated>(`${this.base}/travels/share`, { travelIds }));
+  }
+
+  /** 公开读取分享快照（无需登录；凭不可猜测 token）。 */
+  getShareSnapshot(token: string): Promise<PublicShareSnapshot> {
+    return lastValueFrom(this.http.get<PublicShareSnapshot>(`${this.base}/share-snapshots/${encodeURIComponent(token)}`));
   }
 
   resolveMediaUrl(path: string): string {
