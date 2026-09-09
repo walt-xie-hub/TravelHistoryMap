@@ -18,6 +18,12 @@ export const routes: Routes = [
       import('@features/auth/pages/register/register-page').then((m) => m.RegisterPage),
   },
   {
+    // 公开只读分享页（ADR-0012）：无需登录，仅凭不可猜测的 token 读取快照
+    path: 's/:token',
+    loadComponent: () =>
+      import('@features/travel/pages/share-view/share-view-page').then((m) => m.ShareViewPage),
+  },
+  {
     path: '',
     canActivate: [authGuard],
     loadComponent: () =>
@@ -48,6 +54,16 @@ export const routes: Routes = [
         path: 'travels/:id',
         loadComponent: () =>
           import('@features/travel/pages/travel-detail/travel-detail-page').then((m) => m.TravelDetailPage),
+      },
+      {
+        path: 'photos',
+        loadComponent: () =>
+          import('@features/travel/pages/photo-wall/photo-wall-page').then((m) => m.PhotoWallPage),
+      },
+      {
+        path: 'trash',
+        loadComponent: () =>
+          import('@features/travel/pages/trash/trash-page').then((m) => m.TrashPage),
       },
       {
         path: '**',

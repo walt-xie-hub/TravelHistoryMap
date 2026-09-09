@@ -20,12 +20,19 @@ button:disabled { opacity: .6; cursor: wait; }
 
 /* —— 图片：选择后本地预览，逐张可移除 / 清空全部（保存上传成功前仍是本地文件，非 Travel image）—— */
 .image-picker { display: grid; gap: 10px; }
-.image-picker__head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.image-picker__head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
 .image-picker__title { font-size: 1rem; }
+.image-picker__actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .image-picker .image-picker__choose { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 0; border-radius: 8px; background: var(--primary); color: #fff; font-weight: 700; cursor: pointer; font-size: 14px; }
 .image-picker__choose input { display: none; }
 .image-picker__choose.disabled { opacity: .6; cursor: not-allowed; }
+/* 拍照入口（capture=environment）：移动端调起相机；桌面退化为文件选择 */
+.image-picker .image-picker__shoot { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--surface); color: var(--text-strong); font-weight: 700; cursor: pointer; font-size: 14px; }
+.image-picker__shoot input { display: none; }
+.image-picker__shoot.disabled { opacity: .6; cursor: not-allowed; }
+.image-picker__shoot:hover { border-color: var(--primary); color: var(--primary-strong); }
 .image-picker__hint { margin: 0; color: var(--text-muted); font-size: 13px; }
+.image-picker__hint kbd { padding: 1px 5px; border: 1px solid var(--border-color); border-bottom-width: 2px; border-radius: 4px; background: var(--surface-hover); font-family: inherit; font-size: 12px; }
 .image-picker__grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; }
 .image-picker__cell { position: relative; aspect-ratio: 1; border-radius: 8px; overflow: hidden; background: var(--surface-hover); }
 .image-picker__cell img { display: block; width: 100%; height: 100%; object-fit: cover; }
@@ -40,6 +47,21 @@ button:disabled { opacity: .6; cursor: wait; }
 .description-editor__head strong { color: var(--text-strong); }
 .description-editor__count { font-size: 13px; color: var(--text-muted); }
 .description-editor__count.over { color: var(--danger); font-weight: 700; }
+
+/* —— ADR-0014 标签 + 精选收藏 —— */
+.tags-field { display: grid; gap: 8px; }
+.tags-field__head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.tags-field__head strong { color: var(--text-strong); }
+.tags-field__head span { color: var(--text-muted); font-size: 13px; }
+.chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 6px 4px 10px; border-radius: 999px; background: var(--primary-soft); color: var(--primary-strong); font-size: 13px; font-weight: 600; }
+.chip__remove { width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--primary-strong); font-size: 12px; cursor: pointer; }
+.chip__remove:hover { background: var(--primary); color: #fff; }
+.tag-add { display: flex; gap: 8px; }
+.tag-add input { flex: 1; min-width: 0; }
+.favorite-toggle { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; color: var(--text); cursor: pointer; justify-self: start; }
+.favorite-toggle input { width: auto; }
+
 
 @media (max-width: 640px) {
 	.location-picker__header { display: grid; gap: 4px; }

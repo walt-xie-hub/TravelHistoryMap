@@ -110,5 +110,13 @@
         回到全览
       </button>
     }
+
+    <button type="button" class="btn btn-ghost map-share-btn" (click)="shareOpen.set(true)" [disabled]="!hasRecords()">
+      分享足迹
+    </button>
   </section>
 </div>
+
+@if (shareOpen() && hasRecords()) {
+  <app-travel-share-dialog [records]="records()" (close)="shareOpen.set(false)" />
+}

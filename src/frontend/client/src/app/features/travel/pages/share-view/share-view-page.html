@@ -1,0 +1,40 @@
+<section class="share-page">
+  <header class="share-head">
+    <a routerLink="/login" class="brand">
+      <span aria-hidden="true">🧭</span> Travel Map
+    </a>
+    <span class="share-head__tag">旅行足迹分享</span>
+  </header>
+
+  @if (loading()) { <p class="center">加载中…</p> }
+  @else if (error()) {
+    <div class="state">
+      <div class="state__icon" aria-hidden="true">🗺️</div>
+      <h1>这份分享找不到了</h1>
+      <p>{{ error() }}</p>
+      <a class="btn" routerLink="/login">去记录我的足迹</a>
+    </div>
+  } @else if (snapshot(); as snap) {
+    <main class="card">
+      <div class="card__head">
+        <h1>{{ snap.title }}</h1>
+        <p class="meta">共 {{ snap.recordCount }} 站 · 创建于 {{ snap.createdAt | date:'yyyy-MM-dd' }}</p>
+      </div>
+      <ol class="rows">
+        @for (row of snap.rows; track $index) {
+          <li class="row">
+            <span class="row__index" aria-hidden="true">{{ $index + 1 }}</span>
+            <div class="row__body">
+              <div class="row__name">{{ row.locationName }}</div>
+              <div class="row__time">{{ row.arrivedAt | date:'M月d日 HH:mm' }} → {{ row.departedAt ? (row.departedAt | date:'M月d日 HH:mm') : '进行中' }}</div>
+              @if (row.description) {
+                <div class="row__desc" [innerHTML]="safeHtml(row.description)"></div>
+              }
+            </div>
+          </li>
+        }
+      </ol>
+      <footer class="card__foot">用 Travel Map 记录每一次出发 ✈️</footer>
+    </main>
+  }
+</section>

@@ -27,6 +27,30 @@ public interface ITravelService
     /// <summary>更新 userId 名下的记录；非本人或不存在返回 null。</summary>
     Task<DTOs.TravelRecordDto?> UpdateAsync(int userId, int id, DTOs.UpdateTravelDto dto, CancellationToken cancellationToken = default);
 
-    /// <summary>删除 userId 名下的记录；非本人或不存在返回 false。</summary>
+    /// <summary>
+    /// 删除 userId 名下的记录——移入回收站（软删除，ADR-0013），不物理删除图片/行；非本人或不存在返回 false。
+    /// </summary>
     Task<bool> DeleteAsync(int userId, int id, CancellationToken cancellationToken = default);
+
+    /// <summary>回收站分页：userId 名下已软删除的记录（按删除时间倒序）。</summary>
+    Task<Domain.Common.PagedResult<DTOs.TravelRecordDto>> GetTrashAsync(
+        int userId,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>从回收站恢复 userId 名下的记录；非本人、不存在或不在回收站返回 false。</summary>
+    Task<bool> RestoreAsync(int userId, int id, CancellationToken cancellationToken = default);
+
+    /// <summary>彻底删除 userId 名下的记录（物理删除行）；图片媒体与图片行由表现层先清理。</summary>
+    Task<bool> DeletePermanentlyAsync(int userId, int id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 为 userId 创建只读分享快照（复制所选记录的分享行），返回不可猜测的 Token；
+    /// 无任何属主/无有效记录时返回 null。
+    /// </summary>
+    Task<string?> CreateShareAsync(int userId, IReadOnlyList<int> travelIds, CancellationToken cancellationToken = default);
+
+    /// <summary>按 Token 公开读取分享快照（只读，不校验归属）；不存在返回 null。</summary>
+    Task<DTOs.PublicShareSnapshotDto?> GetShareSnapshotAsync(string token, CancellationToken cancellationToken = default);
 }

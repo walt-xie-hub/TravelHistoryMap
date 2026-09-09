@@ -33,6 +33,8 @@ export class MainLayout {
   protected readonly navItems: NavItem[] = [
     { path: '/home', label: '首页', icon: '🏠' },
     { path: '/map', label: '地图', icon: '🗺️' },
+    { path: '/photos', label: '照片墙', icon: '🖼️' },
+    { path: '/trash', label: '回收站', icon: '🗑️' },
   ];
 
   /** 当前登录用户（无头像时显示姓名首字母占位图）。 */

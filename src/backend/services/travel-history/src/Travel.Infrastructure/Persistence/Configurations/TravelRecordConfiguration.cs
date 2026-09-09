@@ -47,11 +47,24 @@ public class TravelRecordConfiguration : IEntityTypeConfiguration<TravelRecord>
             // 长度校验改在应用层按“可见字符 ≤4000”执行（见 TravelService/RichTextSanitizer）。
             .HasColumnType("text");
 
+        // ADR-0014：标签 JSON 数组字符串 + 收藏标记
+        builder.Property(t => t.TagsJson)
+            .IsRequired()
+            .HasColumnType("text");
+
+        builder.Property(t => t.IsFavorite)
+            .IsRequired();
+
         builder.Property(t => t.CreatedAt)
             .IsRequired();
 
         builder.Property(t => t.UpdatedAt)
             .IsRequired(false);
+
+        // ADR-0013：软删除时间戳；null = 未删除。
+        builder.Property(t => t.DeletedAt)
+            .IsRequired(false)
+            .HasColumnType("timestamptz");
 
         // 主查询：按用户取历史并按到达时间倒序，因此建 (UserId, ArrivedAt) 复合索引
         builder.HasIndex(t => new { t.UserId, t.ArrivedAt });

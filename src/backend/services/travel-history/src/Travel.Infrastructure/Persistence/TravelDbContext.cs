@@ -12,6 +12,7 @@ public class TravelDbContext : DbContext
 
     public DbSet<TravelRecord> TravelRecords => Set<TravelRecord>();
     public DbSet<TravelImage> TravelImages => Set<TravelImage>();
+    public DbSet<TravelShareSnapshot> TravelShareSnapshots => Set<TravelShareSnapshot>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

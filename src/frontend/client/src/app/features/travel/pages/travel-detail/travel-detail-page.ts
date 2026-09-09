@@ -1,11 +1,13 @@
 import { DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, HostListener, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TravelHistoryService } from '../../data-access/travel-history.service';
 import type { TravelImage, TravelRecord } from '../../models/travel-record.model';
 import { RichTextEditorComponent } from '../../components/rich-text-editor/rich-text-editor';
+import { TravelShareDialog } from '../../components/travel-share-dialog/travel-share-dialog';
 import { isRichHtml, sanitizeRichTextToTrusted, visibleTextLength } from '../../utils/rich-text.util';
+import { acceptImageFiles, pastedImageFiles } from '../../utils/staged-images.util';
 import { DomSanitizer } from '@angular/platform-browser';
 import type { SafeHtml } from '@angular/platform-browser';
 
@@ -19,7 +21,7 @@ const MAX_IMAGES = 9;
 @Component({
   selector: 'app-travel-detail-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, RouterLink, RichTextEditorComponent],
+  imports: [DatePipe, RouterLink, RichTextEditorComponent, TravelShareDialog],
   templateUrl: './travel-detail-page.html',
   styleUrl: './travel-detail-page.scss',
 })
@@ -35,9 +37,11 @@ export class TravelDetailPage implements OnInit, OnDestroy {
   protected readonly selectedImage = signal<DisplayImage | null>(null);
   protected readonly loading = signal(true);
   protected readonly error = signal('');
+  protected readonly favoriteBusy = signal(false);
 
   // —— 编辑态：仅“正文 + 图片增删”可编辑；地点快照与到达/离开边界保持只读（见 ADR-0008/0009）——
   protected readonly editing = signal(false);
+  protected readonly shareOpen = signal(false);
   protected readonly editDescription = signal('');
   protected readonly descriptionCount = computed(() => visibleTextLength(this.editDescription()));
   /** 已选但尚未上传（点“保存”才逐张上传）的图片 */
@@ -119,28 +123,59 @@ export class TravelDetailPage implements OnInit, OnDestroy {
     void this.router.navigate(['/map']);
   }
 
+  // —— ADR-0014 收藏切换（用整条记录全量更新，保留正文/标签/时间不变） ——
+
+  protected async toggleFavorite(item: TravelRecord): Promise<void> {
+    if (this.favoriteBusy() || this.saving()) return;
+    this.favoriteBusy.set(true);
+    this.error.set('');
+    try {
+      const updated = await this.travel.update(item.id, {
+        locationName: item.locationName,
+        latitude: item.latitude,
+        longitude: item.longitude,
+        arrivedAt: item.arrivedAt,
+        departedAt: item.departedAt,
+        description: item.description,
+        tags: item.tags ?? [],
+        isFavorite: !item.isFavorite,
+      });
+      this.record.set(updated);
+    } catch (err) {
+      this.error.set(this.message(err, '收藏操作失败，请稍后重试。'));
+    } finally {
+      this.favoriteBusy.set(false);
+    }
+  }
+
   // —— 图片：新增（暂存）——
 
   protected onAddFiles(event: Event): void {
     const input = event.target as HTMLInputElement;
     const allSelected = Array.from(input.files ?? []);
-    input.value = ''; // 允许再次选择同一文件
-    const capacity = this.remainingSlots();
-    if (capacity <= 0) {
-      this.error.set('每条旅游记录最多 9 张图片，已达上限。');
+    input.value = ''; // 允许再次选择同一文件 / 相机重复拍摄
+    this.stagePending(allSelected);
+  }
+
+  /** 图片暂存统一入口：文件选择、相机（capture）、剪贴板粘贴都汇聚到这里。 */
+  private stagePending(files: readonly File[]): void {
+    const { accepted, error } = acceptImageFiles(files, this.images().length + this.pendingFiles().length);
+    if (accepted.length === 0) {
+      this.error.set(error ?? '');
       return;
     }
-    let selected = allSelected;
-    if (selected.length > capacity) {
-      this.error.set(`最多还能添加 ${capacity} 张图片。`);
-      selected = selected.slice(0, capacity);
-    }
-    if (selected.some((file) => file.size > 10 * 1024 * 1024 || !['image/jpeg', 'image/png', 'image/webp'].includes(file.type))) {
-      this.error.set('图片仅支持 JPEG、PNG、WebP，且单张不超过 10 MB。');
-      return;
-    }
-    this.pendingFiles.update(files => [...files, ...selected]);
-    this.error.set('');
+    this.pendingFiles.update((current) => [...current, ...accepted]);
+    this.error.set(error ?? ''); // 有裁剪/上限警告则保留提示
+  }
+
+  /** 剪贴板粘贴图片（M2 快捷记录）：仅编辑态生效；纯文本粘贴不拦截。 */
+  @HostListener('document:paste', ['$event'])
+  protected onDocumentPaste(event: ClipboardEvent): void {
+    if (this.saving() || !this.editing() || !this.record()) return;
+    const pasted = pastedImageFiles(event);
+    if (pasted.length === 0) return;
+    event.preventDefault();
+    this.stagePending(pasted);
   }
 
   protected removeStaged(index: number): void {
@@ -194,6 +229,9 @@ export class TravelDetailPage implements OnInit, OnDestroy {
         arrivedAt: item.arrivedAt,
         departedAt: item.departedAt,
         description,
+        // ADR-0014：PUT 全量替换，须回传标签/收藏，否则会被清空
+        tags: item.tags ?? [],
+        isFavorite: item.isFavorite ?? false,
       });
       this.record.set(updated);
       this.editDescription.set(updated.description ?? '');

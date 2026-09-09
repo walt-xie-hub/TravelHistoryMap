@@ -10,6 +10,8 @@ import { lastValueFrom } from 'rxjs';
 import { environment } from '@env/environment';
 import {
   CreateTravelRequest,
+  PublicShareSnapshot,
+  ShareCreated,
   TravelPagedResult,
   TravelImage,
   TravelRecord,
@@ -61,8 +63,40 @@ export class TravelHistoryService {
     return lastValueFrom(this.http.put<TravelRecord>(`${this.base}/travels/${id}`, request));
   }
 
+  /** 全量删除 userId 名下的记录——移入回收站（软删除，ADR-0013），可恢复。 */
   delete(id: number): Promise<void> {
     return lastValueFrom(this.http.delete<void>(`${this.base}/travels/${id}`));
+  }
+
+  /** 回收站分页：已软删除记录（最近删除在前）。 */
+  getTrashPaged(page: number, pageSize: number): Promise<TravelPagedResult<TravelRecord>> {
+    const params = new HttpParams().set('page', String(page)).set('pageSize', String(pageSize));
+    return lastValueFrom(this.http.get<TravelPagedResult<TravelRecord>>(`${this.base}/travels/trash`, { params }));
+  }
+
+  /** 回收站全量拉取（自动翻页）。 */
+  async getAllTrash(): Promise<TravelRecord[]> {
+    const pageSize = 100;
+    const collected: TravelRecord[] = [];
+    let page = 1;
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const result = await this.getTrashPaged(page, pageSize);
+      collected.push(...result.items);
+      if (collected.length >= result.totalCount || page >= result.totalPages) break;
+      page += 1;
+    }
+    return collected;
+  }
+
+  /** 从回收站恢复记录。 */
+  restore(id: number): Promise<void> {
+    return lastValueFrom(this.http.post<void>(`${this.base}/travels/${id}/restore`, null));
+  }
+
+  /** 彻底删除记录（含图片与媒体，不可恢复）。 */
+  deletePermanently(id: number): Promise<void> {
+    return lastValueFrom(this.http.delete<void>(`${this.base}/travels/${id}/permanent`));
   }
 
   getById(id: number): Promise<TravelRecord> {
@@ -82,6 +116,16 @@ export class TravelHistoryService {
   /** 删除某条记录下的单张图片（后端清理媒体文件并删除数据库行）。 */
   deleteImage(id: number, imageId: number): Promise<void> {
     return lastValueFrom(this.http.delete<void>(`${this.base}/travels/${id}/images/${imageId}`));
+  }
+
+  /** 创建只读分享快照（ADR-0012），返回 token 与相对路径 /s/{token}。 */
+  shareTravels(travelIds: number[]): Promise<ShareCreated> {
+    return lastValueFrom(this.http.post<ShareCreated>(`${this.base}/travels/share`, { travelIds }));
+  }
+
+  /** 公开读取分享快照（无需登录；凭不可猜测 token）。 */
+  getShareSnapshot(token: string): Promise<PublicShareSnapshot> {
+    return lastValueFrom(this.http.get<PublicShareSnapshot>(`${this.base}/share-snapshots/${encodeURIComponent(token)}`));
   }
 
   resolveMediaUrl(path: string): string {

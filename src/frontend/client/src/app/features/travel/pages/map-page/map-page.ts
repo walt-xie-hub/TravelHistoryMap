@@ -22,6 +22,7 @@ import type {
   AmapPlaceResult,
 } from '../../../../../types/amap';
 import { MapSidePanel } from '../../components/map-side-panel/map-side-panel';
+import { TravelShareDialog } from '../../components/travel-share-dialog/travel-share-dialog';
 import { AmapLoaderService } from '../../data-access/amap-loader.service';
 import { TravelHistoryService } from '../../data-access/travel-history.service';
 import type { TravelRangeRequest, TravelRecord } from '../../models/travel-record.model';
@@ -44,7 +45,7 @@ type MapState = 'idle' | 'ready' | 'missing-key' | 'error';
 @Component({
   selector: 'app-map-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [EmptyState, LoadingSpinner, MapSidePanel, PageHeader],
+  imports: [EmptyState, LoadingSpinner, MapSidePanel, PageHeader, TravelShareDialog],
   templateUrl: './map-page.html',
   styleUrl: './map-page.scss',
 })
@@ -57,6 +58,7 @@ export class MapPage implements AfterViewInit, OnDestroy {
     viewChild.required<ElementRef<HTMLDivElement>>('mapContainer');
 
   readonly records = signal<TravelRecord[]>([]);
+  readonly shareOpen = signal(false);
   readonly travelLoading = signal(false);
   readonly travelError = signal<string | null>(null);
   readonly mapState = signal<MapState>('idle');
@@ -423,8 +425,9 @@ export class MapPage implements AfterViewInit, OnDestroy {
   async onRecordDelete(recordId: number): Promise<void> {
     const record = this.records().find((item) => item.id === recordId);
     if (!record) return;
+    // ADR-0013：删除 = 移入回收站，可随时恢复；彻底删除请在回收站操作
     const confirmed = window.confirm(
-      `确定要删除“${record.locationName}”这条停留记录吗？描述、图片及相关数据也会一并删除。`,
+      `确定要将“${record.locationName}”这条停留记录移入回收站吗？可随时从回收站恢复。`,
     );
     if (!confirmed) return;
 
@@ -439,7 +442,7 @@ export class MapPage implements AfterViewInit, OnDestroy {
       }
       await this.refreshRecords();
     } catch {
-      this.travelError.set('删除停留记录失败，请稍后重试。');
+      this.travelError.set('移入回收站失败，请稍后重试。');
     } finally {
       this.travelLoading.set(false);
     }

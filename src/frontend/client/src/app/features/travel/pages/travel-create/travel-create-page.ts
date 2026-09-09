@@ -3,6 +3,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   ElementRef,
+  HostListener,
   OnDestroy,
   computed,
   inject,
@@ -17,6 +18,7 @@ import { TravelHistoryService } from '../../data-access/travel-history.service';
 import { HttpErrorResponse } from '@angular/common/http';
 import { RichTextEditorComponent } from '../../components/rich-text-editor/rich-text-editor';
 import { visibleTextLength } from '../../utils/rich-text.util';
+import { acceptImageFiles, pastedImageFiles } from '../../utils/staged-images.util';
 
 /** 已选、待上传的本地图片：File 本体 + 预览用本地对象 URL。
  *  尚未成为该记录的 Travel image——保存（create 成功并逐张上传）后才持久化。 */
@@ -48,6 +50,10 @@ export class TravelCreatePage implements AfterViewInit, OnDestroy {
   protected readonly departedAt = signal('');
   protected readonly description = signal('');
   protected readonly descriptionCount = computed(() => visibleTextLength(this.description()));
+  // ADR-0014：标签 + 精选收藏
+  protected readonly tags = signal<string[]>([]);
+  protected readonly tagInput = signal('');
+  protected readonly favorite = signal(false);
   protected readonly files = signal<SelectedImage[]>([]);
   protected readonly loading = signal(false);
   protected readonly searching = signal(false);
@@ -177,28 +183,31 @@ export class TravelCreatePage implements AfterViewInit, OnDestroy {
   protected onFiles(event: Event): void {
     const input = event.target as HTMLInputElement;
     const picked = Array.from(input.files ?? []);
-    input.value = ''; // 允许再次选择同一文件
-    if (picked.length === 0) return;
+    input.value = ''; // 允许再次选择同一文件 / 相机重复拍摄
+    this.stageFiles(picked);
+  }
 
-    const capacity = this.remainingSlots();
-    if (capacity <= 0) {
-      this.error.set('每条旅游记录最多 9 张图片，已达上限。');
+  /** 图片暂存统一入口：文件选择、相机（capture）、剪贴板粘贴都汇聚到这里。 */
+  private stageFiles(files: readonly File[]): void {
+    const { accepted, error } = acceptImageFiles(files, this.files().length);
+    if (accepted.length === 0) {
+      this.error.set(error ?? '');
       return;
     }
-    let accepted = picked;
-    if (accepted.length > capacity) {
-      this.error.set(`最多还能添加 ${capacity} 张图片。`);
-      accepted = accepted.slice(0, capacity);
-    }
-    if (accepted.some((file) => file.size > 10 * 1024 * 1024 || !['image/jpeg', 'image/png', 'image/webp'].includes(file.type))) {
-      this.error.set('图片仅支持 JPEG、PNG、WebP，且单张不超过 10 MB。');
-      return;
-    }
-
-    // 累积追加到已选集合；逐张生成预览用对象 URL（提交成功上传后才成为该记录的 Travel image）
+    // 逐张生成预览用对象 URL（提交成功上传后才成为该记录的 Travel image）
     const additions = accepted.map((file) => ({ file, url: URL.createObjectURL(file) }));
     this.files.update((current) => [...current, ...additions]);
-    this.error.set('');
+    this.error.set(error ?? ''); // 有裁剪/上限警告则保留提示
+  }
+
+  /** 剪贴板粘贴图片（M2 快捷记录）：全局监听，仅截获“带图片”的粘贴。 */
+  @HostListener('document:paste', ['$event'])
+  protected onDocumentPaste(event: ClipboardEvent): void {
+    if (this.loading()) return;
+    const pasted = pastedImageFiles(event);
+    if (pasted.length === 0) return; // 纯文本粘贴不拦截
+    event.preventDefault();
+    this.stageFiles(pasted);
   }
 
   protected removeImage(index: number): void {
@@ -208,14 +217,35 @@ export class TravelCreatePage implements AfterViewInit, OnDestroy {
     this.error.set('');
   }
 
+  // —— ADR-0014 标签 ——
+
+  protected addTag(): void {
+    const tag = this.tagInput().trim();
+    this.tagInput.set('');
+    if (!tag) return;
+    const current = this.tags();
+    if (current.length >= 8) {
+      this.error.set('每条记录最多 8 个标签。');
+      return;
+    }
+    if (tag.length > 20) {
+      this.error.set('单个标签不能超过 20 个字符。');
+      return;
+    }
+    if (current.some((item) => item.toLocaleLowerCase() === tag.toLocaleLowerCase())) return;
+    this.tags.update((items) => [...items, tag]);
+    this.error.set('');
+  }
+
+  protected removeTag(index: number): void {
+    this.tags.update((items) => items.filter((_, i) => i !== index));
+  }
+
+
   protected clearImages(): void {
     for (const item of this.files()) URL.revokeObjectURL(item.url);
     this.files.set([]);
     this.error.set('');
-  }
-
-  private remainingSlots(): number {
-    return 9 - this.files().length;
   }
 
   protected async submit(): Promise<void> {
@@ -245,6 +275,8 @@ export class TravelCreatePage implements AfterViewInit, OnDestroy {
         arrivedAt: arrived.toISOString(),
         departedAt: departed?.toISOString() ?? null,
         description: this.descriptionCount() > 0 ? this.description() : null,
+        tags: this.tags(),
+        isFavorite: this.favorite(),
       });
       // 逐张上传并即时从预览清单移除，成功后释放对象 URL；中途失败则剩余项留在清单便于重试
       for (const item of [...this.files()]) {

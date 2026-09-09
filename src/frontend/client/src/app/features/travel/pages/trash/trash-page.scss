@@ -1,0 +1,150 @@
+.trash-page {
+  max-width: var(--container-lg, 920px);
+  margin: 0 auto;
+  padding: 24px 0;
+}
+
+.page-heading {
+  margin-bottom: 20px;
+
+  &__row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    h1 {
+      margin: 0;
+    }
+  }
+
+  &__sub {
+    margin: 8px 0 0;
+    color: var(--text-muted);
+    font-size: var(--text-sm, 13px);
+  }
+}
+
+.form-error {
+  padding: 12px;
+  border-radius: var(--radius, 8px);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.state-text {
+  color: var(--text-muted);
+  padding: 24px 0;
+}
+
+.empty {
+  padding: 56px 24px;
+  text-align: center;
+  background: var(--surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg, 16px);
+
+  &__icon {
+    margin: 0 0 8px;
+    font-size: 44px;
+  }
+
+  h2 {
+    margin: 0 0 6px;
+    color: var(--text-strong);
+  }
+
+  p {
+    margin: 0 0 18px;
+    color: var(--text-muted);
+  }
+
+  &__cta {
+    display: inline-block;
+    padding: 8px 18px;
+    border-radius: var(--radius, 8px);
+    background: var(--primary);
+    color: #fff;
+    font-weight: 700;
+    text-decoration: none;
+
+    &:hover {
+      background: var(--primary-strong);
+    }
+  }
+}
+
+.trash-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.trash-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md, 12px);
+  background: var(--surface);
+
+  &__info {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  &__name {
+    color: var(--text-strong);
+    font-size: var(--text-base, 15px);
+  }
+
+  &__time {
+    color: var(--text-muted);
+    font-size: var(--text-sm, 13px);
+  }
+
+  &__actions {
+    display: flex;
+    gap: 8px;
+    flex: none;
+  }
+}
+
+.btn-restore,
+.btn-purge {
+  padding: 7px 14px;
+  border-radius: var(--radius, 8px);
+  font-weight: 700;
+  cursor: pointer;
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: wait;
+  }
+}
+
+.btn-restore {
+  border: 1px solid var(--border-color);
+  background: var(--surface);
+  color: var(--text-strong);
+
+  &:hover {
+    border-color: var(--primary);
+    color: var(--primary-strong);
+  }
+}
+
+.btn-purge {
+  border: 0;
+  background: var(--danger-soft);
+  color: var(--danger);
+
+  &:hover {
+    background: var(--danger);
+    color: #fff;
+  }
+}

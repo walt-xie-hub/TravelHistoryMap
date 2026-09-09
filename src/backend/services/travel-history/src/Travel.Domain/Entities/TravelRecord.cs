@@ -32,11 +32,26 @@ public class TravelRecord
     /// <summary>这次停留的文字描述，可为空。</summary>
     public string? Description { get; set; }
 
+    /// <summary>
+    /// 标签（ADR-0014）：以 JSON 数组字符串存储（如 ["亲子游","徒步"]）。
+    /// 归一化（trim/去重/限量）在应用层完成，领域层只存序列化结果，默认 "[]"。
+    /// </summary>
+    public string TagsJson { get; set; } = "[]";
+
+    /// <summary>是否收藏/精选（ADR-0014）：默认 false。</summary>
+    public bool IsFavorite { get; set; }
+
     /// <summary>创建时间（UTC）</summary>
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     /// <summary>最后更新时间（UTC，可选）</summary>
     public DateTimeOffset? UpdatedAt { get; set; }
+
+    /// <summary>
+    /// 软删除时间（UTC，可选；ADR-0013）。
+    /// 非空 = 已移入回收站：默认列表/详情/分享均不可见，可由回收站恢复或彻底删除。
+    /// </summary>
+    public DateTimeOffset? DeletedAt { get; set; }
 
     // 注：乐观锁行版本（PostgreSQL xmin 系统列）不放在领域实体里，原因是 EF Core 内置
     // 约定会把任何叫 RowVersion 的属性强制识别为 byte[]（SQL Server [Timestamp] 语义），

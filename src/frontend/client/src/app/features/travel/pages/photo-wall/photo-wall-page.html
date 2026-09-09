@@ -1,0 +1,73 @@
+<section class="photo-wall-page">
+  <header class="page-heading">
+    <div class="page-heading__row">
+      <a routerLink="/map">返回地图</a>
+      <h1>照片墙</h1>
+    </div>
+    <p class="page-heading__sub">
+      点击缩略图全屏查看原图（可左右滑动/方向键切换），点地点标题进入该旅行的详情
+    </p>
+  </header>
+
+  @if (loading()) {
+    <p class="state-text">正在整理你的足迹照片…</p>
+  } @else if (error()) {
+    <p class="state-text state-text--error" role="alert">{{ error() }}</p>
+  } @else if (trips().length === 0) {
+    <div class="empty">
+      <p class="empty__icon" aria-hidden="true">🖼️</p>
+      <h2>还没有带照片的旅行足迹</h2>
+      <p>去地图添加旅游记录，并上传旅途照片，这里就会长出你的照片墙。</p>
+      <a class="empty__cta" routerLink="/map">去地图看看</a>
+    </div>
+  } @else {
+    <p class="stats">
+      共 {{ trips().length }} 段带照片的旅行 · {{ photoCount() }} 张照片
+    </p>
+
+    @if (years().length > 1) {
+      <div class="year-filter" role="group" aria-label="按年份筛选">
+        <button type="button" class="year-filter__chip" [class.year-filter__chip--active]="selectedYear() === 'all'"
+          (click)="selectYear('all')">全部</button>
+        @for (year of years(); track year) {
+          <button type="button" class="year-filter__chip" [class.year-filter__chip--active]="selectedYear() === year"
+            (click)="selectYear(year)">{{ year }} 年</button>
+        }
+      </div>
+    }
+
+    <div class="timeline">
+      @for (trip of visibleTrips(); track trip.id) {
+        <article class="trip">
+          <div class="trip__axis" aria-hidden="true">
+            <span class="trip__dot"></span>
+          </div>
+          <div class="trip__body">
+            <button type="button" class="trip__head" (click)="openTrip(trip.id)">
+              <h2 class="trip__name">{{ trip.locationName }}</h2>
+              <p class="trip__meta">
+                {{ trip.timeLabel }}
+                @if (trip.endLabel) { → {{ trip.endLabel }} }
+                @else { · 进行中 }
+                · {{ trip.images.length }} 张
+              </p>
+            </button>
+            <div class="trip__photos">
+              @for (item of trip.images; track item.image.id; let index = $index) {
+                <button type="button" class="trip__photo" (click)="openViewer(trip, index)"
+                  [attr.aria-label]="'全屏查看 ' + item.image.originalFileName">
+                  <img [src]="item.src" [alt]="item.image.originalFileName" />
+                </button>
+              }
+            </div>
+          </div>
+        </article>
+      }
+    </div>
+  }
+
+  @if (viewer(); as v) {
+    <app-image-lightbox [items]="v.items" [startIndex]="v.index" (close)="closeViewer()"
+      [actionLabel]="'查看旅行详情'" [action]="goToViewerTrip" />
+  }
+</section>

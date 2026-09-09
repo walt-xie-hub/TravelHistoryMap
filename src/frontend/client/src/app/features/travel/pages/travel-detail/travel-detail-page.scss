@@ -3,8 +3,11 @@
 .page-heading h1 { margin: 12px 0 0; }
 .page-heading .back-link { padding: 0; background: none; color: var(--link, var(--text)); font: inherit; text-decoration: underline; }
 .detail-card { padding: 24px; background: var(--surface); border: 1px solid var(--border-color); border-radius: 12px; }
-.detail-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.detail-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
 .detail-time { font-weight: 700; margin: 0; }
+.detail-actions { display: flex; gap: 10px; align-items: center; }
+.share-toggle { padding: 8px 14px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--surface); color: var(--text); font-weight: 700; cursor: pointer; }
+.share-toggle:hover { background: var(--surface-hover); border-color: var(--primary); color: var(--primary-strong); }
 .detail-coordinates, .detail-empty { color: var(--text-muted); }
 .detail-description { white-space: pre-wrap; line-height: 1.7; }
 
@@ -32,6 +35,14 @@
 .add-images { display: inline-flex; align-items: center; padding: 8px 14px; border: 0; border-radius: 8px; background: var(--primary); color: #fff; font-weight: 700; cursor: pointer; font-size: 14px; }
 .add-images input { display: none; }
 .add-images.disabled { opacity: .6; cursor: not-allowed; }
+.image-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+/* 拍照入口（capture=environment）：移动端调起相机；桌面退化为文件选择 */
+.image-actions .shoot { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--surface); color: var(--text-strong); font-weight: 700; cursor: pointer; font-size: 14px; }
+.image-actions .shoot input { display: none; }
+.image-actions .shoot.disabled { opacity: .6; cursor: not-allowed; }
+.image-actions .shoot:hover { border-color: var(--primary); color: var(--primary-strong); }
+.paste-hint { margin: 10px 0 0; color: var(--text-muted); font-size: 13px; }
+.paste-hint kbd { padding: 1px 5px; border: 1px solid var(--border-color); border-bottom-width: 2px; border-radius: 4px; background: var(--surface-hover); font-family: inherit; font-size: 12px; }
 
 .image-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; margin-top: 12px; }
 .thumbnail-cell { position: relative; aspect-ratio: 1; border-radius: 8px; overflow: hidden; background: var(--surface-hover); }
@@ -59,3 +70,13 @@
 .image-modal { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 32px; background: rgb(15 23 42 / .82); }
 .image-modal img { max-width: min(100%, 1000px); max-height: 85dvh; object-fit: contain; }
 .image-modal .close { position: absolute; top: 20px; right: 20px; padding: 8px 12px; border: 0; border-radius: 8px; background: #fff; cursor: pointer; }
+
+/* —— ADR-0014 标签 + 精选收藏 —— */
+.detail-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
+.fav-toggle { padding: 6px 12px; border: 1px solid var(--border-color); border-radius: 999px; background: var(--surface); color: var(--text-muted); font-weight: 700; cursor: pointer; }
+.fav-toggle:hover { border-color: var(--primary); color: var(--primary-strong); }
+.fav-toggle--on { border-color: transparent; background: var(--primary); color: #fff; }
+.fav-toggle:disabled { opacity: .6; cursor: wait; }
+.tag-chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.tag-chip { padding: 3px 10px; border-radius: 999px; background: var(--primary-soft); color: var(--primary-strong); font-size: 12px; font-weight: 600; }
+
