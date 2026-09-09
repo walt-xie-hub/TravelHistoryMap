@@ -56,6 +56,11 @@ export const routes: Routes = [
           import('@features/travel/pages/travel-detail/travel-detail-page').then((m) => m.TravelDetailPage),
       },
       {
+        path: 'photos',
+        loadComponent: () =>
+          import('@features/travel/pages/photo-wall/photo-wall-page').then((m) => m.PhotoWallPage),
+      },
+      {
         path: '**',
         loadComponent: () =>
           import('@features/not-found/not-found').then((m) => m.NotFound),
