@@ -1,10 +1,10 @@
 <aside class="side-panel">
   <div class="panel-block">
     <div class="panel-top">
-      <div class="stats-row">
-        <span class="stat"><strong>{{ totalCount() }}</strong> 次停留</span>
+      <div class="stats" role="list" aria-label="足迹统计">
+        <span class="stat" role="listitem"><strong>{{ totalCount() }}</strong><span>次停留</span></span>
         @if (ongoingCount() > 0) {
-          <span class="stat stat--ongoing"><strong>{{ ongoingCount() }}</strong> 进行中</span>
+          <span class="stat stat--ongoing" role="listitem"><strong>{{ ongoingCount() }}</strong><span>进行中</span></span>
         }
       </div>
       <a class="btn btn-primary add-travel-btn" routerLink="/travels/new">＋ 添加旅游记录</a>
@@ -81,7 +81,10 @@
     @if (travelLoading()) {
       <app-loading-spinner message="加载停留记录中…" />
     } @else if (rows().length === 0) {
-      <p class="field-hint">该时间范围内暂无停留记录。</p>
+      <div class="list-empty">
+        <span class="list-empty__icon" aria-hidden="true">🗺️</span>
+        <p>该时间范围内暂无停留记录。</p>
+      </div>
     } @else {
       <div class="record-list" role="list">
         @for (row of rows(); track row.record.id) {

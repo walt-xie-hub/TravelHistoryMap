@@ -29,11 +29,11 @@ Travel record 的归属者，由 `user_id` 外键引用 `users.Id`。travel-hist
 _Avoid_: 跨服务同步调用验证用户存在性
 
 **Travel detail**:
-Travel record 的可选文字描述，直接属于该次停留；没有描述不影响 Travel record 的存在。
-_Avoid_: 独立行程、游记聚合
+Travel record 的可选正文，直接属于该次停留；没有正文不影响 Travel record 的存在。由该记录的登录用户所有，可随时编辑或清空。正文是带排版的富文本内容（加粗/斜体/下划线/删除线/标题/列表/引用/链接，以及字体、字号、颜色、背景高亮、对齐等行内排版）；**不内嵌图片**——图片独立管理为该记录的 Travel image。
+_Avoid_: 独立行程、游记聚合、把图片塞进正文
 
 **Travel image**:
-与 Travel record 关联的图片资源。数据库保存文件元数据和原图/缩略图路径，文件内容保存在可配置的持久化媒体存储中；图片访问必须继承所属 Travel record 的用户权限。
+与 Travel record 关联的图片资源。数据库保存文件元数据和原图/缩略图路径，文件内容保存在可配置的持久化媒体存储中；图片访问必须继承所属 Travel record 的用户权限。由该记录的登录用户所有，可在详情页逐张增删（删除为永久移除，不可恢复）。
 _Avoid_: 将图片二进制塞入 TravelRecords、公开图片 URL
 
 **Client application**:

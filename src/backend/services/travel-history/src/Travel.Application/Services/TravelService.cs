@@ -1,5 +1,6 @@
 using Travel.Application.Abstractions;
 using Travel.Application.DTOs;
+using Travel.Application.Sanitization;
 using Travel.Domain.Abstractions;
 using Travel.Domain.Common;
 using Travel.Domain.Entities;
@@ -47,7 +48,7 @@ public class TravelService : ITravelService
             Longitude = dto.Longitude,
             ArrivedAt = dto.ArrivedAt.ToUniversalTime(),
             DepartedAt = dto.DepartedAt?.ToUniversalTime(),
-            Description = string.IsNullOrWhiteSpace(dto.Description) ? null : dto.Description.Trim(),
+            Description = PrepareDescription(dto.Description),
         };
         var created = await _repository.AddAsync(record, ct);
         return ToDto(created);
@@ -64,7 +65,7 @@ public class TravelService : ITravelService
         existing.Longitude = dto.Longitude;
         existing.ArrivedAt = dto.ArrivedAt.ToUniversalTime();
         existing.DepartedAt = dto.DepartedAt?.ToUniversalTime();
-        existing.Description = string.IsNullOrWhiteSpace(dto.Description) ? null : dto.Description.Trim();
+        existing.Description = PrepareDescription(dto.Description);
         existing.UpdatedAt = DateTimeOffset.UtcNow;
 
         var updated = await _repository.UpdateAsync(existing, ct);
@@ -88,4 +89,18 @@ public class TravelService : ITravelService
         record.ArrivedAt,
         record.DepartedAt,
         record.Description);
+
+    /// <summary>
+    /// 正文入库口径（ADR-0009）：空→null；否则消毒成 allow-list HTML；
+    /// 可见字符（去标签、解码、空白折叠）超过 4000 视为非法，抛 ArgumentException（表现层转 400）。
+    /// </summary>
+    private static string? PrepareDescription(string? description)
+    {
+        var html = RichTextSanitizer.Prepare(description);
+        if (html is null)
+            return null;
+        if (RichTextSanitizer.VisibleCharacterCount(html) > RichTextSanitizer.MaxVisibleCharacters)
+            throw new ArgumentException("Travel detail must not exceed 4000 visible characters.");
+        return html;
+    }
 }

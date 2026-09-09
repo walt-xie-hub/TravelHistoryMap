@@ -2,7 +2,7 @@
   display: flex;
   gap: 16px;
   align-items: stretch;
-  height: calc(100dvh - 220px);
+  height: calc(100dvh - var(--map-chrome));
   min-height: 520px;
 }
 
@@ -70,8 +70,8 @@
   margin: 6px 0 0;
   padding: 7px 9px;
   border-radius: 7px;
-  background: #fff7ed;
-  color: #c2410c;
+  background: var(--danger-soft);
+  color: var(--danger);
   font-size: 12px;
 }
 
@@ -151,4 +151,35 @@
   .map-stage {
     min-height: 60dvh;
   }
+}
+
+/* 图例（与地图 marker 语义色一致） */
+.map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  margin-top: 10px;
+}
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.legend-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
+}
+.legend-dot--ongoing {
+  background: #16a34a;
+  box-shadow: 0 0 0 3px #dcfce7;
+}
+.legend-dot--merged {
+  background: #7c3aed;
+  box-shadow: 0 0 0 3px #ede9fe;
 }

@@ -12,6 +12,10 @@
 server {
     listen 80;
 
+    # 图片上传 body 上限：travel 服务单张最大 10 MB，网关放开到 12 MB 以免 413
+    # （nginx 默认 1 MB 会让 >1MB 的图片上传被拒）。
+    client_max_body_size 12m;
+
     # 安全响应头：HSTS 要求浏览器后续只用 HTTPS；其余为常见 XSS/嗅探防护
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
     add_header X-Content-Type-Options "nosniff" always;
