@@ -1,12 +1,13 @@
 import { DatePipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, HostListener, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TravelHistoryService } from '../../data-access/travel-history.service';
 import type { TravelImage, TravelRecord } from '../../models/travel-record.model';
 import { RichTextEditorComponent } from '../../components/rich-text-editor/rich-text-editor';
 import { TravelShareDialog } from '../../components/travel-share-dialog/travel-share-dialog';
 import { isRichHtml, sanitizeRichTextToTrusted, visibleTextLength } from '../../utils/rich-text.util';
+import { acceptImageFiles, pastedImageFiles } from '../../utils/staged-images.util';
 import { DomSanitizer } from '@angular/platform-browser';
 import type { SafeHtml } from '@angular/platform-browser';
 
@@ -126,23 +127,29 @@ export class TravelDetailPage implements OnInit, OnDestroy {
   protected onAddFiles(event: Event): void {
     const input = event.target as HTMLInputElement;
     const allSelected = Array.from(input.files ?? []);
-    input.value = ''; // 允许再次选择同一文件
-    const capacity = this.remainingSlots();
-    if (capacity <= 0) {
-      this.error.set('每条旅游记录最多 9 张图片，已达上限。');
+    input.value = ''; // 允许再次选择同一文件 / 相机重复拍摄
+    this.stagePending(allSelected);
+  }
+
+  /** 图片暂存统一入口：文件选择、相机（capture）、剪贴板粘贴都汇聚到这里。 */
+  private stagePending(files: readonly File[]): void {
+    const { accepted, error } = acceptImageFiles(files, this.images().length + this.pendingFiles().length);
+    if (accepted.length === 0) {
+      this.error.set(error ?? '');
       return;
     }
-    let selected = allSelected;
-    if (selected.length > capacity) {
-      this.error.set(`最多还能添加 ${capacity} 张图片。`);
-      selected = selected.slice(0, capacity);
-    }
-    if (selected.some((file) => file.size > 10 * 1024 * 1024 || !['image/jpeg', 'image/png', 'image/webp'].includes(file.type))) {
-      this.error.set('图片仅支持 JPEG、PNG、WebP，且单张不超过 10 MB。');
-      return;
-    }
-    this.pendingFiles.update(files => [...files, ...selected]);
-    this.error.set('');
+    this.pendingFiles.update((current) => [...current, ...accepted]);
+    this.error.set(error ?? ''); // 有裁剪/上限警告则保留提示
+  }
+
+  /** 剪贴板粘贴图片（M2 快捷记录）：仅编辑态生效；纯文本粘贴不拦截。 */
+  @HostListener('document:paste', ['$event'])
+  protected onDocumentPaste(event: ClipboardEvent): void {
+    if (this.saving() || !this.editing() || !this.record()) return;
+    const pasted = pastedImageFiles(event);
+    if (pasted.length === 0) return;
+    event.preventDefault();
+    this.stagePending(pasted);
   }
 
   protected removeStaged(index: number): void {

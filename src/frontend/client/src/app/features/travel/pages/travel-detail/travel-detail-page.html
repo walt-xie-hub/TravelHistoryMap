@@ -44,14 +44,26 @@
         <div class="image-section__head">
           <h2>图片</h2>
           @if (editing()) {
-            <label class="add-images" [class.disabled]="saving() || remainingSlots() <= 0">
-              <span>添加图片（还可添加 {{ remainingSlots() }} 张）</span>
-              <input type="file" accept="image/jpeg,image/png,image/webp" multiple
-                [disabled]="saving() || remainingSlots() <= 0"
-                (change)="onAddFiles($event)" />
-            </label>
+            <div class="image-actions">
+              <label class="add-images" [class.disabled]="saving() || remainingSlots() <= 0">
+                <span>选择图片（还可添加 {{ remainingSlots() }} 张）</span>
+                <input type="file" accept="image/jpeg,image/png,image/webp" multiple
+                  [disabled]="saving() || remainingSlots() <= 0"
+                  (change)="onAddFiles($event)" />
+              </label>
+              <label class="shoot" [class.disabled]="saving() || remainingSlots() <= 0"
+                [attr.aria-label]="'拍照添加图片'">
+                <span>📷 拍照</span>
+                <input type="file" accept="image/*" capture="environment"
+                  [disabled]="saving() || remainingSlots() <= 0"
+                  (change)="onAddFiles($event)" />
+              </label>
+            </div>
           }
         </div>
+        @if (editing()) {
+          <p class="paste-hint">也可以直接 <kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>V</kbd> 粘贴剪贴板截图；移动端「拍照」会调起相机。</p>
+        }
 
         @if (images().length) {
           <div class="image-grid">

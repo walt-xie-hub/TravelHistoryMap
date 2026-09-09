@@ -35,6 +35,14 @@
 .add-images { display: inline-flex; align-items: center; padding: 8px 14px; border: 0; border-radius: 8px; background: var(--primary); color: #fff; font-weight: 700; cursor: pointer; font-size: 14px; }
 .add-images input { display: none; }
 .add-images.disabled { opacity: .6; cursor: not-allowed; }
+.image-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+/* 拍照入口（capture=environment）：移动端调起相机；桌面退化为文件选择 */
+.image-actions .shoot { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--surface); color: var(--text-strong); font-weight: 700; cursor: pointer; font-size: 14px; }
+.image-actions .shoot input { display: none; }
+.image-actions .shoot.disabled { opacity: .6; cursor: not-allowed; }
+.image-actions .shoot:hover { border-color: var(--primary); color: var(--primary-strong); }
+.paste-hint { margin: 10px 0 0; color: var(--text-muted); font-size: 13px; }
+.paste-hint kbd { padding: 1px 5px; border: 1px solid var(--border-color); border-bottom-width: 2px; border-radius: 4px; background: var(--surface-hover); font-family: inherit; font-size: 12px; }
 
 .image-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; margin-top: 12px; }
 .thumbnail-cell { position: relative; aspect-ratio: 1; border-radius: 8px; overflow: hidden; background: var(--surface-hover); }
