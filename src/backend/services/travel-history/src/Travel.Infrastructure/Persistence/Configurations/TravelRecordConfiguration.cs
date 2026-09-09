@@ -47,6 +47,14 @@ public class TravelRecordConfiguration : IEntityTypeConfiguration<TravelRecord>
             // 长度校验改在应用层按“可见字符 ≤4000”执行（见 TravelService/RichTextSanitizer）。
             .HasColumnType("text");
 
+        // ADR-0014：标签 JSON 数组字符串 + 收藏标记
+        builder.Property(t => t.TagsJson)
+            .IsRequired()
+            .HasColumnType("text");
+
+        builder.Property(t => t.IsFavorite)
+            .IsRequired();
+
         builder.Property(t => t.CreatedAt)
             .IsRequired();
 

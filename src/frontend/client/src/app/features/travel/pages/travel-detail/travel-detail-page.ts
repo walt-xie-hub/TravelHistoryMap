@@ -37,6 +37,7 @@ export class TravelDetailPage implements OnInit, OnDestroy {
   protected readonly selectedImage = signal<DisplayImage | null>(null);
   protected readonly loading = signal(true);
   protected readonly error = signal('');
+  protected readonly favoriteBusy = signal(false);
 
   // —— 编辑态：仅“正文 + 图片增删”可编辑；地点快照与到达/离开边界保持只读（见 ADR-0008/0009）——
   protected readonly editing = signal(false);
@@ -122,6 +123,31 @@ export class TravelDetailPage implements OnInit, OnDestroy {
     void this.router.navigate(['/map']);
   }
 
+  // —— ADR-0014 收藏切换（用整条记录全量更新，保留正文/标签/时间不变） ——
+
+  protected async toggleFavorite(item: TravelRecord): Promise<void> {
+    if (this.favoriteBusy() || this.saving()) return;
+    this.favoriteBusy.set(true);
+    this.error.set('');
+    try {
+      const updated = await this.travel.update(item.id, {
+        locationName: item.locationName,
+        latitude: item.latitude,
+        longitude: item.longitude,
+        arrivedAt: item.arrivedAt,
+        departedAt: item.departedAt,
+        description: item.description,
+        tags: item.tags ?? [],
+        isFavorite: !item.isFavorite,
+      });
+      this.record.set(updated);
+    } catch (err) {
+      this.error.set(this.message(err, '收藏操作失败，请稍后重试。'));
+    } finally {
+      this.favoriteBusy.set(false);
+    }
+  }
+
   // —— 图片：新增（暂存）——
 
   protected onAddFiles(event: Event): void {
@@ -203,6 +229,9 @@ export class TravelDetailPage implements OnInit, OnDestroy {
         arrivedAt: item.arrivedAt,
         departedAt: item.departedAt,
         description,
+        // ADR-0014：PUT 全量替换，须回传标签/收藏，否则会被清空
+        tags: item.tags ?? [],
+        isFavorite: item.isFavorite ?? false,
       });
       this.record.set(updated);
       this.editDescription.set(updated.description ?? '');

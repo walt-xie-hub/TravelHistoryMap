@@ -178,6 +178,80 @@ public class TravelServiceTests
     }
 
     [Fact]
+    public async Task CreateAsync_WithTagsAndFavorite_NormalizesAndPersists()
+    {
+        // Arrange（ADR-0014：标签 trim / 忽略大小写去重；收藏标记落库）
+        _repositoryMock.Setup(r => r.AddAsync(It.IsAny<TravelRecord>(), It.IsAny<CancellationToken>()))
+                       .ReturnsAsync((TravelRecord t, CancellationToken _) => t);
+        var dto = new CreateTravelDto(
+            "Shanghai", 31.2304m, 121.4737m, Arrived, Departed,
+            Tags: new[] { " 亲子游 ", "徒步", "亲子游" },
+            IsFavorite: true);
+
+        // Act
+        var result = await _sut.CreateAsync(10, dto);
+
+        // Assert
+        Assert.Equal(new[] { "亲子游", "徒步" }, result.Tags);
+        Assert.True(result.IsFavorite);
+        _repositoryMock.Verify(r => r.AddAsync(
+            It.Is<TravelRecord>(t => t.IsFavorite
+                && JsonSerializer.Deserialize<List<string>>(t.TagsJson)!
+                    .SequenceEqual(new string[] { "亲子游", "徒步" })),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task CreateAsync_TooManyTags_ThrowsAndDoesNotPersist()
+    {
+        // Arrange（ADR-0014：最多 8 个标签）
+        var many = Enumerable.Range(1, 9).Select(i => $"tag{i}").ToArray();
+        var dto = new CreateTravelDto("Shanghai", 31.2304m, 121.4737m, Arrived, Tags: many);
+
+        // Act / Assert
+        await Assert.ThrowsAsync<ArgumentException>(() => _sut.CreateAsync(10, dto));
+        _repositoryMock.Verify(r => r.AddAsync(It.IsAny<TravelRecord>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task CreateAsync_OverlongTag_ThrowsAndDoesNotPersist()
+    {
+        // Arrange（ADR-0014：单个标签 ≤20 字符）
+        var dto = new CreateTravelDto("Shanghai", 31.2304m, 121.4737m, Arrived,
+            Tags: new[] { new string('长', 21) });
+
+        // Act / Assert
+        await Assert.ThrowsAsync<ArgumentException>(() => _sut.CreateAsync(10, dto));
+        _repositoryMock.Verify(r => r.AddAsync(It.IsAny<TravelRecord>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_TogglesFavoriteAndStoresTags()
+    {
+        // Arrange
+        _repositoryMock.Setup(r => r.GetByIdAsync(1, It.IsAny<CancellationToken>()))
+                       .ReturnsAsync(SampleRecord(userId: 10));
+        _repositoryMock.Setup(r => r.UpdateAsync(It.IsAny<TravelRecord>(), It.IsAny<CancellationToken>()))
+                       .ReturnsAsync((TravelRecord t, CancellationToken _) => t);
+
+        var dto = new UpdateTravelDto("Beijing", 39.9042m, 116.4074m, Arrived, Departed,
+            Tags: new[] { "出差" }, IsFavorite: true);
+
+        // Act
+        var result = await _sut.UpdateAsync(10, 1, dto);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(new[] { "出差" }, result!.Tags);
+        Assert.True(result.IsFavorite);
+        _repositoryMock.Verify(r => r.UpdateAsync(
+            It.Is<TravelRecord>(t => t.IsFavorite
+                && JsonSerializer.Deserialize<List<string>>(t.TagsJson)!
+                    .SequenceEqual(new string[] { "出差" })),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task UpdateAsync_WhenRecordOwnedByUser_UpdatesAndReturnsDto()
     {
         // Arrange

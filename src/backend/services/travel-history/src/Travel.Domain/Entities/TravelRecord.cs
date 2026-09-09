@@ -32,6 +32,15 @@ public class TravelRecord
     /// <summary>这次停留的文字描述，可为空。</summary>
     public string? Description { get; set; }
 
+    /// <summary>
+    /// 标签（ADR-0014）：以 JSON 数组字符串存储（如 ["亲子游","徒步"]）。
+    /// 归一化（trim/去重/限量）在应用层完成，领域层只存序列化结果，默认 "[]"。
+    /// </summary>
+    public string TagsJson { get; set; } = "[]";
+
+    /// <summary>是否收藏/精选（ADR-0014）：默认 false。</summary>
+    public bool IsFavorite { get; set; }
+
     /// <summary>创建时间（UTC）</summary>
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 

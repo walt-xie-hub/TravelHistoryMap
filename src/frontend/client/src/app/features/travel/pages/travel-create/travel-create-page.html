@@ -33,6 +33,35 @@
       <app-rich-text-editor [value]="description()" (valueChange)="description.set($event)"
         [placeholder]="'记录这段旅行的见闻（可选），支持加粗、标题、列表等排版'" />
     </div>
+    <div class="tags-field">
+      <div class="tags-field__head">
+        <strong>标签（可选）</strong>
+        <span>最多 8 个，每个不超过 20 字</span>
+      </div>
+      @if (tags().length) {
+        <ul class="chips">
+          @for (tag of tags(); track $index) {
+            <li class="chip">
+              <span>{{ tag }}</span>
+              <button type="button" class="chip__remove" [attr.aria-label]="'移除标签 ' + tag"
+                [disabled]="loading()" (click)="removeTag($index)">✕</button>
+            </li>
+          }
+        </ul>
+      }
+      <div class="tag-add">
+        <input type="text" maxlength="30" [value]="tagInput()" [disabled]="loading()"
+          (input)="tagInput.set($any($event.target).value)"
+          (keydown.enter)="addTag(); $event.preventDefault()"
+          placeholder="例如：亲子游 / 独自旅行 / 徒步，回车添加" />
+        <button type="button" [disabled]="loading()" (click)="addTag()">添加</button>
+      </div>
+      <label class="favorite-toggle">
+        <input type="checkbox" [checked]="favorite()" [disabled]="loading()"
+          (change)="favorite.set($any($event.target).checked)" />
+        <span>标为精选收藏 ★（重点回味的足迹）</span>
+      </label>
+    </div>
     <section class="image-picker">
       <div class="image-picker__head">
         <strong class="image-picker__title">图片（{{ files().length }}/9）</strong>

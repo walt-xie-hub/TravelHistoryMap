@@ -50,6 +50,10 @@ export class TravelCreatePage implements AfterViewInit, OnDestroy {
   protected readonly departedAt = signal('');
   protected readonly description = signal('');
   protected readonly descriptionCount = computed(() => visibleTextLength(this.description()));
+  // ADR-0014：标签 + 精选收藏
+  protected readonly tags = signal<string[]>([]);
+  protected readonly tagInput = signal('');
+  protected readonly favorite = signal(false);
   protected readonly files = signal<SelectedImage[]>([]);
   protected readonly loading = signal(false);
   protected readonly searching = signal(false);
@@ -213,6 +217,31 @@ export class TravelCreatePage implements AfterViewInit, OnDestroy {
     this.error.set('');
   }
 
+  // —— ADR-0014 标签 ——
+
+  protected addTag(): void {
+    const tag = this.tagInput().trim();
+    this.tagInput.set('');
+    if (!tag) return;
+    const current = this.tags();
+    if (current.length >= 8) {
+      this.error.set('每条记录最多 8 个标签。');
+      return;
+    }
+    if (tag.length > 20) {
+      this.error.set('单个标签不能超过 20 个字符。');
+      return;
+    }
+    if (current.some((item) => item.toLocaleLowerCase() === tag.toLocaleLowerCase())) return;
+    this.tags.update((items) => [...items, tag]);
+    this.error.set('');
+  }
+
+  protected removeTag(index: number): void {
+    this.tags.update((items) => items.filter((_, i) => i !== index));
+  }
+
+
   protected clearImages(): void {
     for (const item of this.files()) URL.revokeObjectURL(item.url);
     this.files.set([]);
@@ -246,6 +275,8 @@ export class TravelCreatePage implements AfterViewInit, OnDestroy {
         arrivedAt: arrived.toISOString(),
         departedAt: departed?.toISOString() ?? null,
         description: this.descriptionCount() > 0 ? this.description() : null,
+        tags: this.tags(),
+        isFavorite: this.favorite(),
       });
       // 逐张上传并即时从预览清单移除，成功后释放对象 URL；中途失败则剩余项留在清单便于重试
       for (const item of [...this.files()]) {

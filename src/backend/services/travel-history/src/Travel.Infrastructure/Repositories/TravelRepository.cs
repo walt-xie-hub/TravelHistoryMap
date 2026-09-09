@@ -97,6 +97,8 @@ public class TravelRepository : ITravelRepository
         existing.ArrivedAt = record.ArrivedAt;
         existing.DepartedAt = record.DepartedAt;
         existing.Description = record.Description;
+        existing.TagsJson = record.TagsJson;   // ADR-0014
+        existing.IsFavorite = record.IsFavorite; // ADR-0014
         existing.UpdatedAt = record.UpdatedAt;
 
         await _db.SaveChangesAsync(ct);

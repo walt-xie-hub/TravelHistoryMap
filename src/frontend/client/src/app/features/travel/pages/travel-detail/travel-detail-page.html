@@ -23,6 +23,23 @@
       </div>
       <p class="detail-coordinates">坐标：{{ item.latitude }}, {{ item.longitude }}</p>
 
+      @if (!editing()) {
+        <div class="detail-meta">
+          <button type="button" class="fav-toggle" [class.fav-toggle--on]="item.isFavorite"
+            [disabled]="favoriteBusy()" [attr.aria-pressed]="item.isFavorite"
+            (click)="toggleFavorite(item)">
+            {{ item.isFavorite ? '★ 已收藏' : '☆ 收藏' }}
+          </button>
+          @if (item.tags?.length) {
+            <ul class="tag-chips" aria-label="标签">
+              @for (tag of item.tags; track $index) {
+                <li class="tag-chip">{{ tag }}</li>
+              }
+            </ul>
+          }
+        </div>
+      }
+
       @if (editing()) {
         <div class="edit-field">
           <div class="edit-field__head">

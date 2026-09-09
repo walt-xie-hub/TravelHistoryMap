@@ -52,6 +52,8 @@ public class TravelService : ITravelService
             ArrivedAt = dto.ArrivedAt.ToUniversalTime(),
             DepartedAt = dto.DepartedAt?.ToUniversalTime(),
             Description = PrepareDescription(dto.Description),
+            TagsJson = NormalizeTags(dto.Tags),
+            IsFavorite = dto.IsFavorite,
         };
         var created = await _repository.AddAsync(record, ct);
         return ToDto(created);
@@ -69,6 +71,8 @@ public class TravelService : ITravelService
         existing.ArrivedAt = dto.ArrivedAt.ToUniversalTime();
         existing.DepartedAt = dto.DepartedAt?.ToUniversalTime();
         existing.Description = PrepareDescription(dto.Description);
+        existing.TagsJson = NormalizeTags(dto.Tags);
+        existing.IsFavorite = dto.IsFavorite;
         existing.UpdatedAt = DateTimeOffset.UtcNow;
 
         var updated = await _repository.UpdateAsync(existing, ct);
@@ -167,7 +171,52 @@ public class TravelService : ITravelService
         record.Longitude,
         record.ArrivedAt,
         record.DepartedAt,
-        record.Description);
+        record.Description,
+        ParseTags(record.TagsJson),
+        record.IsFavorite);
+
+    private const int MaxTags = 8;
+    private const int MaxTagLength = 20;
+
+    /// <summary>
+    /// 标签归一化（ADR-0014）：trim、忽略空、忽略大小写去重、限量 8 个、单个 ≤20 字符；
+    /// 超限抛 ArgumentException（表现层转 400）。序列化为 JSON 数组字符串落库。
+    /// </summary>
+    private static string NormalizeTags(IReadOnlyList<string>? tags)
+    {
+        if (tags is null || tags.Count == 0)
+            return "[]";
+        if (tags.Count > MaxTags)
+            throw new ArgumentException($"每个旅行记录最多 {MaxTags} 个标签。");
+
+        var cleaned = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var raw in tags)
+        {
+            var tag = raw?.Trim();
+            if (string.IsNullOrEmpty(tag))
+                continue;
+            if (tag.Length > MaxTagLength)
+                throw new ArgumentException($"单个标签长度不能超过 {MaxTagLength} 个字符。");
+            if (seen.Add(tag))
+                cleaned.Add(tag);
+        }
+        return JsonSerializer.Serialize(cleaned);
+    }
+
+    private static IReadOnlyList<string> ParseTags(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return Array.Empty<string>();
+        try
+        {
+            return JsonSerializer.Deserialize<List<string>>(json) ?? [];
+        }
+        catch (JsonException)
+        {
+            return Array.Empty<string>();
+        }
+    }
 
     /// <summary>
     /// 正文入库口径（ADR-0009）：空→null；否则消毒成 allow-list HTML；

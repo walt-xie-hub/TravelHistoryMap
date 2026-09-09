@@ -17,6 +17,10 @@ export interface TravelRecord {
   /** 离开时间（UTC ISO 8601）；null = 仍在当地 */
   departedAt: string | null;
   description: string | null;
+  /** 标签（ADR-0014）：自由文本，最多 8 个 */
+  tags?: string[];
+  /** 精选收藏（ADR-0014） */
+  isFavorite?: boolean;
   images?: TravelImage[];
 }
 
@@ -36,6 +40,10 @@ export interface CreateTravelRequest {
   arrivedAt: string;
   departedAt?: string | null;
   description?: string | null;
+  /** 标签（ADR-0014） */
+  tags?: string[];
+  /** 精选收藏（ADR-0014） */
+  isFavorite?: boolean;
 }
 
 /** 分页结果，字段与后端 PagedResult<T> 序列化一致（camelCase） */

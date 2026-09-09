@@ -13,6 +13,8 @@ public record TravelRecordDto(
     DateTimeOffset ArrivedAt,
     DateTimeOffset? DepartedAt,
     string? Description = null,
+    IReadOnlyList<string>? Tags = null,
+    bool IsFavorite = false,
     IReadOnlyList<TravelImageDto>? Images = null);
 
 public record TravelImageDto(
@@ -33,7 +35,9 @@ public record CreateTravelDto(
     decimal Longitude,
     DateTimeOffset ArrivedAt,
     DateTimeOffset? DepartedAt = null,
-    string? Description = null);
+    string? Description = null,
+    IReadOnlyList<string>? Tags = null,
+    bool IsFavorite = false);
 
 /// <summary>
 /// 更新旅行记录请求模型（不允许改归属用户）。
@@ -44,4 +48,6 @@ public record UpdateTravelDto(
     decimal Longitude,
     DateTimeOffset ArrivedAt,
     DateTimeOffset? DepartedAt = null,
-    string? Description = null);
+    string? Description = null,
+    IReadOnlyList<string>? Tags = null,
+    bool IsFavorite = false);
