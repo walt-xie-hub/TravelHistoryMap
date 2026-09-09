@@ -5,6 +5,7 @@ import type { LightboxItem } from '../../components/image-lightbox/image-lightbo
 import { TravelHistoryService } from '../../data-access/travel-history.service';
 import type { TravelImage } from '../../models/travel-record.model';
 import { fmtDateTime } from '../../utils/travel-display';
+import { createMediaUrlHandle } from '../../utils/media-url.util';
 
 /** 照片墙里的单张：DTO + 可直接 <img> 的缩略图地址（resolveMediaUrl） */
 interface WallImage {
@@ -52,7 +53,10 @@ type YearFilter = 'all' | string;
 export class PhotoWallPage implements OnInit, OnDestroy {
   private readonly travel = inject(TravelHistoryService);
   private readonly router = inject(Router);
-  private readonly objectUrls = new Set<string>();
+  // 媒体 URL 句柄（architecture #1）：统一“鉴权 blob → 对象 URL → dispose 回收”记账
+  private readonly media = createMediaUrlHandle({
+    fetchBlob: (path) => this.travel.getMediaBlob(path),
+  });
 
   readonly loading = signal(true);
   readonly error = signal('');
@@ -113,15 +117,12 @@ export class PhotoWallPage implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    for (const url of this.objectUrls) URL.revokeObjectURL(url);
+    this.media.dispose();
   }
 
-  /** 媒体接口需登录态：用带 token 的 HttpClient 取缩略图 blob → 对象 URL（与详情页一致）。 */
+  /** 媒体接口需登录态：用带 token 的 HttpClient 取 blob → 对象 URL（缓存复用，与详情页一致）。 */
   private async blobUrl(path: string): Promise<string> {
-    const blob = await this.travel.getMediaBlob(path);
-    const url = URL.createObjectURL(blob);
-    this.objectUrls.add(url);
-    return url;
+    return this.media.urlFor(path);
   }
 
   protected selectYear(year: YearFilter): void {
@@ -155,11 +156,8 @@ export class PhotoWallPage implements OnInit, OnDestroy {
     if (viewer) this.openTrip(viewer.tripId);
   };
 
-  /** 原图同样需登录态：blob → 对象 URL（进入灯箱切换时才按需拉取）。 */
+  /** 原图同样需登录态：blob → 对象 URL（进入灯箱切换时才按需拉取，路径缓存复用）。 */
   private async loadOriginal(image: TravelImage): Promise<string> {
-    const blob = await this.travel.getMediaBlob(image.originalUrl);
-    const url = URL.createObjectURL(blob);
-    this.objectUrls.add(url);
-    return url;
+    return this.media.urlFor(image.originalUrl);
   }
 }

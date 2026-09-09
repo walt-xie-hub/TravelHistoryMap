@@ -8,6 +8,7 @@ import { RichTextEditorComponent } from '../../components/rich-text-editor/rich-
 import { TravelShareDialog } from '../../components/travel-share-dialog/travel-share-dialog';
 import { isRichHtml, sanitizeRichTextToTrusted, visibleTextLength } from '../../utils/rich-text.util';
 import { acceptImageFiles, pastedImageFiles } from '../../utils/staged-images.util';
+import { createMediaUrlHandle } from '../../utils/media-url.util';
 import { DomSanitizer } from '@angular/platform-browser';
 import type { SafeHtml } from '@angular/platform-browser';
 
@@ -30,7 +31,10 @@ export class TravelDetailPage implements OnInit, OnDestroy {
   private readonly router = inject(Router);
   private readonly travel = inject(TravelHistoryService);
   private readonly sanitizer = inject<DomSanitizer>(DomSanitizer);
-  private readonly objectUrls = new Set<string>();
+  // 媒体 URL 句柄（architecture #1）：统一“鉴权 blob → 对象 URL → dispose 回收”记账
+  private readonly media = createMediaUrlHandle({
+    fetchBlob: (path) => this.travel.getMediaBlob(path),
+  });
 
   protected readonly record = signal<TravelRecord | null>(null);
   protected readonly images = signal<DisplayImage[]>([]);
@@ -73,7 +77,7 @@ export class TravelDetailPage implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    for (const url of this.objectUrls) URL.revokeObjectURL(url);
+    this.media.dispose();
   }
 
   // —— 编辑开关 ——
@@ -290,19 +294,11 @@ export class TravelDetailPage implements OnInit, OnDestroy {
   private removeDisplayImage(image: DisplayImage): void {
     this.images.update(items => items.filter(x => x !== image));
     if (this.selectedImage() === image) this.selectedImage.set(null);
-    this.revoke(image.thumbnailSrc);
-    this.revoke(image.originalSrc);
-  }
-
-  private revoke(url?: string): void {
-    if (url && this.objectUrls.delete(url)) URL.revokeObjectURL(url);
+    // 对象 URL 由 media 句柄缓存并在页面销毁时统一回收；不做逐张 evict
   }
 
   private async toObjectUrl(path: string): Promise<string> {
-    const blob = await this.travel.getMediaBlob(path);
-    const url = URL.createObjectURL(blob);
-    this.objectUrls.add(url);
-    return url;
+    return this.media.urlFor(path);
   }
 
   private message(err: unknown, fallback: string): string {
