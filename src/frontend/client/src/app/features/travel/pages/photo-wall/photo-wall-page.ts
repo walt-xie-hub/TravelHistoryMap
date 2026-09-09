@@ -1,5 +1,7 @@
 import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
+import { ImageLightbox } from '../../components/image-lightbox/image-lightbox';
+import type { LightboxItem } from '../../components/image-lightbox/image-lightbox';
 import { TravelHistoryService } from '../../data-access/travel-history.service';
 import type { TravelImage } from '../../models/travel-record.model';
 import { fmtDateTime } from '../../utils/travel-display';
@@ -25,6 +27,13 @@ interface WallTrip {
   images: WallImage[];
 }
 
+/** 当前灯箱状态：某段旅行 + 起始索引 */
+interface WallViewer {
+  tripId: number;
+  items: LightboxItem[];
+  index: number;
+}
+
 type YearFilter = 'all' | string;
 
 /**
@@ -36,7 +45,7 @@ type YearFilter = 'all' | string;
 @Component({
   selector: 'app-photo-wall-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink],
+  imports: [ImageLightbox, RouterLink],
   templateUrl: './photo-wall-page.html',
   styleUrl: './photo-wall-page.scss',
 })
@@ -49,6 +58,7 @@ export class PhotoWallPage implements OnInit, OnDestroy {
   readonly error = signal('');
   readonly trips = signal<WallTrip[]>([]);
   readonly selectedYear = signal<YearFilter>('all');
+  readonly viewer = signal<WallViewer | null>(null);
 
   /** 可选年份（倒序） */
   readonly years = computed(() => {
@@ -120,5 +130,36 @@ export class PhotoWallPage implements OnInit, OnDestroy {
 
   protected openTrip(id: number): void {
     void this.router.navigate(['/travels', id]);
+  }
+
+  /** 打开该旅行的全屏灯箱（懒加载原图，滑动/键盘切换）。 */
+  protected openViewer(trip: WallTrip, imageIndex: number): void {
+    this.viewer.set({
+      tripId: trip.id,
+      index: imageIndex,
+      items: trip.images.map((item) => ({
+        key: item.image.id,
+        title: item.image.originalFileName,
+        load: () => this.loadOriginal(item.image),
+      })),
+    });
+  }
+
+  protected closeViewer(): void {
+    this.viewer.set(null);
+  }
+
+  /** 从灯箱跳到当前旅行的详情（箭头属性保持 this 绑定，供子组件以纯回调方式调用）。 */
+  protected readonly goToViewerTrip = (): void => {
+    const viewer = this.viewer();
+    if (viewer) this.openTrip(viewer.tripId);
+  };
+
+  /** 原图同样需登录态：blob → 对象 URL（进入灯箱切换时才按需拉取）。 */
+  private async loadOriginal(image: TravelImage): Promise<string> {
+    const blob = await this.travel.getMediaBlob(image.originalUrl);
+    const url = URL.createObjectURL(blob);
+    this.objectUrls.add(url);
+    return url;
   }
 }

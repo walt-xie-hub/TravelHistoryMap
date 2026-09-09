@@ -1,0 +1,32 @@
+@if (items().length > 0) {
+  <div #root class="lightbox" tabindex="-1" role="dialog" aria-modal="true" aria-label="图片查看器">
+    <div class="lightbox__backdrop" (click)="close.emit()"></div>
+
+    <header class="lightbox__bar">
+      <span class="lightbox__counter">{{ index() + 1 }} / {{ items().length }}</span>
+      <h2 class="lightbox__title">{{ items()[index()].title }}</h2>
+      @if (actionLabel() && action()) {
+        <button type="button" class="lightbox__action" (click)="runAction()">{{ actionLabel() }}</button>
+      }
+      <button type="button" class="lightbox__close" (click)="close.emit()" aria-label="关闭">✕</button>
+    </header>
+
+    <div class="lightbox__stage"
+      (pointerdown)="onPointerDown($event)"
+      (pointerup)="onPointerUp($event)">
+      @if (loading()) {
+        <p class="lightbox__hint">加载中…</p>
+      } @else if (error()) {
+        <p class="lightbox__hint lightbox__hint--error" role="alert">{{ error() }}</p>
+      } @else if (src()) {
+        <img class="lightbox__img" [src]="src()" [alt]="items()[index()].title" draggable="false" />
+      }
+
+      @if (items().length > 1) {
+        <button type="button" class="lightbox__nav lightbox__nav--prev" (click)="prev()" aria-label="上一张">‹</button>
+        <button type="button" class="lightbox__nav lightbox__nav--next" (click)="next()" aria-label="下一张">›</button>
+        <span class="lightbox__swipe-hint">← 左右滑动 / 键盘切换 →</span>
+      }
+    </div>
+  </div>
+}

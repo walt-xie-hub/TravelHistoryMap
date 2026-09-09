@@ -5,7 +5,7 @@
       <h1>照片墙</h1>
     </div>
     <p class="page-heading__sub">
-      按时间回看每一段带照片的旅行足迹 · 点击缩略图查看该次旅行的原图与详情
+      点击缩略图全屏查看原图（可左右滑动/方向键切换），点地点标题进入该旅行的详情
     </p>
   </header>
 
@@ -53,9 +53,9 @@
               </p>
             </button>
             <div class="trip__photos">
-              @for (item of trip.images; track item.image.id) {
-                <button type="button" class="trip__photo" (click)="openTrip(trip.id)"
-                  [attr.aria-label]="'查看 ' + item.image.originalFileName">
+              @for (item of trip.images; track item.image.id; let index = $index) {
+                <button type="button" class="trip__photo" (click)="openViewer(trip, index)"
+                  [attr.aria-label]="'全屏查看 ' + item.image.originalFileName">
                   <img [src]="item.src" [alt]="item.image.originalFileName" />
                 </button>
               }
@@ -64,5 +64,10 @@
         </article>
       }
     </div>
+  }
+
+  @if (viewer(); as v) {
+    <app-image-lightbox [items]="v.items" [startIndex]="v.index" (close)="closeViewer()"
+      [actionLabel]="'查看旅行详情'" [action]="goToViewerTrip" />
   }
 </section>
