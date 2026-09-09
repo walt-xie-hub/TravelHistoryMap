@@ -140,6 +140,36 @@ public static class TravelEndpoints
             return deleted ? Results.NoContent() : Results.NotFound();
         });
 
+        // 创建只读分享快照（登录用户）；不可猜测 token，供 /s/{token} 只读页使用
+        group.MapPost("/share", async (
+            ShareCreateRequest request,
+            ClaimsPrincipal principal,
+            ITravelService svc,
+            CancellationToken ct) =>
+        {
+            try
+            {
+                var token = await svc.CreateShareAsync(CurrentUserId(principal), request?.TravelIds ?? [], ct);
+                return token is null
+                    ? Results.BadRequest(new { error = "所选记录不可分享。" })
+                    : Results.Ok(new { token, url = $"/s/{token}" });
+            }
+            catch (ArgumentException ex)
+            {
+                return Results.BadRequest(new { error = ex.Message });
+            }
+        });
+
+        // 公开只读分享页数据（无鉴权）：仅凭不可猜测 token 返回快照内容，无任何写操作
+        app.MapGet("/api/share-snapshots/{token}", async (
+            string token,
+            ITravelService svc,
+            CancellationToken ct) =>
+        {
+            var dto = await svc.GetShareSnapshotAsync(token, ct);
+            return dto is null ? Results.NotFound() : Results.Ok(dto);
+        });
+
         return app;
     }
 

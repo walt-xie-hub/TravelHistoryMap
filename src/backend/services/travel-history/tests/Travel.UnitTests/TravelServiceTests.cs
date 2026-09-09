@@ -1,5 +1,6 @@
 using Moq;
 using Xunit;
+using System.Text.Json;
 using Travel.Application.Abstractions;
 using Travel.Application.DTOs;
 using Travel.Application.Services;
@@ -336,5 +337,87 @@ public class TravelServiceTests
         Assert.Contains("<strong>世界</strong>", result!.Description);
         Assert.DoesNotContain("script", result.Description);
         Assert.DoesNotContain("alert", result.Description);
+    }
+
+    [Fact]
+    public async Task CreateShareAsync_WithOwnedRecords_ReturnsTokenAndPersists()
+    {
+        // Arrange
+        var records = new List<TravelRecord> { SampleRecord(1, 10), SampleRecord(2, 10) };
+        records[0].ArrivedAt = Arrived;
+        records[1].ArrivedAt = Departed;
+        _repositoryMock.Setup(r => r.GetByIdsAsync(10, It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(records);
+        _repositoryMock.Setup(r => r.AddShareAsync(It.IsAny<TravelShareSnapshot>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((TravelShareSnapshot s, CancellationToken _) => { s.Token = "t0k3n"; return s; });
+
+        // Act
+        var token = await _sut.CreateShareAsync(10, new List<int> { 1, 2 });
+
+        // Assert
+        Assert.Equal("t0k3n", token);
+        _repositoryMock.Verify(r => r.AddShareAsync(
+            It.Is<TravelShareSnapshot>(s => s.UserId == 10 && s.RecordCount == 2 && s.RowsJson.Contains("Shanghai")),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task CreateShareAsync_NoOwnedRecords_ReturnsNull()
+    {
+        // Arrange
+        _repositoryMock.Setup(r => r.GetByIdsAsync(10, It.IsAny<IReadOnlyList<int>>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<TravelRecord>());
+
+        // Act
+        var token = await _sut.CreateShareAsync(10, new List<int> { 99 });
+
+        // Assert
+        Assert.Null(token);
+        _repositoryMock.Verify(r => r.AddShareAsync(It.IsAny<TravelShareSnapshot>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task CreateShareAsync_EmptyOrTooMany_Throws()
+    {
+        await Assert.ThrowsAsync<ArgumentException>(() => _sut.CreateShareAsync(10, new List<int>()));
+        await Assert.ThrowsAsync<ArgumentException>(() => _sut.CreateShareAsync(10, Enumerable.Range(1, 101).ToList()));
+    }
+
+    [Fact]
+    public async Task GetShareSnapshotAsync_ValidToken_ReturnsDto()
+    {
+        // Arrange
+        var rows = new List<ShareSnapshotRow> { new("Shanghai", Arrived, Departed, "<p>好玩</p>") };
+        _repositoryMock.Setup(r => r.GetShareByTokenAsync("tok", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new TravelShareSnapshot
+            {
+                Token = "tok",
+                Title = "Shanghai 等 1 站",
+                CreatedAt = Arrived,
+                RecordCount = 1,
+                RowsJson = JsonSerializer.Serialize(rows),
+            });
+
+        // Act
+        var dto = await _sut.GetShareSnapshotAsync("tok");
+
+        // Assert
+        Assert.NotNull(dto);
+        Assert.Equal(1, dto!.RecordCount);
+        Assert.Equal("Shanghai", dto.Rows[0].LocationName);
+    }
+
+    [Fact]
+    public async Task GetShareSnapshotAsync_UnknownToken_ReturnsNull()
+    {
+        // Arrange
+        _repositoryMock.Setup(r => r.GetShareByTokenAsync("nope", It.IsAny<CancellationToken>()))
+            .ReturnsAsync((TravelShareSnapshot?)null);
+
+        // Act
+        var dto = await _sut.GetShareSnapshotAsync("nope");
+
+        // Assert
+        Assert.Null(dto);
     }
 }

@@ -34,4 +34,10 @@ public interface ITravelRepository
     Task<TravelImage?> GetImageAsync(int imageId, CancellationToken cancellationToken = default);
     Task<TravelImage> AddImageAsync(TravelImage image, CancellationToken cancellationToken = default);
     Task<bool> DeleteImageAsync(int imageId, CancellationToken cancellationToken = default);
+
+    /// <summary>按 id 集合取 userId 名下记录（分享快照创建用）。</summary>
+    Task<IReadOnlyList<TravelRecord>> GetByIdsAsync(int userId, IReadOnlyList<int> ids, CancellationToken cancellationToken = default);
+
+    Task<TravelShareSnapshot?> GetShareByTokenAsync(string token, CancellationToken cancellationToken = default);
+    Task<TravelShareSnapshot> AddShareAsync(TravelShareSnapshot share, CancellationToken cancellationToken = default);
 }

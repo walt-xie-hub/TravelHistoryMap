@@ -29,4 +29,13 @@ public interface ITravelService
 
     /// <summary>删除 userId 名下的记录；非本人或不存在返回 false。</summary>
     Task<bool> DeleteAsync(int userId, int id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 为 userId 创建只读分享快照（复制所选记录的分享行），返回不可猜测的 Token；
+    /// 无任何属主/无有效记录时返回 null。
+    /// </summary>
+    Task<string?> CreateShareAsync(int userId, IReadOnlyList<int> travelIds, CancellationToken cancellationToken = default);
+
+    /// <summary>按 Token 公开读取分享快照（只读，不校验归属）；不存在返回 null。</summary>
+    Task<DTOs.PublicShareSnapshotDto?> GetShareSnapshotAsync(string token, CancellationToken cancellationToken = default);
 }

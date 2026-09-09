@@ -119,4 +119,20 @@ public class TravelRepository : ITravelRepository
         await _db.SaveChangesAsync(ct);
         return true;
     }
+
+    public async Task<IReadOnlyList<TravelRecord>> GetByIdsAsync(int userId, IReadOnlyList<int> ids, CancellationToken ct = default)
+        => await _db.TravelRecords.AsNoTracking()
+            .Where(t => t.UserId == userId && ids.Contains(t.Id))
+            .ToListAsync(ct);
+
+    public Task<TravelShareSnapshot?> GetShareByTokenAsync(string token, CancellationToken ct = default)
+        => _db.TravelShareSnapshots.AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Token == token, ct);
+
+    public async Task<TravelShareSnapshot> AddShareAsync(TravelShareSnapshot share, CancellationToken ct = default)
+    {
+        _db.TravelShareSnapshots.Add(share);
+        await _db.SaveChangesAsync(ct);
+        return share;
+    }
 }

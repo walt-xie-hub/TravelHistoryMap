@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text.Json;
 using Travel.Application.Abstractions;
 using Travel.Application.DTOs;
 using Travel.Application.Sanitization;
@@ -79,6 +81,52 @@ public class TravelService : ITravelService
             return false;
         return await _repository.DeleteAsync(id, ct);
     }
+
+    public async Task<string?> CreateShareAsync(int userId, IReadOnlyList<int> travelIds, CancellationToken ct = default)
+    {
+        var ids = travelIds.Distinct().ToList();
+        if (ids.Count == 0 || ids.Count > 100)
+            throw new ArgumentException("请选择 1–100 条记录用于分享。");
+
+        var records = (await _repository.GetByIdsAsync(userId, ids, ct))
+            .OrderBy(r => r.ArrivedAt)
+            .ToList();
+        if (records.Count == 0)
+            return null;
+
+        var rows = records
+            .Select(r => new ShareSnapshotRow(r.LocationName, r.ArrivedAt, r.DepartedAt, r.Description))
+            .ToList();
+
+        var saved = await _repository.AddShareAsync(new TravelShareSnapshot
+        {
+            Token = GenerateShareToken(),
+            UserId = userId,
+            Title = rows.Count == 1
+                ? rows[0].LocationName
+                : $"{rows[0].LocationName} 等 {rows.Count} 站",
+            RowsJson = JsonSerializer.Serialize(rows),
+            RecordCount = rows.Count,
+            CreatedAt = DateTimeOffset.UtcNow,
+        }, ct);
+
+        return saved.Token;
+    }
+
+    public async Task<PublicShareSnapshotDto?> GetShareSnapshotAsync(string token, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(token))
+            return null;
+        var share = await _repository.GetShareByTokenAsync(token, ct);
+        if (share is null)
+            return null;
+
+        var rows = JsonSerializer.Deserialize<List<ShareSnapshotRow>>(share.RowsJson) ?? [];
+        return new PublicShareSnapshotDto(share.Title, share.CreatedAt, share.RecordCount, rows);
+    }
+
+    private static string GenerateShareToken()
+        => Convert.ToHexString(RandomNumberGenerator.GetBytes(24)).ToLowerInvariant();
 
     private static TravelRecordDto ToDto(TravelRecord record) => new(
         record.Id,

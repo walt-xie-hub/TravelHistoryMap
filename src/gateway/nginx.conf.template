@@ -32,6 +32,15 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
+    # 只读分享快照 → travel-service（公开端点，见 ADR-0012）
+    location /api/share-snapshots {
+        proxy_pass ${TRAVEL_SERVICE_URL};
+        proxy_ssl_server_name on;
+        proxy_ssl_verify off;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
     # /api/* -> user-service (the /api prefix is preserved)
     location /api/ {
         proxy_pass ${USER_SERVICE_URL};
