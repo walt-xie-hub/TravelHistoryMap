@@ -23,6 +23,8 @@ import type {
 } from '../../../../../types/amap';
 import { MapSidePanel } from '../../components/map-side-panel/map-side-panel';
 import { TravelShareDialog } from '../../components/travel-share-dialog/travel-share-dialog';
+import { MapTimeline } from '../../components/map-timeline/map-timeline';
+import type { TimelineRun } from '../../utils/timeline.util';
 import { AmapLoaderService } from '../../data-access/amap-loader.service';
 import { TravelHistoryService } from '../../data-access/travel-history.service';
 import type { TravelRangeRequest, TravelRecord } from '../../models/travel-record.model';
@@ -45,7 +47,7 @@ type MapState = 'idle' | 'ready' | 'missing-key' | 'error';
 @Component({
   selector: 'app-map-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [EmptyState, LoadingSpinner, MapSidePanel, PageHeader, TravelShareDialog],
+  imports: [EmptyState, LoadingSpinner, MapSidePanel, PageHeader, TravelShareDialog, MapTimeline],
   templateUrl: './map-page.html',
   styleUrl: './map-page.scss',
 })
@@ -439,6 +441,31 @@ export class MapPage implements AfterViewInit, OnDestroy {
       this.infoWindow?.close();
       if (this.records().length === 1 && this.page() > 1) {
         this.page.update(value => value - 1);
+      }
+      await this.refreshRecords();
+    } catch {
+      this.travelError.set('移入回收站失败，请稍后重试。');
+    } finally {
+      this.travelLoading.set(false);
+    }
+  }
+
+  /** 时光轴删除：确认后把整个 City run 逐条移入回收站并刷新（ADR-0015）。 */
+  async onDeleteRun(run: TimelineRun): Promise<void> {
+    const ids = run.records.map((item) => item.id);
+    const label = run.records.length > 1 ? `${run.records.length} 条停留` : `“${run.records[0]?.locationName}”`;
+    if (!window.confirm(`确定要将该停留${run.records.length > 1 ? '（' + run.records[0]?.locationName + ' 等 ' + run.records.length + ' 条）' : label}移入回收站吗？可随时从回收站恢复。`)) return;
+
+    this.travelLoading.set(true);
+    this.travelError.set(null);
+    try {
+      for (const id of ids) {
+        await this.travelService.delete(id);
+      }
+      if (ids.includes(this.selectedRecordId() ?? -1)) this.selectedRecordId.set(null);
+      this.infoWindow?.close();
+      if (this.records().length === ids.length && this.page() > 1) {
+        this.page.update((value) => value - 1);
       }
       await this.refreshRecords();
     } catch {

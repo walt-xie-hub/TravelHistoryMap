@@ -27,6 +27,30 @@ interface SelectedImage {
   url: string;
 }
 
+/** 去掉行政后缀（上海市→上海、中山市→中山、地区/盟），让时间轴节点短。 */
+function stripAdminSuffix(name: string): string {
+  return name.replace(/(自治州|地区|盟)$/, '').replace(/市$/, '');
+}
+
+function firstString(value: unknown): string {
+  return typeof value === 'string' && value.trim() ? value.trim() : '';
+}
+
+/** 从 AMap 搜索候选提取城市（ADR-0015）：cityname ?? pname。 */
+function cityFromPlace(place: AmapPlaceResult): string {
+  const extended = place as unknown as { cityname?: unknown; pname?: unknown };
+  const raw = firstString(extended.cityname) || firstString(extended.pname);
+  return raw ? stripAdminSuffix(raw) : '';
+}
+
+/** 从逆地理 addressComponent 提取城市：city ?? province。 */
+function cityFromComponents(comp?: { province?: string; city?: string | string[] }): string {
+  const cityValue = comp?.city;
+  const city = typeof cityValue === 'string' ? cityValue : Array.isArray(cityValue) ? cityValue[0] ?? '' : '';
+  const raw = firstString(city) || firstString(comp?.province);
+  return raw ? stripAdminSuffix(raw) : '';
+}
+
 @Component({
   selector: 'app-travel-create-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -46,6 +70,7 @@ export class TravelCreatePage implements AfterViewInit, OnDestroy {
   protected readonly keyword = signal('');
   protected readonly results = signal<AmapPlaceResult[]>([]);
   protected readonly selected = signal<AmapPlaceResult | null>(null);
+  protected readonly city = signal('');
   protected readonly arrivedAt = signal('');
   protected readonly departedAt = signal('');
   protected readonly description = signal('');
@@ -127,6 +152,7 @@ export class TravelCreatePage implements AfterViewInit, OnDestroy {
 
   protected choose(place: AmapPlaceResult): void {
     this.selected.set(place);
+    this.city.set(cityFromPlace(place));
     this.results.set([]);
     const coordinates = this.coordinates(place.location);
     if (coordinates) this.showMarker(coordinates, place.name ?? this.keyword());
@@ -158,6 +184,8 @@ export class TravelCreatePage implements AfterViewInit, OnDestroy {
         geocoder.getAddress(position, (status, result) => {
           if (status === 'complete') {
             const address = result.regeocode?.formattedAddress;
+            const city = cityFromComponents(result.regeocode?.addressComponent);
+            if (city) this.city.set(city);
             if (address) {
               this.selected.update(current => current ? { ...current, name: address, address } : current);
               this.showMarker(position, address);
@@ -277,6 +305,7 @@ export class TravelCreatePage implements AfterViewInit, OnDestroy {
         description: this.descriptionCount() > 0 ? this.description() : null,
         tags: this.tags(),
         isFavorite: this.favorite(),
+        city: this.city() || null,
       });
       // 逐张上传并即时从预览清单移除，成功后释放对象 URL；中途失败则剩余项留在清单便于重试
       for (const item of [...this.files()]) {

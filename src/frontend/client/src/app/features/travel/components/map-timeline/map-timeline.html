@@ -1,0 +1,47 @@
+<div class="map-timeline">
+  @if (runs().length === 0) {
+    <p class="map-timeline__empty">暂无足迹可展示</p>
+  } @else {
+    <div class="map-timeline__scroll">
+      <div class="map-timeline__track">
+        @for (run of runs(); track run.key) {
+          <div class="tl-col"
+            (mouseenter)="onHover(run.key)"
+            (mouseleave)="onHover(null)">
+
+            <span class="tl-col__label" [title]="run.label">{{ labelOf(run) }}</span>
+
+            @if (hovered() === run.key) {
+              <div class="tl-menu" (click)="$event.stopPropagation()">
+                <button type="button" class="tl-menu__btn" (click)="openDetail(run)">详情</button>
+                @if (run.records.length > 1) {
+                  <button type="button" class="tl-menu__btn" (click)="toggleExpanded(run.key)">
+                    {{ isExpanded(run.key) ? '收起' : '展开' }}
+                  </button>
+                }
+                <button type="button" class="tl-menu__btn tl-menu__btn--danger" (click)="removeRun(run)">删除</button>
+              </div>
+            }
+
+            <span class="tl-col__dot"></span>
+
+            @if (thumbOf(run); as url) {
+              <img class="tl-col__thumb" [src]="url" alt="" />
+            }
+
+            @if (run.records.length > 1 && isExpanded(run.key)) {
+              <div class="tl-branch">
+                @for (record of run.records; track record.id) {
+                  <button type="button" class="tl-branch__row" (click)="focusRecord(record.id)">
+                    <span class="tl-branch__name">{{ record.locationName }}</span>
+                    <span class="tl-branch__meta">{{ rangeOf(record) }} · {{ durationOf(record) }}</span>
+                  </button>
+                }
+              </div>
+            }
+          </div>
+        }
+      </div>
+    </div>
+  }
+</div>
