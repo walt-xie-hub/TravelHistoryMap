@@ -7,7 +7,8 @@ import type {
   TravelRecord,
 } from '../../models/travel-record.model';
 import { fmtDuration, fmtRange } from '../../utils/travel-display';
-import { iconSrcForRecord } from '../../utils/travel-icon.util';
+import { iconForRecord } from '../../utils/travel-icon.util';
+import { TravelIconComponent } from '../travel-icon/travel-icon';
 
 interface TravelRow {
   record: TravelRecord;
@@ -34,7 +35,7 @@ function localDayToIso(dateText: string, atEndOfDay: boolean): string {
 @Component({
   selector: 'app-map-side-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LoadingSpinner, RouterLink],
+  imports: [LoadingSpinner, RouterLink, TravelIconComponent],
   templateUrl: './map-side-panel.html',
   styleUrl: './map-side-panel.scss',
 })
@@ -132,8 +133,8 @@ export class MapSidePanel {
   }
 
   /** 行内旅行标识图标（ADR-0016）：显式选择 > 城市特色 */
-  protected iconSrc(record: TravelRecord): string | undefined {
-    return iconSrcForRecord(record);
+  protected iconOf(record: TravelRecord) {
+    return iconForRecord(record);
   }
 
   onRecordDelete(event: Event, id: number): void {

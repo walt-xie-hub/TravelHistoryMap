@@ -66,10 +66,9 @@
     cursor: pointer;
     transition: border-color 0.15s, background 0.15s;
 
-    img {
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
+    /* 剪影图标：无底衬，颜色由格子状态决定 */
+    .icon-picker__glyph {
+      color: var(--text-strong, #111827);
     }
 
     span {
@@ -88,6 +87,10 @@
     &.is-selected {
       border-color: var(--primary, #2563eb);
       background: var(--primary-soft, #eff6ff);
+
+      .icon-picker__glyph {
+        color: var(--primary, #2563eb);
+      }
 
       span {
         color: var(--primary, #2563eb);

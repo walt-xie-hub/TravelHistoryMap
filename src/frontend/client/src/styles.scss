@@ -123,20 +123,16 @@ body {
     --marker-light: #ede9fe;
   }
 
-  /** 旅行标识标记（ADR-0016）：图标圆点替换卡通造型，尺寸与默认标记一致 */
+  /** 旅行标识标记（ADR-0016）：剪影直接叠在地图上（无底衬），用白色光晕保证可读性 */
   &--icon {
-    border-radius: 50%;
-    filter: none;
+    color: var(--marker-color);
 
     .tm-marker__icon {
       display: block;
       width: 100%;
       height: 100%;
-      border-radius: 50%;
-      background: #fff;
-      box-shadow:
-        0 0 0 2px #fff,
-        0 2px 6px rgb(15 23 42 / 0.35);
+      filter: drop-shadow(0 0 1.2px #fff) drop-shadow(0 0 2.4px #fff)
+        drop-shadow(0 2px 3px rgb(15 23 42 / 0.4));
     }
   }
 }

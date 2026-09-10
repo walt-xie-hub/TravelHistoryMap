@@ -19,31 +19,36 @@
    DTO（record/Create/Update）携带 `iconKey`。它是**快照式选择**，不是对可编辑图标表的引用。
    服务端只做 trim / 空值归一 / 长度校验（≤64），**不校验 key 是否在库内**——前端资产是唯一事实来源，
    未知 key 在渲染期回退（显式失效时落到 Regional icon，再不行落到默认标记）。
-2. **Icon library 是前端只读资产**：图标为 `public/icons/{category}/{key}.svg`，
-   `utils/travel-icon.util.ts` 的 `TRAVEL_ICONS` 是 key/标签/分类的**唯一事实来源**；
-   分类：`animal | food | architecture | plant`。用户不能上传/编辑图标（MVP）。
+2. **Icon library 是前端只读数据**：`utils/travel-icon.util.ts` 的 `TRAVEL_ICONS` 是 key/标签/分类/造型的**唯一事实来源**；
+   图标是**内联矢量剪影**（没有独立资产文件）：48×48 视口，**不含文字、不含底衬，除形体以外全透明**。
+   分类：`animal | food | architecture | plant`（共 47 个）。用户不能上传/编辑图标（MVP）。
+   造型用一套几何语言表达“文字要表达的那个东西的形”：圆/椭圆/短形/多边形 → 花瓣模板 → 旋转复制（`repeat`），
+   镂空（眼窝、门洞、篮筐、月餻方孔）用同一 path 的偶数环绕序子路径实现。
 3. **Regional icon 渲染期派生**：城市→图标的映射表 `REGIONAL_ICON_KEYS` 与其余图标工具同住在
    `src/app/features/travel/utils/travel-icon.util.ts`（MVP 精选约 30 条热门城市，如 上海→白玉兰、广州→木棉、成都→熊猫），
    按 City snapshot 去行政后缀匹配；**不落库**。优先级：
    **显式选择（record.iconKey）> Regional icon（city）> 无（默认标记）**。
    未收录城市回退默认；映射结构支持后续补全到全国地级市。
 4. **地图合并标记规则**：同坐标组内**解析后的图标全相同** → 用该图标作为地图标记；
-   不一致/无图标 → 回退默认标记（现有熊猫图形）+ `×N` 计数。进行中仍以描边/配色区分。
-   注意：命中共享图标时，地图标记临时由卡通造型改为图标圆点（尺寸与默认标记一致）——
+   不一致/无图标 → 回退默认标记（现有熊猫图形）+ `×N` 计数。
+   命中共识图标时，地图标记改用该剪影（尺寸与默认标记一致），颜色取该标记的状态色
+   （普通橙 / 进行中绿 / 多次紫），由 CSS 白色光晕保证压在彩色底图上的可读性——
    这是对 ADR-0011「保留地图卡通 marker 造型」的**一处有意识例外的收窄**；其余情况（含聚合、进行中）造型不变。
-5. **呈现范围**：详情页、侧栏「停留记录」行、时光轴节点均显示该图标（16–26px）；
+5. **颜色由使用处决定**：造型数据不带颜色（`currentColor`）——地图标记用状态色，
+   列表 / 时光轴 / 详情 / 选择器用中性墨色，选中态用主色。
+6. **呈现范围**：详情页、侧栏「停留记录」行、时光轴节点均显示该图标（16–26px）；
    分享链路上的公开快照**不含**图标（ADR-0012 分享行保持精简）。
    时光轴节点取该节点**最新一条**记录的解析结果（与「详情 / 定位」同口径），不因组内不一致整组丢图标。
-6. MVP 资产为**简化占位 SVG**，命名/目录按最终规范；生成脚本：`scripts/generate-placeholder-icons.ps1`
-   （按 key 取色 + 标签前两字 + 分类徽记，因为地图标记只渲染图片、无文字兜底）。
-   真美术按同一路径替换，无需改代码。
+7. **渲染入口只有一个**：`travelIconMarkup(icon, size)` 输出内联 SVG；
+   组件 `components/travel-icon` （列表 / 时光轴 / 详情 / 选择器）与地图标记（DOM 拼接） 共用它。
 
 ## 影响
 
 - 领域：`TravelRecord.IconKey`（可空）；Create/Update 全量 PUT 必须回传 `iconKey`，否则会被清空（与 tags/city 同款教训）。
 - API：无新增端点；列表 DTO 多一个字段。
-- 前端：新增 `travel-icon.util.ts`（key/标签/分类 + 地区映射 + 解析入口 `iconForRecord` / `iconSrcForRecord` / `sharedTravelIcon`）、
-  `travel-icon-picker` 组件、`public/icons/**` 资产；地图标记/列表/时光轴渲染图标。
+- 前端：新增 `travel-icon.util.ts`（目录数据 + 造型几何语言 + 地区映射 + 解析入口 `iconForRecord` / `sharedTravelIcon` + 渲染入口 `travelIconMarkup`）、
+  共享组件 `components/travel-icon`、`travel-icon-picker`；地图标记/列表/时光轴/详情渲染图标。
+  旧方案的 `public/icons/**` 资产与 `scripts/generate-placeholder-icons.ps1` 已删除。
 - 预填链路（「再来一次」）会一并带入 `iconKey`；全量 PUT 必须回传，否则显式选择会被清空。
 - 数据：地区映射的准确度以公开资料为准，MVP 为精选集合，后续可扩充。
 
@@ -53,3 +58,7 @@
 - 引外部图标 CDN / 图标字体：离线与 PWA 不友好、许可审查成本高，否决。
 - 一次性生成全国地级市市花图标：成本与校对风险过高，作为后续分批任务，否决本轮。
 - 建图标实体表 + 外键：把展示资产变成业务数据，与快照哲学冲突，否决。
+- **SVG 资产文件 + `<img>` 引用**（首版实现）：被否决——`<img>` 加载的 SVG 拿不到页面的 `currentColor`，
+  想按状态换色就得改用 `mask-image`；且资产里一旦画上文字（占位方案）地图标记就没有可辨识度。
+  现有做法把造型放进目录数据内联渲染，颜色、尺寸、状态色均交给 CSS，无需资产管线。
+- **只保留文字字形**（首版占位方案的思路）：用户明确要求“不要文字，要文字所表达之物的形/轮廓”，否决。

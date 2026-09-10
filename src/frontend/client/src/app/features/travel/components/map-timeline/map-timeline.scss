@@ -85,11 +85,9 @@
     color: var(--primary);
   }
 
-  /* 旅行标识图标：与城市名同排 */
+  /* 旅行标识图标：与城市名同排（剪影，无底衬） */
   &__icon {
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
+    color: var(--text-strong, #111827);
     vertical-align: -3px;
     margin-right: 3px;
   }

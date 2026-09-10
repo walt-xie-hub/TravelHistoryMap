@@ -1,8 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
+import { TravelIconComponent } from '../travel-icon/travel-icon';
 import type { TravelIcon, TravelIconCategory } from '../../utils/travel-icon.util';
 import {
   TRAVEL_ICONS,
-  iconFile,
   regionalCitiesOf,
   regionalIconKey,
   regionalIconKeys,
@@ -12,9 +12,7 @@ import {
 type CategoryFilter = 'region' | TravelIconCategory;
 
 interface GridIcon {
-  key: string;
-  label: string;
-  file: string;
+  icon: TravelIcon;
   /** 地区 tab 专用：关联城市名（展示「城市 → 图标」关联） */
   cities?: readonly string[];
 }
@@ -26,7 +24,7 @@ interface GridIcon {
 @Component({
   selector: 'app-travel-icon-picker',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [],
+  imports: [TravelIconComponent],
   templateUrl: './travel-icon-picker.html',
   styleUrl: './travel-icon-picker.scss',
 })
@@ -62,18 +60,9 @@ export class TravelIconPicker {
       return regionalIconKeys()
         .map((key) => travelIcon(key))
         .filter((icon): icon is TravelIcon => icon !== undefined)
-        .map((icon) => ({
-          key: icon.key,
-          label: icon.label,
-          file: iconFile(icon),
-          cities: regionalCitiesOf(icon.key),
-        }));
+        .map((icon) => ({ icon, cities: regionalCitiesOf(icon.key) }));
     }
-    return TRAVEL_ICONS.filter((icon) => icon.category === category).map((icon) => ({
-      key: icon.key,
-      label: icon.label,
-      file: iconFile(icon),
-    }));
+    return TRAVEL_ICONS.filter((icon) => icon.category === category).map((icon) => ({ icon }));
   });
 
   protected selectCategory(id: CategoryFilter): void {

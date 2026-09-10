@@ -18,8 +18,8 @@
                 }
               } @else {
                 <span class="tl-col__label" [title]="run.label">
-                  @if (iconSrc(run); as src) {
-                    <img class="tl-col__icon" [src]="src" alt="" />
+                  @if (iconOf(run); as icon) {
+                    <app-travel-icon class="tl-col__icon" [icon]="icon" [size]="16" />
                   }
                   @if (hasFavorite(run)) {
                     <span class="tl-col__star" aria-hidden="true">★</span>
@@ -54,8 +54,8 @@
             <div class="tl-cell tl-cell--bottom">
               @if (i % 2 === 0) {
                 <span class="tl-col__label" [title]="run.label">
-                  @if (iconSrc(run); as src) {
-                    <img class="tl-col__icon" [src]="src" alt="" />
+                  @if (iconOf(run); as icon) {
+                    <app-travel-icon class="tl-col__icon" [icon]="icon" [size]="16" />
                   }
                   @if (hasFavorite(run)) {
                     <span class="tl-col__star" aria-hidden="true">★</span>

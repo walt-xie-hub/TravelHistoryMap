@@ -4,7 +4,8 @@ import type { TravelRecord } from '../../models/travel-record.model';
 import { buildCityRuns, newestOf } from '../../utils/timeline.util';
 import type { TimelineRun } from '../../utils/timeline.util';
 import { fmtDuration, fmtRange } from '../../utils/travel-display';
-import { iconForRecord, iconFile } from '../../utils/travel-icon.util';
+import { iconForRecord } from '../../utils/travel-icon.util';
+import { TravelIconComponent } from '../travel-icon/travel-icon';
 
 /**
  * 地图时光轴（Map timeline，ADR-0015）：
@@ -18,7 +19,7 @@ import { iconForRecord, iconFile } from '../../utils/travel-icon.util';
 @Component({
   selector: 'app-map-timeline',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [],
+  imports: [TravelIconComponent],
   templateUrl: './map-timeline.html',
   styleUrl: './map-timeline.scss',
 })
@@ -179,8 +180,7 @@ export class MapTimeline implements OnDestroy {
    * 节点旅行标识图标（ADR-0016）：与「详情 / 定位」同口径取该节点最新一条记录（newestOf），
    * 这样同一城市的多次到访也总能显示标识，不因组内不一致而整组丢失图标。
    */
-  protected iconSrc(run: TimelineRun): string | undefined {
-    const icon = iconForRecord(newestOf(run));
-    return icon ? iconFile(icon) : undefined;
+  protected iconOf(run: TimelineRun) {
+    return iconForRecord(newestOf(run));
   }
 }

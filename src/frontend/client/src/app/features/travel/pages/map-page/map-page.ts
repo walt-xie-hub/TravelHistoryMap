@@ -30,7 +30,7 @@ import { TravelHistoryService } from '../../data-access/travel-history.service';
 import type { TravelRangeRequest, TravelRecord } from '../../models/travel-record.model';
 import { wgs84ToGcj02 } from '../../utils/coord';
 import { TravelMarkerGroup, fmtDateTime, groupRecords } from '../../utils/travel-display';
-import { iconFile, sharedTravelIcon } from '../../utils/travel-icon.util';
+import { sharedTravelIcon, travelIconMarkup } from '../../utils/travel-icon.util';
 
 const DEFAULT_CENTER = [104.1954, 35.8617] as const; // 中国全国视野
 const DEFAULT_ZOOM = 5;
@@ -239,11 +239,10 @@ export class MapPage implements AfterViewInit, OnDestroy {
       const sharedIcon = sharedTravelIcon(group.records);
       if (sharedIcon) {
         content.classList.add('tm-marker--icon');
-        const iconImg = document.createElement('img');
-        iconImg.className = 'tm-marker__icon';
-        iconImg.src = iconFile(sharedIcon);
-        iconImg.alt = sharedIcon.label;
-        content.appendChild(iconImg);
+        const iconHolder = document.createElement('span');
+        iconHolder.className = 'tm-marker__icon';
+        iconHolder.innerHTML = travelIconMarkup(sharedIcon, 42);
+        content.appendChild(iconHolder);
       } else {
         const earLeft = document.createElement('span');
         earLeft.className = 'tm-marker__ear tm-marker__ear--left';

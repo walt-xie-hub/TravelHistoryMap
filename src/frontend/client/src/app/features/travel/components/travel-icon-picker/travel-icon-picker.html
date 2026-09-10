@@ -26,19 +26,19 @@
   </p>
 
   <div class="icon-picker__grid" aria-label="可选图标">
-    @for (icon of icons(); track icon.key) {
+    @for (item of icons(); track item.icon.key) {
       <button
         type="button"
         class="icon-picker__cell"
-        [class.is-selected]="isSelected(icon.key)"
-        [attr.aria-pressed]="isSelected(icon.key)"
-        [title]="icon.label"
-        (click)="pick(icon.key)"
+        [class.is-selected]="isSelected(item.icon.key)"
+        [attr.aria-pressed]="isSelected(item.icon.key)"
+        [title]="item.icon.label"
+        (click)="pick(item.icon.key)"
       >
-        <img [src]="icon.file" alt="" loading="lazy" />
-        <span>{{ icon.label }}</span>
-        @if (icon.cities?.length) {
-          <small class="icon-picker__cities">{{ icon.cities?.join(' / ') }}</small>
+        <app-travel-icon class="icon-picker__glyph" [icon]="item.icon" [size]="32" />
+        <span>{{ item.icon.label }}</span>
+        @if (item.cities?.length) {
+          <small class="icon-picker__cities">{{ item.cities?.join(' / ') }}</small>
         }
       </button>
     }

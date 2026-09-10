@@ -7,8 +7,8 @@
     }
     @if (record(); as item) {
       <h1 class="page-heading__title">
-        @if (iconSrc(item); as src) {
-          <img class="detail-icon" [src]="src" alt="" />
+        @if (iconOf(item); as icon) {
+          <app-travel-icon class="detail-icon" [icon]="icon" [size]="26" />
         }
         {{ item.locationName }}
       </h1>

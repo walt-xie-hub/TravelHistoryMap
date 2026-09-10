@@ -8,7 +8,8 @@ import { toDatetimeLocal } from '../../utils/travel-display';
 import { RichTextEditorComponent } from '../../components/rich-text-editor/rich-text-editor';
 import { TravelIconPicker } from '../../components/travel-icon-picker/travel-icon-picker';
 import { TravelShareDialog } from '../../components/travel-share-dialog/travel-share-dialog';
-import { iconSrcForRecord } from '../../utils/travel-icon.util';
+import { iconForRecord } from '../../utils/travel-icon.util';
+import { TravelIconComponent } from '../../components/travel-icon/travel-icon';
 import { isRichHtml, sanitizeRichTextToTrusted, visibleTextLength } from '../../utils/rich-text.util';
 import { acceptImageFiles, pastedImageFiles } from '../../utils/staged-images.util';
 import { DomSanitizer } from '@angular/platform-browser';
@@ -24,7 +25,7 @@ const MAX_IMAGES = 9;
 @Component({
   selector: 'app-travel-detail-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, RouterLink, RichTextEditorComponent, TravelIconPicker, TravelShareDialog],
+  imports: [DatePipe, RouterLink, RichTextEditorComponent, TravelIconPicker, TravelShareDialog, TravelIconComponent],
   templateUrl: './travel-detail-page.html',
   styleUrl: './travel-detail-page.scss',
 })
@@ -112,8 +113,8 @@ export class TravelDetailPage implements OnInit, OnDestroy {
   }
 
   /** 详情标题旅行标识（ADR-0016）：显式选择 > 城市特色 */
-  protected iconSrc(item: TravelRecord): string | undefined {
-    return iconSrcForRecord(item);
+  protected iconOf(item: TravelRecord) {
+    return iconForRecord(item);
   }
 
   /** “再来一次”：预填本地点（名称/坐标/城市/标识）跳到新建页，到达=现在、离开留空 */

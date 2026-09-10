@@ -356,9 +356,7 @@
 
 .record-icon {
   flex: none;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
+  color: var(--text-strong, #111827);
 }
 
 /* 行内快捷操作：右对齐按钮组（结束停留/再来一次 + 详情 + 删除） */

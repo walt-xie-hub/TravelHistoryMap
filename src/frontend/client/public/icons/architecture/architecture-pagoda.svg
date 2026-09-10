@@ -1,5 +1,0 @@
-﻿<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48' role='img' aria-label='古塔'>
-  <circle cx='24' cy='24' r='22' fill='hsl(88 62% 52%)'/>
-  <text x='24' y='30' text-anchor='middle' font-family='system-ui, -apple-system, sans-serif' font-size='18' font-weight='700' fill='rgba(255,255,255,.96)'>古塔</text>
-  <g transform='translate(31 31) scale(.32)' fill='rgba(255,255,255,.5)'><path d="M12 40V18l12-8 12 8v22z"/><rect x="20" y="30" width="8" height="10"/></g>
-</svg>
