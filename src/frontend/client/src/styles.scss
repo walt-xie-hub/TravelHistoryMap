@@ -451,27 +451,6 @@ body {
   flex: none;
 }
 
-.tm-search-info {
-  display: grid;
-  gap: 4px;
-  min-width: 180px;
-  max-width: 260px;
-  color: var(--text-strong);
-  font-family: inherit;
-  font-size: 12px;
-}
-
-.tm-search-info strong {
-  font-size: 14px;
-}
-
-.tm-search-info span {
-  overflow: hidden;
-  color: var(--text-muted);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 /* 高德默认 InfoWindow 箭头在缩放时位置即可；这里统一收窄内容内边距 */
 .amap-info-content {
   padding: 10px 12px;

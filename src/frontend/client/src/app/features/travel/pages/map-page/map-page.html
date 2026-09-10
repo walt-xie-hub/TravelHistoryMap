@@ -24,35 +24,6 @@
   <section class="map-stage">
     <div #mapContainer class="map-canvas" aria-label="旅行足迹地图"></div>
 
-    @if (mapState() === 'ready') {
-      <div class="map-search" role="search">
-        <div class="map-search__row">
-          <input
-            type="search"
-            aria-label="搜索地图位置"
-            placeholder="搜索地点并在地图上定位"
-            [value]="searchKeyword()"
-            (input)="searchKeyword.set($any($event.target).value)"
-            (keydown.enter)="searchPlace()"
-          />
-          <button type="button" (click)="searchPlace()" [disabled]="searchLoading()">
-            {{ searchLoading() ? '搜索中…' : '搜索' }}
-          </button>
-        </div>
-        @if (searchError()) { <p class="map-search__error">{{ searchError() }}</p> }
-        @if (searchResults().length) {
-          <div class="map-search__results">
-            @for (place of searchResults(); track $index) {
-              <button type="button" (click)="selectSearchPlace(place)">
-                <strong>{{ place.name }}</strong>
-                <span>{{ place.address || '地址信息暂无' }}</span>
-              </button>
-            }
-          </div>
-        }
-      </div>
-    }
-
     @if (mapState() === 'missing-key') {
       <div class="map-overlay map-overlay--card">
         <div class="overlay-card-inner">

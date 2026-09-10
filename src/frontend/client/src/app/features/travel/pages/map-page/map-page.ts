@@ -18,8 +18,6 @@ import type {
   AmapMap,
   AmapMarker,
   AmapNamespace,
-  AmapLngLat,
-  AmapPlaceResult,
 } from '../../../../../types/amap';
 import { MapSidePanel } from '../../components/map-side-panel/map-side-panel';
 import { TravelShareDialog } from '../../components/travel-share-dialog/travel-share-dialog';
@@ -77,10 +75,6 @@ export class MapPage implements AfterViewInit, OnDestroy {
   readonly derivedCities = signal<ReadonlyMap<number, string>>(new Map());
   readonly totalPages = signal(1);
   readonly totalCount = signal(0);
-  readonly searchKeyword = signal('');
-  readonly searchResults = signal<AmapPlaceResult[]>([]);
-  readonly searchLoading = signal(false);
-  readonly searchError = signal('');
 
   /** 进行中/过去 的标注计数徽标（legend 用） */
   readonly hasRecords = computed(() => this.records().length > 0);
@@ -89,7 +83,6 @@ export class MapPage implements AfterViewInit, OnDestroy {
   private map: AmapMap | null = null;
   private infoWindow: AmapInfoWindow | null = null;
   private markers: AmapMarker[] = [];
-  private searchMarker: AmapMarker | null = null;
   /** “定位到某次停留”的高亮光圈（ADR-0017） */
   private focusMarker: AmapMarker | null = null;
   private groupByRecord = new Map<number, MapMarkerGroup>();
@@ -108,7 +101,6 @@ export class MapPage implements AfterViewInit, OnDestroy {
     this.map = null;
     this.infoWindow = null;
     this.markers = [];
-    this.searchMarker = null;
   }
 
   // ---------- 地图初始化 ----------
@@ -377,77 +369,6 @@ export class MapPage implements AfterViewInit, OnDestroy {
     return [lng, lat];
   }
 
-  async searchPlace(): Promise<void> {
-    const keyword = this.searchKeyword().trim();
-    if (!keyword) return;
-    const amap = this.amap;
-    if (!amap || !this.map) {
-      this.searchError.set('地图正在加载，请稍后再搜索。');
-      return;
-    }
-    if (!amap.plugin) {
-      this.searchError.set('地点搜索服务不可用，请检查高德地图配置。');
-      return;
-    }
-    this.searchLoading.set(true);
-    this.searchError.set('');
-    this.searchResults.set([]);
-    try {
-      await new Promise<void>((resolve) => {
-        amap.plugin!(['AMap.PlaceSearch'], () => {
-          if (!amap.PlaceSearch) {
-            this.searchError.set('地点搜索插件加载失败，请刷新页面后重试。');
-            resolve();
-            return;
-          }
-          const searcher = new amap.PlaceSearch!({ pageSize: 8 });
-          searcher.search(keyword, (status, result) => {
-            const places = status === 'complete' ? result.poiList?.pois ?? [] : [];
-            this.searchResults.set(places);
-            if (!places.length) this.searchError.set('没有找到匹配的位置。');
-            resolve();
-          });
-        });
-      });
-    } finally {
-      this.searchLoading.set(false);
-    }
-  }
-
-  selectSearchPlace(place: AmapPlaceResult): void {
-    const position = this.placeCoordinates(place.location);
-    if (!position || !this.map || !this.amap) return;
-    this.searchResults.set([]);
-    this.searchKeyword.set(place.name ?? this.searchKeyword());
-    if (this.searchMarker) this.map.remove(this.searchMarker);
-    this.searchMarker = new this.amap.Marker({
-      position,
-      title: place.name ?? '搜索位置',
-      zIndex: 1200,
-    });
-    this.map.add(this.searchMarker);
-    this.map.setZoomAndCenter(15, position);
-
-    const content = document.createElement('div');
-    content.className = 'tm-search-info';
-    const title = document.createElement('strong');
-    title.textContent = place.name ?? '搜索位置';
-    content.appendChild(title);
-    const address = document.createElement('span');
-    address.textContent = place.address ?? '地址信息暂无';
-    content.appendChild(address);
-    const coordinates = document.createElement('span');
-    coordinates.textContent = `坐标：${position[1].toFixed(6)}, ${position[0].toFixed(6)}`;
-    content.appendChild(coordinates);
-    this.infoWindow?.setContent(content);
-    this.infoWindow?.open(this.map, position);
-  }
-
-  private placeCoordinates(location: AmapPlaceResult['location']): AmapLngLat | null {
-    if (!location) return null;
-    return Array.isArray(location) ? location : [location.getLng(), location.getLat()];
-  }
-
   private fitView(): void {
     const map = this.map;
     if (!map) return;
@@ -598,7 +519,7 @@ export class MapPage implements AfterViewInit, OnDestroy {
     return root;
   }
 
-  /** 侧栏/搜索选中记录：居中到其 marker 并弹信息窗（保底 FOCUS_ZOOM）。 */
+  /** 侧栏选中记录：居中到该条停留的坐标并弹信息窗（保底 FOCUS_ZOOM）。 */
   onRecordSelect(recordId: number): void {
     this.focusOnMap(recordId, FOCUS_ZOOM);
   }
