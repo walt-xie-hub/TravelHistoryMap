@@ -5,7 +5,14 @@
     } @else {
       <a routerLink="/map">返回地图</a>
     }
-    @if (record(); as item) { <h1>{{ item.locationName }}</h1> }
+    @if (record(); as item) {
+      <h1 class="page-heading__title">
+        @if (iconSrc(item); as src) {
+          <img class="detail-icon" [src]="src" alt="" />
+        }
+        {{ item.locationName }}
+      </h1>
+    }
   </header>
 
   @if (loading()) { <p>加载中…</p> }
@@ -63,6 +70,13 @@
             <p class="edit-field__hint">本次停留仍在进行中：填写离开时间即结束这段停留（默认已填当前时间，可改；留空则保持进行中）。</p>
           </div>
         }
+        <div class="edit-field">
+          <div class="edit-field__head">
+            <strong>旅行标识（可选）</strong>
+          </div>
+          <app-travel-icon-picker [value]="editIconKey()" (valueChange)="editIconKey.set($event)"
+            [city]="item.city ?? null" />
+        </div>
       } @else if (item.description && isRichDescription(item.description)) {
         <div class="rich-text-view" [innerHTML]="safeHtml(item.description)"></div>
       } @else if (item.description) {

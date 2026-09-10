@@ -37,6 +37,11 @@ public class TravelRecordConfiguration : IEntityTypeConfiguration<TravelRecord>
             .IsRequired(false)
             .HasMaxLength(40);
 
+        // ADR-0016：旅行标识图标 key（可空，≤64）
+        builder.Property(t => t.IconKey)
+            .IsRequired(false)
+            .HasMaxLength(64);
+
         // 时间以 UTC 时刻存储（timestamptz）
         builder.Property(t => t.ArrivedAt)
             .IsRequired()

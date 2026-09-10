@@ -18,6 +18,9 @@
                 }
               } @else {
                 <span class="tl-col__label" [title]="run.label">
+                  @if (iconSrc(run); as src) {
+                    <img class="tl-col__icon" [src]="src" alt="" />
+                  }
                   @if (hasFavorite(run)) {
                     <span class="tl-col__star" aria-hidden="true">★</span>
                   }{{ labelOf(run) }}
@@ -51,6 +54,9 @@
             <div class="tl-cell tl-cell--bottom">
               @if (i % 2 === 0) {
                 <span class="tl-col__label" [title]="run.label">
+                  @if (iconSrc(run); as src) {
+                    <img class="tl-col__icon" [src]="src" alt="" />
+                  }
                   @if (hasFavorite(run)) {
                     <span class="tl-col__star" aria-hidden="true">★</span>
                   }{{ labelOf(run) }}

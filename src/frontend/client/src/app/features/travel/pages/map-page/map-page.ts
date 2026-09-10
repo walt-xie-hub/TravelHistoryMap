@@ -30,6 +30,7 @@ import { TravelHistoryService } from '../../data-access/travel-history.service';
 import type { TravelRangeRequest, TravelRecord } from '../../models/travel-record.model';
 import { wgs84ToGcj02 } from '../../utils/coord';
 import { TravelMarkerGroup, fmtDateTime, groupRecords } from '../../utils/travel-display';
+import { iconFile, sharedTravelIcon } from '../../utils/travel-icon.util';
 
 const DEFAULT_CENTER = [104.1954, 35.8617] as const; // 中国全国视野
 const DEFAULT_ZOOM = 5;
@@ -234,20 +235,31 @@ export class MapPage implements AfterViewInit, OnDestroy {
         count > 1 ? `多次到访，共 ${count} 次` : ongoing ? '进行中' : '普通停留',
       );
 
-      const earLeft = document.createElement('span');
-      earLeft.className = 'tm-marker__ear tm-marker__ear--left';
-      const earRight = document.createElement('span');
-      earRight.className = 'tm-marker__ear tm-marker__ear--right';
-      const face = document.createElement('span');
-      face.className = 'tm-marker__face';
-      const eyeLeft = document.createElement('span');
-      eyeLeft.className = 'tm-marker__eye tm-marker__eye--left';
-      const eyeRight = document.createElement('span');
-      eyeRight.className = 'tm-marker__eye tm-marker__eye--right';
-      const muzzle = document.createElement('span');
-      muzzle.className = 'tm-marker__muzzle';
-      face.append(eyeLeft, eyeRight, muzzle);
-      content.append(earLeft, earRight, face);
+      // ADR-0016：组内解析图标一致 → 用该图标作为标记；否则回退聚合标记（熊猫）+ 计数
+      const sharedIcon = sharedTravelIcon(group.records);
+      if (sharedIcon) {
+        content.classList.add('tm-marker--icon');
+        const iconImg = document.createElement('img');
+        iconImg.className = 'tm-marker__icon';
+        iconImg.src = iconFile(sharedIcon);
+        iconImg.alt = sharedIcon.label;
+        content.appendChild(iconImg);
+      } else {
+        const earLeft = document.createElement('span');
+        earLeft.className = 'tm-marker__ear tm-marker__ear--left';
+        const earRight = document.createElement('span');
+        earRight.className = 'tm-marker__ear tm-marker__ear--right';
+        const face = document.createElement('span');
+        face.className = 'tm-marker__face';
+        const eyeLeft = document.createElement('span');
+        eyeLeft.className = 'tm-marker__eye tm-marker__eye--left';
+        const eyeRight = document.createElement('span');
+        eyeRight.className = 'tm-marker__eye tm-marker__eye--right';
+        const muzzle = document.createElement('span');
+        muzzle.className = 'tm-marker__muzzle';
+        face.append(eyeLeft, eyeRight, muzzle);
+        content.append(earLeft, earRight, face);
+      }
 
       if (count > 1) {
         const countBadge = document.createElement('span');
@@ -437,6 +449,7 @@ export class MapPage implements AfterViewInit, OnDestroy {
             longitude: first.longitude,
             latitude: first.latitude,
             city: first.city ?? null,
+            iconKey: first.iconKey ?? null,
           },
         },
       });

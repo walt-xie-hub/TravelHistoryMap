@@ -6,7 +6,9 @@ import { TravelHistoryService } from '../../data-access/travel-history.service';
 import type { TravelImage, TravelRecord } from '../../models/travel-record.model';
 import { toDatetimeLocal } from '../../utils/travel-display';
 import { RichTextEditorComponent } from '../../components/rich-text-editor/rich-text-editor';
+import { TravelIconPicker } from '../../components/travel-icon-picker/travel-icon-picker';
 import { TravelShareDialog } from '../../components/travel-share-dialog/travel-share-dialog';
+import { iconSrcForRecord } from '../../utils/travel-icon.util';
 import { isRichHtml, sanitizeRichTextToTrusted, visibleTextLength } from '../../utils/rich-text.util';
 import { acceptImageFiles, pastedImageFiles } from '../../utils/staged-images.util';
 import { DomSanitizer } from '@angular/platform-browser';
@@ -22,7 +24,7 @@ const MAX_IMAGES = 9;
 @Component({
   selector: 'app-travel-detail-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, RouterLink, RichTextEditorComponent, TravelShareDialog],
+  imports: [DatePipe, RouterLink, RichTextEditorComponent, TravelIconPicker, TravelShareDialog],
   templateUrl: './travel-detail-page.html',
   styleUrl: './travel-detail-page.scss',
 })
@@ -46,6 +48,8 @@ export class TravelDetailPage implements OnInit, OnDestroy {
   protected readonly editDescription = signal('');
   /** 进行中收尾：补记的离开时间（datetime-local 值；空=保持进行中） */
   protected readonly editDepartAt = signal('');
+  /** ADR-0016：编辑态的旅行标识（null = 按城市自动） */
+  protected readonly editIconKey = signal<string | null>(null);
   protected readonly descriptionCount = computed(() => visibleTextLength(this.editDescription()));
   /** 已选但尚未上传（点“保存”才逐张上传）的图片 */
   protected readonly pendingFiles = signal<File[]>([]);
@@ -91,6 +95,7 @@ export class TravelDetailPage implements OnInit, OnDestroy {
     if (!item || this.saving()) return;
     this.editDescription.set(item.description ?? '');
     this.editDepartAt.set('');
+    this.editIconKey.set(item.iconKey ?? null);
     this.pendingFiles.set([]);
     this.error.set('');
     this.editing.set(true);
@@ -102,10 +107,16 @@ export class TravelDetailPage implements OnInit, OnDestroy {
     this.pendingFiles.set([]);
     this.editDescription.set('');
     this.editDepartAt.set('');
+    this.editIconKey.set(null);
     this.error.set('');
   }
 
-  /** “再来一次”：预填本地点（名称/坐标/城市）跳到新建页，到达=现在、离开留空 */
+  /** 详情标题旅行标识（ADR-0016）：显式选择 > 城市特色 */
+  protected iconSrc(item: TravelRecord): string | undefined {
+    return iconSrcForRecord(item);
+  }
+
+  /** “再来一次”：预填本地点（名称/坐标/城市/标识）跳到新建页，到达=现在、离开留空 */
   protected recordAgain(item: TravelRecord): void {
     void this.router.navigate(['/travels/new'], {
       state: {
@@ -114,6 +125,7 @@ export class TravelDetailPage implements OnInit, OnDestroy {
           longitude: item.longitude,
           latitude: item.latitude,
           city: item.city ?? null,
+          iconKey: item.iconKey ?? null,
         },
       },
     });
@@ -130,6 +142,7 @@ export class TravelDetailPage implements OnInit, OnDestroy {
     if (this.pendingFiles().length > 0) return true;
     const item = this.record()!;
     if (item.departedAt === null && this.editDepartAt() !== '') return true; // 进行中收尾：填了离开时间
+    if ((item.iconKey ?? null) !== this.editIconKey()) return true; // 旅行标识变更
     return this.normalizedDescription() !== (item.description ?? null);
   }
 
@@ -171,6 +184,7 @@ export class TravelDetailPage implements OnInit, OnDestroy {
         tags: item.tags ?? [],
         isFavorite: !item.isFavorite,
         city: item.city ?? null,
+        iconKey: item.iconKey ?? null,
       });
       this.record.set(updated);
     } catch (err) {
@@ -260,7 +274,8 @@ export class TravelDetailPage implements OnInit, OnDestroy {
       departValue = leave.toISOString();
     }
 
-    if (description === (item.description ?? null) && !departChanged && this.pendingFiles().length === 0) {
+    if (description === (item.description ?? null) && !departChanged && this.pendingFiles().length === 0
+        && (item.iconKey ?? null) === this.editIconKey()) {
       this.cancelEdit();
       return;
     }
@@ -280,10 +295,12 @@ export class TravelDetailPage implements OnInit, OnDestroy {
         tags: item.tags ?? [],
         isFavorite: item.isFavorite ?? false,
         city: item.city ?? null,
+        iconKey: this.editIconKey(),
       });
       this.record.set(updated);
       this.editDescription.set(updated.description ?? '');
       this.editDepartAt.set('');
+      this.editIconKey.set(updated.iconKey ?? null);
 
       // 2) 新增图片：逐张上传；成功的即时入列，失败的保留在待上传清单以便重试
       const failed: string[] = [];

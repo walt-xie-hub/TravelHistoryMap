@@ -109,6 +109,9 @@
             (click)="onRecordSelect(row.record.id)"
           >
             <span class="record-main">
+              @if (iconSrc(row.record); as src) {
+                <img class="record-icon" [src]="src" alt="" />
+              }
               <span class="record-name">{{ row.record.locationName }}</span>
               @if (row.record.isFavorite) {
                 <span class="record-star" title="精选收藏" aria-label="精选收藏">★</span>

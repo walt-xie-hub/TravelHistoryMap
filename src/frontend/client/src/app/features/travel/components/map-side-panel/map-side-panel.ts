@@ -7,6 +7,7 @@ import type {
   TravelRecord,
 } from '../../models/travel-record.model';
 import { fmtDuration, fmtRange } from '../../utils/travel-display';
+import { iconSrcForRecord } from '../../utils/travel-icon.util';
 
 interface TravelRow {
   record: TravelRecord;
@@ -130,6 +131,11 @@ export class MapSidePanel {
     this.recordSelect.emit(id);
   }
 
+  /** 行内旅行标识图标（ADR-0016）：显式选择 > 城市特色 */
+  protected iconSrc(record: TravelRecord): string | undefined {
+    return iconSrcForRecord(record);
+  }
+
   onRecordDelete(event: Event, id: number): void {
     event.stopPropagation();
     this.recordDelete.emit(id);
@@ -140,7 +146,7 @@ export class MapSidePanel {
     this.recordDetail.emit(id);
   }
 
-  /** “再来一次”：预填本地点（名称/坐标/城市）跳新建页，到达=现在、离开留空 */
+  /** “再来一次”：预填本地点（名称/坐标/城市/标识）跳新建页，到达=现在、离开留空 */
   onRecordAgain(event: Event, record: TravelRecord): void {
     event.stopPropagation();
     void this.router.navigate(['/travels/new'], {
@@ -150,6 +156,7 @@ export class MapSidePanel {
           longitude: record.longitude,
           latitude: record.latitude,
           city: record.city ?? null,
+          iconKey: record.iconKey ?? null,
         },
       },
     });

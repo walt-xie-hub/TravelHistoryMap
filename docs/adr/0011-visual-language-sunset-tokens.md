@@ -15,6 +15,7 @@ Accepted
   - 地图三态统一为主题语义色：普通 = 珊瑚橙、进行中 = 绿、多次到访 = 紫 `#7c3aed`。
 - **token 体系化**：语义/几何 token 集中在 `styles.scss :root`（`--primary*`、`--danger*`、`--success*`、`--warning*`、`--radius-*`、`--shadow-*`、`--focus-ring`）；页面硬编码的错误红/成功绿等收编为 token。绝大多数组件本就使用 `var(--*, fallback)`，改 `:root` 即全站生效。
 - **保留地图卡通 marker 造型**，仅重着色；补齐地图**图例圆点**样式（此前无样式不可见）。
+  （后续 ADR-0016 在此之上开了一个收窄的例外：同坐标组解析出同一旅行标识时，地图标记改用图标圆点。）
 - **统一焦点态**：全局 `:focus-visible` 用主色 focus ring；编辑器等有自定义 outline 规则处自行覆盖（避免回到“黑边”问题）。
 - **字体与排版**：拉丁/数字用 `Inter`，中文走系统字体栈（`PingFang SC / Microsoft YaHei / Noto Sans SC`，不引外部字体）；数字统一 `font-variant-numeric: tabular-nums`；补 `--font-sans` 与 `--text-xs…2xl`、行高 token。
 - **布局 token 化**：`--header-h / --content-pad-* / --container-max|lg|md / --side-panel-w / --map-chrome` 收编头部高度、内容区宽度/内边距、创建/详情容器宽度、侧栏宽度与地图主区高度（原 `calc(100dvh-220px)` 魔法数改为 token 表达），保持响应式断点语义。

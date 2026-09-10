@@ -19,6 +19,7 @@ import type { TravelCreatePrefill } from '../../models/travel-record.model';
 import { toDatetimeLocal } from '../../utils/travel-display';
 import { HttpErrorResponse } from '@angular/common/http';
 import { RichTextEditorComponent } from '../../components/rich-text-editor/rich-text-editor';
+import { TravelIconPicker } from '../../components/travel-icon-picker/travel-icon-picker';
 import { visibleTextLength } from '../../utils/rich-text.util';
 import { acceptImageFiles, pastedImageFiles } from '../../utils/staged-images.util';
 
@@ -56,7 +57,7 @@ function cityFromComponents(comp?: { province?: string; city?: string | string[]
 @Component({
   selector: 'app-travel-create-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, RouterLink, RichTextEditorComponent],
+  imports: [FormsModule, RouterLink, RichTextEditorComponent, TravelIconPicker],
   templateUrl: './travel-create-page.html',
   styleUrl: './travel-create-page.scss',
 })
@@ -81,6 +82,8 @@ export class TravelCreatePage implements AfterViewInit, OnDestroy {
   protected readonly tags = signal<string[]>([]);
   protected readonly tagInput = signal('');
   protected readonly favorite = signal(false);
+  // ADR-0016：旅行标识图标（null = 按城市自动）
+  protected readonly iconKey = signal<string | null>(null);
   protected readonly files = signal<SelectedImage[]>([]);
   protected readonly loading = signal(false);
   protected readonly searching = signal(false);
@@ -102,6 +105,8 @@ export class TravelCreatePage implements AfterViewInit, OnDestroy {
         location: [prefill.longitude, prefill.latitude],
       } as unknown as AmapPlaceResult);
       this.city.set(prefill.city?.trim() ? prefill.city.trim() : '');
+      // 旅行标识随预填带入（显式选择优先于城市派生，ADR-0016）
+      this.iconKey.set(prefill.iconKey ?? null);
       // 缺省到达时间=现在；离开留空（进行中）
       this.arrivedAt.set(prefill.arrivedAt ?? toDatetimeLocal(new Date()));
     }
@@ -325,6 +330,7 @@ export class TravelCreatePage implements AfterViewInit, OnDestroy {
         tags: this.tags(),
         isFavorite: this.favorite(),
         city: this.city() || null,
+        iconKey: this.iconKey(),
       });
       // 逐张上传并即时从预览清单移除，成功后释放对象 URL；中途失败则剩余项留在清单便于重试
       for (const item of [...this.files()]) {

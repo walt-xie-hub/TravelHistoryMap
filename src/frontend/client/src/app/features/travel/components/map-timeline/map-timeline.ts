@@ -4,6 +4,7 @@ import type { TravelRecord } from '../../models/travel-record.model';
 import { buildCityRuns, newestOf } from '../../utils/timeline.util';
 import type { TimelineRun } from '../../utils/timeline.util';
 import { fmtDuration, fmtRange } from '../../utils/travel-display';
+import { iconForRecord, iconFile } from '../../utils/travel-icon.util';
 
 /**
  * 地图时光轴（Map timeline，ADR-0015）：
@@ -172,5 +173,14 @@ export class MapTimeline implements OnDestroy {
   /** 该节点是否含精选收藏（ADR-0014）：模板据此在标签前渲染 ★ 徽标 */
   protected hasFavorite(run: TimelineRun): boolean {
     return run.records.some((record) => record.isFavorite);
+  }
+
+  /**
+   * 节点旅行标识图标（ADR-0016）：与「详情 / 定位」同口径取该节点最新一条记录（newestOf），
+   * 这样同一城市的多次到访也总能显示标识，不因组内不一致而整组丢失图标。
+   */
+  protected iconSrc(run: TimelineRun): string | undefined {
+    const icon = iconForRecord(newestOf(run));
+    return icon ? iconFile(icon) : undefined;
   }
 }

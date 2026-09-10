@@ -107,6 +107,11 @@ button:disabled { opacity: .6; cursor: wait; }
 .favorite-toggle__text strong { color: var(--text-strong); font-size: 14px; }
 .favorite-toggle__text em { font-style: normal; font-weight: 400; font-size: 12px; color: var(--text-muted); }
 
+.icon-field { display: grid; gap: 8px; }
+.icon-field__head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.icon-field__head strong { color: var(--text-strong); }
+.icon-field__head span { color: var(--text-muted); font-size: 13px; }
+
 
 @media (max-width: 640px) {
 	.location-picker__header { display: grid; gap: 4px; }

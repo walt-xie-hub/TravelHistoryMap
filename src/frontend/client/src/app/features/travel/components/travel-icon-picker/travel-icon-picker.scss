@@ -1,0 +1,114 @@
+.icon-picker {
+  display: grid;
+  gap: 10px;
+
+  &__cats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  &__cat {
+    padding: 4px 12px;
+    border: 1px solid var(--border-color, #d1d5db);
+    border-radius: 999px;
+    background: var(--surface, #ffffff);
+    color: var(--text, #111827);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+
+    &:hover {
+      border-color: var(--primary, #2563eb);
+      color: var(--primary, #2563eb);
+    }
+
+    &.is-active {
+      background: var(--primary, #2563eb);
+      border-color: var(--primary, #2563eb);
+      color: #ffffff;
+    }
+  }
+
+  &__hint {
+    margin: 0;
+    font-size: 12px;
+    color: var(--text-muted, #6b7280);
+  }
+
+  /** 地区 tab：格子内展示关联城市（「城市 → 图标」关联可见） */
+  &__cities {
+    font-size: 10px;
+    line-height: 1.2;
+    color: var(--text-muted, #6b7280);
+    text-align: center;
+  }
+
+  &__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+    gap: 8px;
+    max-height: 232px;
+    overflow-y: auto;
+    padding: 2px;
+  }
+
+  &__cell {
+    display: grid;
+    justify-items: center;
+    gap: 4px;
+    padding: 6px 4px;
+    border: 1px solid var(--border-color, #e5e7eb);
+    border-radius: 10px;
+    background: var(--surface, #ffffff);
+    font: inherit;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+
+    img {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+    }
+
+    span {
+      font-size: 11px;
+      color: var(--text-muted, #6b7280);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 100%;
+    }
+
+    &:hover {
+      border-color: color-mix(in srgb, var(--primary, #2563eb) 50%, transparent);
+    }
+
+    &.is-selected {
+      border-color: var(--primary, #2563eb);
+      background: var(--primary-soft, #eff6ff);
+
+      span {
+        color: var(--primary, #2563eb);
+        font-weight: 600;
+      }
+    }
+  }
+
+  &__clear {
+    justify-self: start;
+    padding: 4px 10px;
+    border: 1px solid var(--border-color, #d1d5db);
+    border-radius: 8px;
+    background: var(--surface, #ffffff);
+    color: var(--text-muted, #6b7280);
+    font-size: 12px;
+    cursor: pointer;
+
+    &:hover {
+      border-color: var(--primary, #2563eb);
+      color: var(--primary, #2563eb);
+    }
+  }
+}

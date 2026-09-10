@@ -29,6 +29,13 @@ public class TravelRecord
     /// </summary>
     public string? City { get; set; }
 
+    /// <summary>
+    /// 旅行标识图标（ADR-0016，可选）：Icon library 中的 key（如 <c>animal-panda</c>），
+    /// 是内联在记录上的快照式选择（用户手选），不是对可编辑图标表的引用。
+    /// 地区特色图标在渲染期按 City 派生，不落库。
+    /// </summary>
+    public string? IconKey { get; set; }
+
     /// <summary>到达时间（UTC 时刻，必填）</summary>
     public DateTimeOffset ArrivedAt { get; set; }
 

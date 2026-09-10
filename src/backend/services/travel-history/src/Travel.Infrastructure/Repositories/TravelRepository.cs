@@ -103,6 +103,7 @@ public class TravelRepository : ITravelRepository
         existing.TagsJson = record.TagsJson;   // ADR-0014
         existing.IsFavorite = record.IsFavorite; // ADR-0014
         existing.City = record.City;           // ADR-0015
+        existing.IconKey = record.IconKey;     // ADR-0016
         existing.UpdatedAt = record.UpdatedAt;
 
         await _db.SaveChangesAsync(ct);

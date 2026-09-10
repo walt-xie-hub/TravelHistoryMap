@@ -76,6 +76,14 @@
       </label>
     </div>
 
+    <div class="icon-field">
+      <div class="icon-field__head">
+        <strong>旅行标识（可选）</strong>
+        <span>用于地图 / 列表 / 时光轴</span>
+      </div>
+      <app-travel-icon-picker [value]="iconKey()" (valueChange)="iconKey.set($event)" [city]="city()" />
+    </div>
+
     <section class="image-picker">
       <div class="image-picker__head">
         <strong class="image-picker__title">图片（{{ files().length }}/9）</strong>

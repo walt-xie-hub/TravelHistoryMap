@@ -56,6 +56,7 @@ public class TravelService : ITravelService
             TagsJson = NormalizeTags(dto.Tags),
             IsFavorite = dto.IsFavorite,
             City = NormalizeCity(dto.City),
+            IconKey = NormalizeIconKey(dto.IconKey),
         };
         var created = await _repository.AddAsync(record, ct);
         return ToDto(created);
@@ -76,6 +77,7 @@ public class TravelService : ITravelService
         existing.TagsJson = NormalizeTags(dto.Tags);
         existing.IsFavorite = dto.IsFavorite;
         existing.City = NormalizeCity(dto.City);
+        existing.IconKey = NormalizeIconKey(dto.IconKey);
         existing.UpdatedAt = DateTimeOffset.UtcNow;
 
         var updated = await _repository.UpdateAsync(existing, ct);
@@ -177,9 +179,24 @@ public class TravelService : ITravelService
         record.Description,
         ParseTags(record.TagsJson),
         record.IsFavorite,
-        record.City);
+        record.City,
+        null,
+        record.IconKey);
 
     private const int MaxCityLength = 40;
+
+    private const int MaxIconKeyLength = 64;
+
+    /// <summary>图标 key 归一化（ADR-0016）：trim、空→null、>64 抛 400。</summary>
+    private static string? NormalizeIconKey(string? iconKey)
+    {
+        if (string.IsNullOrWhiteSpace(iconKey))
+            return null;
+        var value = iconKey.Trim();
+        if (value.Length > MaxIconKeyLength)
+            throw new ArgumentException($"图标标识长度不能超过 {MaxIconKeyLength} 个字符。");
+        return value;
+    }
 
     /// <summary>城市快照归一化（ADR-0015）：trim、空→null、>40 抛 400。</summary>
     private static string? NormalizeCity(string? city)

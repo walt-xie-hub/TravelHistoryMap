@@ -23,6 +23,8 @@ export interface TravelRecord {
   isFavorite?: boolean;
   /** 城市快照（ADR-0015）：地级市短名，可为空 */
   city?: string | null;
+  /** 旅行标识图标 key（ADR-0016）：Icon library 中的 key；空=按城市自动 */
+  iconKey?: string | null;
   images?: TravelImage[];
 }
 
@@ -48,10 +50,14 @@ export interface CreateTravelRequest {
   isFavorite?: boolean;
   /** 城市快照（ADR-0015） */
   city?: string | null;
+  /** 旅行标识图标 key（ADR-0016） */
+  iconKey?: string | null;
 }
 
 /** “再来一次”预填数据：由触发方经 router state 传给新建页（复用既有地点的名称/坐标/城市） */
 export interface TravelCreatePrefill {
+  /** 旅行标识（ADR-0016）：预填时带入上一次的显式选择 */
+  iconKey?: string | null;
   locationName: string;
   longitude: number;
   latitude: number;

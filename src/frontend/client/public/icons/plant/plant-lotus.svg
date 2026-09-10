@@ -1,0 +1,5 @@
+﻿<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48' role='img' aria-label='荷花'>
+  <circle cx='24' cy='24' r='22' fill='hsl(165 62% 52%)'/>
+  <text x='24' y='30' text-anchor='middle' font-family='system-ui, -apple-system, sans-serif' font-size='18' font-weight='700' fill='rgba(255,255,255,.96)'>荷花</text>
+  <g transform='translate(31 31) scale(.32)' fill='rgba(255,255,255,.5)'><path d="M24 6c14 10 14 24 0 32C10 30 10 16 24 6z"/></g>
+</svg>

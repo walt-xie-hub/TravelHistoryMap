@@ -84,6 +84,15 @@
     margin-right: 2px;
     color: var(--primary);
   }
+
+  /* 旅行标识图标：与城市名同排 */
+  &__icon {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    vertical-align: -3px;
+    margin-right: 3px;
+  }
 }
 
 /* —— 节点圆点：激活(悬停/触屏点击)时轻微放大+主题描边，上方浮出“节点操作条”（ADR-0015）—— */

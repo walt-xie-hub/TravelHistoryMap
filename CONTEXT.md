@@ -55,3 +55,15 @@ _Avoid_: 把不同城市的记录误并为一段、按坐标聚簇代替城市�
 **精选收藏（Favorite）**:
 Travel record 上的是/否标记，表示“值得重点回味的足迹”。用户可在创建/详情切换；地图页可开启“★ 收藏”只看这些记录，列表/地图/时光轴上以 ★ 呈现。
 _Avoid_: 收藏夹、合集、相册（把多条记录组成可分享的集合是另一个概念，尚未实现）
+
+**Travel icon（旅行标识图标）**:
+一条 Travel record 上内联的图标选择（Icon library 中的 key，如 `animal-panda`），用于在详情页、列表行、时光轴节点标识这次旅行。为空表示未显式选择——渲染期按 City snapshot 派生地区特色图标，该派生不落库（见 ADR-0016）。地图标记仅在**同坐标组解析结果一致**时才改用该图标，否则仍是默认标记加计数。
+_Avoid_: 把图标当地图 marker（marker 是标注）、外键引用可编辑图标表
+
+**Icon library（图标库）**:
+前端只读资产集合（`public/icons/{category}/{key}.svg`；分类 动物/美食/建筑/植物），key → 资源映射由前端维护；不是用户数据，不提供增删改。
+_Avoid_: 用户上传的图标库、把图标库当业务实体表
+
+**Regional icon（地区特色图标）**:
+按 Travel record 的 City snapshot 自动匹配的地区特色图标（MVP 为热门城市市花/代表动物等精选映射）。优先级：显式 Travel icon > Regional icon > 无（默认标记）。
+_Avoid_: 实时逆地理查询、把地区映射当权威市花数据库

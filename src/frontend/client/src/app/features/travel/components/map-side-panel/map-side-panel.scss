@@ -354,6 +354,13 @@
   line-height: 1;
 }
 
+.record-icon {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+}
+
 /* 行内快捷操作：右对齐按钮组（结束停留/再来一次 + 详情 + 删除） */
 .record-actions {
   display: flex;

@@ -56,6 +56,14 @@
   color: var(--text-muted);
 }
 
+.page-heading__title .detail-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  vertical-align: -6px;
+  margin-right: 6px;
+}
+
 .edit-field { display: grid; gap: 7px; margin-top: 16px; color: var(--text-strong); }
 .edit-field__head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-weight: 600; }
 .edit-field__count { font-weight: 400; font-size: 13px; color: var(--text-muted); }

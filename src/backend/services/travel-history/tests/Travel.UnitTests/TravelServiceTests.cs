@@ -248,6 +248,56 @@ public class TravelServiceTests
     }
 
     [Fact]
+    public async Task CreateAsync_WithIconKey_NormalizesAndPersists()
+    {
+        // Arrange（ADR-0016：图标 key trim 后落库并透出 DTO）
+        _repositoryMock.Setup(r => r.AddAsync(It.IsAny<TravelRecord>(), It.IsAny<CancellationToken>()))
+                       .ReturnsAsync((TravelRecord t, CancellationToken _) => t);
+        var dto = new CreateTravelDto("Shanghai", 31.2304m, 121.4737m, Arrived, Departed, IconKey: " animal-panda ");
+
+        // Act
+        var result = await _sut.CreateAsync(10, dto);
+
+        // Assert
+        Assert.Equal("animal-panda", result.IconKey);
+        _repositoryMock.Verify(r => r.AddAsync(
+            It.Is<TravelRecord>(t => t.IconKey == "animal-panda"),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task CreateAsync_IconKeyTooLong_ThrowsAndDoesNotPersist()
+    {
+        // Arrange（ADR-0016：图标 key ≤64）
+        var dto = new CreateTravelDto("Shanghai", 31.2304m, 121.4737m, Arrived, IconKey: new string('i', 65));
+
+        // Act / Assert
+        await Assert.ThrowsAsync<ArgumentException>(() => _sut.CreateAsync(10, dto));
+        _repositoryMock.Verify(r => r.AddAsync(It.IsAny<TravelRecord>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task UpdateAsync_SetsIconKey()
+    {
+        // Arrange（ADR-0016：全量更新写回图标 key）
+        _repositoryMock.Setup(r => r.GetByIdAsync(1, It.IsAny<CancellationToken>()))
+                       .ReturnsAsync(SampleRecord(userId: 10));
+        _repositoryMock.Setup(r => r.UpdateAsync(It.IsAny<TravelRecord>(), It.IsAny<CancellationToken>()))
+                       .ReturnsAsync((TravelRecord t, CancellationToken _) => t);
+        var dto = new UpdateTravelDto("Shanghai", 31.2304m, 121.4737m, Arrived, Departed, IconKey: "food-hotpot");
+
+        // Act
+        var result = await _sut.UpdateAsync(10, 1, dto);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal("food-hotpot", result!.IconKey);
+        _repositoryMock.Verify(r => r.UpdateAsync(
+            It.Is<TravelRecord>(t => t.IconKey == "food-hotpot"),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task CreateAsync_WithCity_NormalizesAndPersists()
     {
         // Arrange（ADR-0015：城市快照 trim 后落库并透出 DTO）

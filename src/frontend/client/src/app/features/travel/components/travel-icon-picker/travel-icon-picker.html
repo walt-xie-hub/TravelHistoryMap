@@ -1,0 +1,50 @@
+<div class="icon-picker">
+  <div class="icon-picker__cats" role="group" aria-label="图标分类">
+    @for (cat of categories; track cat.id) {
+      <button
+        type="button"
+        class="icon-picker__cat"
+        [class.is-active]="isActive(cat.id)"
+        [attr.aria-pressed]="isActive(cat.id)"
+        (click)="selectCategory(cat.id)"
+      >
+        {{ cat.label }}
+      </button>
+    }
+  </div>
+
+  <p class="icon-picker__hint">
+    @if (selected(); as icon) {
+      已选：{{ icon.label }}
+    } @else if (unknownSelection()) {
+      已选：{{ value() }}（图标库中不存在，将按城市显示）
+    } @else if (suggested(); as icon) {
+      未选择：将按城市自动显示「{{ icon.label }}」。
+    } @else {
+      未选择：地图/列表使用默认标记。
+    }
+  </p>
+
+  <div class="icon-picker__grid" aria-label="可选图标">
+    @for (icon of icons(); track icon.key) {
+      <button
+        type="button"
+        class="icon-picker__cell"
+        [class.is-selected]="isSelected(icon.key)"
+        [attr.aria-pressed]="isSelected(icon.key)"
+        [title]="icon.label"
+        (click)="pick(icon.key)"
+      >
+        <img [src]="icon.file" alt="" loading="lazy" />
+        <span>{{ icon.label }}</span>
+        @if (icon.cities?.length) {
+          <small class="icon-picker__cities">{{ icon.cities?.join(' / ') }}</small>
+        }
+      </button>
+    }
+  </div>
+
+  @if (value()) {
+    <button type="button" class="icon-picker__clear" (click)="clear()">清除选择（按城市自动）</button>
+  }
+</div>

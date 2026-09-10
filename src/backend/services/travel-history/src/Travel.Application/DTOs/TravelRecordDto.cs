@@ -16,7 +16,8 @@ public record TravelRecordDto(
     IReadOnlyList<string>? Tags = null,
     bool IsFavorite = false,
     string? City = null,
-    IReadOnlyList<TravelImageDto>? Images = null);
+    IReadOnlyList<TravelImageDto>? Images = null,
+    string? IconKey = null);
 
 public record TravelImageDto(
     int Id,
@@ -39,7 +40,8 @@ public record CreateTravelDto(
     string? Description = null,
     IReadOnlyList<string>? Tags = null,
     bool IsFavorite = false,
-    string? City = null);
+    string? City = null,
+    string? IconKey = null);
 
 /// <summary>
 /// 更新旅行记录请求模型（不允许改归属用户）。
@@ -53,4 +55,5 @@ public record UpdateTravelDto(
     string? Description = null,
     IReadOnlyList<string>? Tags = null,
     bool IsFavorite = false,
-    string? City = null);
+    string? City = null,
+    string? IconKey = null);
