@@ -100,15 +100,24 @@ body {
 
 .tm-marker {
   position: relative;
+  /* 固定 42px 外框＝基准尺寸（map-zoom.util.ts 的 MARKER_BASE_SIZE）：
+     画面层随缩放档位变化，但点击热区在任何档位都不小于 42px（ADR-0004） */
   width: 42px;
   height: 42px;
   cursor: pointer;
   filter: drop-shadow(0 2px 2px rgb(15 23 42 / 0.28));
   transform: translate(-50%, -50%);
-  transition: transform 160ms ease;
 
-  &:hover {
-    transform: translate(-50%, -50%) scale(1.12);
+  /* 会随地图缩放档位缩放的“画面层”：剪影、熊猫部件、以及挂在其角上的徽标 */
+  &__art {
+    position: absolute;
+    inset: 0;
+    transform: scale(var(--marker-scale, 1));
+    transition: transform 0.15s ease;
+  }
+
+  &:hover &__art {
+    transform: scale(calc(var(--marker-scale, 1) * 1.12));
   }
 
   &--ordinary {
@@ -119,11 +128,6 @@ body {
   &--ongoing {
     --marker-color: #16a34a;
     --marker-light: #dcfce7;
-  }
-
-  &--merged {
-    --marker-color: #7c3aed;
-    --marker-light: #ede9fe;
   }
 
   /** 旅行标识标记（ADR-0016）：剪影直接叠在地图上（无底衬），用白色光晕保证可读性 */
@@ -213,6 +217,7 @@ body {
   position: absolute;
   top: -7px;
   right: -8px;
+  /* 徽标基准尺寸 18px＝map-zoom.util.ts 的 BADGE_BASE_SIZE；视觉尺寸由 --badge-scale 定（ADR-0004） */
   min-width: 18px;
   height: 18px;
   padding: 0 4px;
@@ -225,6 +230,9 @@ body {
   line-height: 14px;
   text-align: center;
   box-shadow: 0 1px 3px rgb(15 23 42 / 0.3);
+  /* 徽标刻意不与画面层同比例缩放：远档同比例会小到读不出数字（ADR-0004） */
+  transform: scale(var(--badge-scale, 1));
+  transition: transform 0.15s ease;
 }
 
 /* 组内含精选收藏（ADR-0017）：左上角星标 */
@@ -243,6 +251,9 @@ body {
   line-height: 14px;
   text-align: center;
   box-shadow: 0 1px 3px rgb(15 23 42 / 0.3);
+  /* 同计数徽标：星标按档位回到标准尺寸，不随画面层同比例缩小（ADR-0004） */
+  transform: scale(var(--badge-scale, 1));
+  transition: transform 0.15s ease;
 }
 
 /* “定位到某次停留”的高亮光圈（ADR-0017） */
@@ -279,8 +290,8 @@ body {
   }
 }
 
-/* 进行中停留：脉冲光环 */
-.tm-marker--ongoing::after {
+/* 进行中停留：脉冲光环（画在会随档位缩放的画面层上，因此与标记同步缩放，ADR-0004） */
+.tm-marker--ongoing .tm-marker__art::after {
   content: '';
   position: absolute;
   inset: -3px;

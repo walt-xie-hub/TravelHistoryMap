@@ -41,6 +41,8 @@ export interface AmapClickEvent {
 
 export interface AmapMap {
   on(event: 'click', handler: (event: AmapClickEvent) => void): void;
+  /** 缩放结束后触发：用它与 getZoom() 推导标记档位（ADR-0004） */
+  on(event: 'zoomend', handler: () => void): void;
   add(overlay: unknown): void;
   remove(overlay: unknown): void;
   setFitView(overlays?: readonly unknown[], immediately?: boolean, avoid?: readonly number[]): void;

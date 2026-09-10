@@ -28,6 +28,7 @@ import { AmapReverseGeocodeService } from '../../data-access/amap-reverse-geocod
 import { TravelHistoryService } from '../../data-access/travel-history.service';
 import type { TravelRangeRequest, TravelRecord } from '../../models/travel-record.model';
 import { wgs84ToGcj02 } from '../../utils/coord';
+import { markerTierFor, markerTierVars, type MarkerTier } from '../../utils/map-zoom.util';
 import { MapMarkerGroup, effectiveCity, fmtDateTime, groupMapMarkers, iconSourceOf } from '../../utils/travel-display';
 import { iconForRecord, sharedTravelIcon, travelIconMarkup } from '../../utils/travel-icon.util';
 
@@ -82,6 +83,14 @@ export class MapPage implements AfterViewInit, OnDestroy {
   readonly mapErrorMsg = signal('');
   readonly selectedRecordId = signal<number | null>(null);
   readonly page = signal(1);
+
+  /**
+   * 标记缩放档位（ADR-0004）：由地图 zoom 推导，默认值对应地图初始 zoom。
+   * 只用于换一组 CSS 变量，**不重建标记**，所以缩放不会关掉气泡、也不会抢走视野。
+   */
+  readonly markerTier = signal<MarkerTier>(markerTierFor(DEFAULT_ZOOM));
+  /** 档位对应的 CSS 自定义属性，挂在 `.map-stage` 上并级联到 AMap 注入的标记 DOM */
+  readonly markerStageVars = computed(() => markerTierVars(this.markerTier()));
   /** 无 City 快照记录的**派生城市**（recordId → 城市短名）：只用于地图分组，ADR-0017 */
   readonly derivedCities = signal<ReadonlyMap<number, string>>(new Map());
   readonly totalPages = signal(1);
@@ -176,6 +185,9 @@ export class MapPage implements AfterViewInit, OnDestroy {
       offset: new amap.Pixel(0, -30),
       closeWhenClickMap: false,
     });
+    // 标记随缩放分档（ADR-0004）：只在缩放结束后重算一次，连续缩放中不去改样式
+    this.map.on('zoomend', () => this.applyMarkerTier());
+    this.applyMarkerTier();
     this.mapState.set('ready');
     // 「全部足迹」模式可能在 SDK 就绪前就已经切过去（此时 renderMarkers 会直接 return），
     // 所以这里不只看列表的 loadedKey，还要看当前范围
@@ -321,6 +333,11 @@ export class MapPage implements AfterViewInit, OnDestroy {
         `${label}：${count} 次停留${ongoing ? '（含进行中）' : ''}${favorite ? '（含精选收藏）' : ''}`,
       );
 
+      // 画面层（ADR-0004）：剪影 / 熊猫部件 / 徽标都放进来，随缩放档位整体 scale；
+      // 外框保持 42px 不变，因此点击热区不会在远档变小
+      const art = document.createElement('div');
+      art.className = 'tm-marker__art';
+
       // ADR-0017：城市标记 = 该城**首次到访**那条记录的解析结果（显式 iconKey > Regional icon）；
       // 地点标记仍要求组内解析一致（ADR-0016），否则回退默认标记（熊猫）+ 计数
       const icon = this.iconForGroup(group);
@@ -329,7 +346,7 @@ export class MapPage implements AfterViewInit, OnDestroy {
         const iconHolder = document.createElement('span');
         iconHolder.className = 'tm-marker__icon';
         iconHolder.innerHTML = travelIconMarkup(icon, 42);
-        content.appendChild(iconHolder);
+        art.appendChild(iconHolder);
       } else {
         const earLeft = document.createElement('span');
         earLeft.className = 'tm-marker__ear tm-marker__ear--left';
@@ -344,15 +361,16 @@ export class MapPage implements AfterViewInit, OnDestroy {
         const muzzle = document.createElement('span');
         muzzle.className = 'tm-marker__muzzle';
         face.append(eyeLeft, eyeRight, muzzle);
-        content.append(earLeft, earRight, face);
+        art.append(earLeft, earRight, face);
       }
+      content.appendChild(art);
 
       if (favorite) {
         const star = document.createElement('span');
         star.className = 'tm-marker__star';
         star.textContent = '★';
         star.setAttribute('aria-hidden', 'true');
-        content.appendChild(star);
+        art.appendChild(star);
       }
 
       // 计数徽标：仅「地点标记」（同一坐标多次停留）用；
@@ -361,7 +379,7 @@ export class MapPage implements AfterViewInit, OnDestroy {
         const countBadge = document.createElement('span');
         countBadge.className = 'tm-marker__count';
         countBadge.textContent = String(count);
-        content.appendChild(countBadge);
+        art.appendChild(countBadge);
       }
 
       const marker = new amap.Marker({
@@ -466,6 +484,17 @@ export class MapPage implements AfterViewInit, OnDestroy {
       return;
     }
     map.setFitView(this.markers, false, FIT_PADDING);
+  }
+
+  /**
+   * 按当前 zoom 落档（ADR-0004）：档位没变就不写信号，避免无意义的重渲染。
+   * 分档标准（边界与尺寸）只在 utils/map-zoom.util.ts 维护，这里仅做映射。
+   */
+  private applyMarkerTier(): void {
+    const zoom = this.map?.getZoom();
+    if (zoom === undefined) return;
+    const tier = markerTierFor(zoom);
+    if (tier.id !== this.markerTier().id) this.markerTier.set(tier);
   }
 
   // ---------- 气泡与联动 ----------

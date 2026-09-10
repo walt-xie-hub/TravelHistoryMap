@@ -82,7 +82,12 @@
       </div>
     }
 
-    <section class="map-stage">
+    <!-- data-zoom-tier：当前缩放档位（far/mid/near），供调试与 E2E 断言；档位变化只换 --marker-scale / --badge-scale（ADR-0004） -->
+    <section
+      class="map-stage"
+      [attr.data-zoom-tier]="markerTier().id"
+      [style]="markerStageVars()"
+    >
     <div #mapContainer class="map-canvas" aria-label="旅行足迹地图"></div>
 
     @if (mapState() === 'missing-key') {
