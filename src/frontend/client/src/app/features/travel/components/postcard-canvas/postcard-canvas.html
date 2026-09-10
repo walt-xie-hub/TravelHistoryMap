@@ -321,41 +321,55 @@
     }
     @if (content().modules.postmark) {
       <div class="pc-postmark" [style.transform]="'rotate(' + cancelAngle() + 'deg)'">
-        <svg [attr.viewBox]="postmarkViewBox()" role="img" [attr.aria-label]="postmarkLabel()">
+        <!--
+          SVG 子元素一律用**呈现属性**（fill / stroke / font-size…），不要依赖组件 CSS：
+          导出走 html-to-image，它只内联元素自身的计算样式、**不会带上组件样式表**，
+          组件作用域的 .pc-postmark__* 在导出图里等于不存在 —— 描边会丢、文字会变黑。
+        -->
+        <svg
+          [attr.viewBox]="postmarkViewBox()"
+          [attr.width]="postmark().size"
+          [attr.height]="postmark().size"
+          role="img"
+          [attr.aria-label]="postmarkLabel()"
+        >
           <defs>
             <path [attr.id]="uid + '-place'" [attr.d]="postmark().placeArc" fill="none"></path>
             <path [attr.id]="uid + '-date'" [attr.d]="postmark().dateArc" fill="none"></path>
           </defs>
-          <circle class="pc-postmark__ring" [attr.r]="postmark().size / 2 - 3"></circle>
-          <circle
-            class="pc-postmark__ring pc-postmark__ring--inner"
-            [attr.r]="postmark().innerRadius"
-          ></circle>
-          <line
-            class="pc-postmark__rule"
-            [attr.x1]="-postmark().noteWidth / 2"
-            [attr.x2]="postmark().noteWidth / 2"
-            y1="-30"
-            y2="-30"
-          ></line>
-          <line
-            class="pc-postmark__rule"
-            [attr.x1]="-postmark().noteWidth / 2"
-            [attr.x2]="postmark().noteWidth / 2"
-            y1="30"
-            y2="30"
-          ></line>
-          <text class="pc-postmark__note" y="16">{{ postmarkNote }}</text>
-          <text class="pc-postmark__arc">
-            <textPath [attr.href]="'#' + uid + '-place'" startOffset="50%" text-anchor="middle">
-              {{ content().fields.place }}
-            </textPath>
-          </text>
-          <text class="pc-postmark__date">
-            <textPath [attr.href]="'#' + uid + '-date'" startOffset="50%" text-anchor="middle">
-              {{ content().fields.date }}
-            </textPath>
-          </text>
+          <g [attr.transform]="'translate(' + postmarkCenter() + ' ' + postmarkCenter() + ')'">
+            <circle [attr.r]="postmark().size / 2 - 3" fill="none" stroke="currentcolor" stroke-width="4"></circle>
+            <circle [attr.r]="postmark().innerRadius" fill="none" stroke="currentcolor" stroke-width="2"></circle>
+            <line
+              [attr.x1]="-postmark().noteWidth / 2"
+              [attr.x2]="postmark().noteWidth / 2"
+              y1="-30"
+              y2="-30"
+              stroke="currentcolor"
+              stroke-width="3"
+            ></line>
+            <line
+              [attr.x1]="-postmark().noteWidth / 2"
+              [attr.x2]="postmark().noteWidth / 2"
+              y1="30"
+              y2="30"
+              stroke="currentcolor"
+              stroke-width="3"
+            ></line>
+            <text y="16" fill="currentcolor" font-size="26" font-weight="700" letter-spacing="4" text-anchor="middle">
+              {{ postmarkNote }}
+            </text>
+            <text fill="currentcolor" font-size="24" letter-spacing="1.5">
+              <textPath [attr.href]="'#' + uid + '-place'" startOffset="50%" text-anchor="middle">
+                {{ content().fields.place }}
+              </textPath>
+            </text>
+            <text fill="currentcolor" font-size="22" letter-spacing="1">
+              <textPath [attr.href]="'#' + uid + '-date'" startOffset="50%" text-anchor="middle">
+                {{ content().fields.date }}
+              </textPath>
+            </text>
+          </g>
         </svg>
       </div>
     }

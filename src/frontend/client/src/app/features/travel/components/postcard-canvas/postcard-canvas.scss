@@ -144,6 +144,8 @@
   height: 288px;
 }
 
+/* 邮戳：只在这里给尺寸与颜色；圆/线/文字的描边与字号写在模板的**呈现属性**上
+   （导出时组件样式不会进克隆，见模板里的注释）。 */
 .pc-postmark {
   position: absolute;
   top: 132px;
@@ -158,44 +160,6 @@
     width: 100%;
     height: 100%;
     overflow: visible;
-  }
-
-  &__ring {
-    fill: none;
-    stroke: currentcolor;
-    stroke-width: 4;
-  }
-
-  &__ring--inner {
-    stroke-width: 2;
-  }
-
-  &__rule {
-    stroke: currentcolor;
-    stroke-width: 3;
-  }
-
-  &__note {
-    fill: currentcolor;
-    font-family: var(--pc-font);
-    font-size: 26px;
-    font-weight: 700;
-    letter-spacing: 0.18em;
-    text-anchor: middle;
-  }
-
-  &__arc {
-    fill: currentcolor;
-    font-family: var(--pc-font);
-    font-size: 24px;
-    letter-spacing: 0.06em;
-  }
-
-  &__date {
-    fill: currentcolor;
-    font-family: var(--pc-font);
-    font-size: 22px;
-    letter-spacing: 0.04em;
   }
 }
 

@@ -64,11 +64,15 @@ export class PostcardCanvas {
   );
   protected readonly postmark = computed(() => postmarkGeometry());
   protected readonly cancelAngle = computed(() => stampCancelAngle(this.content().mainRecordId));
-  /** 邮戳坐标原点在圆心，方便用 transform 摆位 */
-  protected readonly postmarkViewBox = computed(() => {
-    const half = this.postmark().size / 2;
-    return `${-half} ${-half} ${this.postmark().size} ${this.postmark().size}`;
-  });
+  /**
+   * 邮戳画布：viewBox 从 (0,0) 起，圆心靠 `translate` 组摆放。
+   * 不用 `-size/2 -size/2 size size` 那种“原点居中”的 viewBox：
+   * 导出时整份 DOM 会被序列化成 SVG 再当图片渲染，原点偏移在这条路径上不可靠
+   * （实测圆/文字会错位到角上），绝对坐标则在任何渲染路径下都一致。
+   */
+  protected readonly postmarkViewBox = computed(() => `0 0 ${this.postmark().size} ${this.postmark().size}`);
+  /** 圆心在画布内的平移量 */
+  protected readonly postmarkCenter = computed(() => this.postmark().size / 2);
 
   /** 选中的图片地址（按选择顺序；缺图时数组更短，版式用占位提示） */
   protected readonly photos = computed(() =>

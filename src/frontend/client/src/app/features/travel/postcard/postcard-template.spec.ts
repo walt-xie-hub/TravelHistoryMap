@@ -38,11 +38,13 @@ describe('postcardTemplateById（ADR-0018：10 款模板）', () => {
     }
   });
 
-  it('邮票与邮戳是所有模板的既定元素（默认开）', () => {
+  it('邮票与邮戳是所有模板的既定元素，默认全开（用户可关）', () => {
     for (const template of POSTCARD_TEMPLATES) {
       expect(template.modules).toContain('stamp');
       expect(template.modules).toContain('postmark');
+      // 用户要求“邮票 + 邮戳”是明信片的一部分，因此每款都默认带上
       expect(template.defaults).toContain('stamp');
+      expect(template.defaults).toContain('postmark');
     }
   });
 
@@ -61,8 +63,11 @@ describe('resolveModules（模块开关按模板能力收敛）', () => {
     const resolved = resolveModules(polaroid);
     expect(resolved.caption).toBe(true);
     expect(resolved.stamp).toBe(true);
-    expect(resolved.postmark).toBe(false);
+    // 邮票与邮戳是所有模板的既定元素，默认开
+    expect(resolved.postmark).toBe(true);
+    // 清单/収件人栏则看模板默认值（拍立得默认不带）
     expect(resolved.trail).toBe(false);
+    expect(resolved.recipient).toBe(false);
   });
 
   it('模板不支持的模块一律关掉（换模板不会把版式撑破）', () => {

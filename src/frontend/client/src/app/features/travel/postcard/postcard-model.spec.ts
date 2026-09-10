@@ -127,7 +127,9 @@ describe('createPostcardContent（默认内容）', () => {
 
   it('模块开关＝模板默认值；模板不支持的一律关闭', () => {
     const polaroid = createPostcardContent({ records, templateId: 'polaroid' });
-    expect(polaroid.modules.postmark).toBe(false);
+    // 邮票与邮戳默认开；清单看模板默认（拍立得默认不带）
+    expect(polaroid.modules.postmark).toBe(true);
+    expect(polaroid.modules.trail).toBe(false);
     expect(polaroid.modules.recipient).toBe(false);
     const backPlain = createPostcardContent({ records, templateId: 'back-plain' });
     expect(backPlain.modules.recipient).toBe(true);

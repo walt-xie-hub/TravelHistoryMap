@@ -102,7 +102,7 @@ export const POSTCARD_TEMPLATES: readonly PostcardTemplate[] = [
     imageCount: 1,
     trailLimit: 5,
     modules: ['caption', 'stamp', 'postmark', 'trail', 'icon'],
-    defaults: ['caption', 'stamp'],
+    defaults: ['caption', 'stamp', 'postmark'],
   },
   {
     id: 'collage',
@@ -132,7 +132,7 @@ export const POSTCARD_TEMPLATES: readonly PostcardTemplate[] = [
     imageCount: 1,
     trailLimit: 3,
     modules: ['caption', 'stamp', 'postmark', 'trail'],
-    defaults: ['caption', 'stamp'],
+    defaults: ['caption', 'stamp', 'postmark'],
   },
   {
     id: 'film-strip',
@@ -152,7 +152,7 @@ export const POSTCARD_TEMPLATES: readonly PostcardTemplate[] = [
     imageCount: 1,
     trailLimit: 3,
     modules: ['caption', 'stamp', 'postmark', 'trail'],
-    defaults: ['caption', 'stamp'],
+    defaults: ['caption', 'stamp', 'postmark'],
   },
   {
     id: 'back-letter',
