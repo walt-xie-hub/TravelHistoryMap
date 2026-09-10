@@ -15,6 +15,8 @@ import { Router, RouterLink } from '@angular/router';
 import type { AmapClickEvent, AmapLngLat, AmapMap, AmapMarker, AmapPlaceResult, AmapNamespace } from '../../../../../types/amap';
 import { AmapLoaderService } from '../../data-access/amap-loader.service';
 import { TravelHistoryService } from '../../data-access/travel-history.service';
+import type { TravelCreatePrefill } from '../../models/travel-record.model';
+import { toDatetimeLocal } from '../../utils/travel-display';
 import { HttpErrorResponse } from '@angular/common/http';
 import { RichTextEditorComponent } from '../../components/rich-text-editor/rich-text-editor';
 import { visibleTextLength } from '../../utils/rich-text.util';
@@ -87,6 +89,23 @@ export class TravelCreatePage implements AfterViewInit, OnDestroy {
     const coordinates = this.coordinates(this.selected()?.location);
     return coordinates ? `${coordinates[1]}, ${coordinates[0]}` : '';
   });
+
+  constructor() {
+    // “再来一次”预填：由触发方（侧栏/详情等）经 router state 传入地点/坐标/城市
+    const state = this.router.getCurrentNavigation()?.extras.state as
+      | { prefill?: TravelCreatePrefill }
+      | undefined;
+    const prefill = state?.prefill;
+    if (prefill) {
+      this.selected.set({
+        name: prefill.locationName,
+        location: [prefill.longitude, prefill.latitude],
+      } as unknown as AmapPlaceResult);
+      this.city.set(prefill.city?.trim() ? prefill.city.trim() : '');
+      // 缺省到达时间=现在；离开留空（进行中）
+      this.arrivedAt.set(prefill.arrivedAt ?? toDatetimeLocal(new Date()));
+    }
+  }
 
   ngAfterViewInit(): void {
     void this.initializeMap();

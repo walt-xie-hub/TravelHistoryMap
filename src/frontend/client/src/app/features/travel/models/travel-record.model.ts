@@ -50,6 +50,16 @@ export interface CreateTravelRequest {
   city?: string | null;
 }
 
+/** “再来一次”预填数据：由触发方经 router state 传给新建页（复用既有地点的名称/坐标/城市） */
+export interface TravelCreatePrefill {
+  locationName: string;
+  longitude: number;
+  latitude: number;
+  city?: string | null;
+  /** 到达时间（可选；缺省=当前时刻） */
+  arrivedAt?: string;
+}
+
 /** 分页结果，字段与后端 PagedResult<T> 序列化一致（camelCase） */
 export interface TravelPagedResult<T> {
   items: T[];

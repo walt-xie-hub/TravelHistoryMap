@@ -4,30 +4,55 @@
   } @else {
     <div class="map-timeline__scroll">
       <div class="map-timeline__track">
-        @for (run of runs(); track run.key) {
+        @for (run of runs(); track run.key; let i = $index) {
           <div class="tl-col"
             (mouseenter)="onHover(run.key)"
-            (mouseleave)="onHover(null)">
+            (mouseleave)="onHover(null)"
+            (click)="onColTap($event, run.key)">
 
-            <span class="tl-col__label" [title]="run.label">{{ labelOf(run) }}</span>
-
-            @if (hovered() === run.key) {
-              <div class="tl-menu" (click)="$event.stopPropagation()">
-                <button type="button" class="tl-menu__btn" (click)="openDetail(run)">详情</button>
-                @if (run.records.length > 1) {
-                  <button type="button" class="tl-menu__btn" (click)="toggleExpanded(run.key)">
-                    {{ isExpanded(run.key) ? '收起' : '展开' }}
-                  </button>
+            <!-- 上半格：奇数节点(第1/3/5…)放缩略图；偶数节点放城市名 -->
+            <div class="tl-cell tl-cell--top">
+              @if (i % 2 === 0) {
+                @if (thumbOf(run); as url) {
+                  <img class="tl-col__thumb" [src]="url" alt="" />
                 }
-                <button type="button" class="tl-menu__btn tl-menu__btn--danger" (click)="removeRun(run)">删除</button>
-              </div>
-            }
+              } @else {
+                <span class="tl-col__label" [title]="run.label">{{ labelOf(run) }}</span>
+              }
+            </div>
 
-            <span class="tl-col__dot"></span>
+            <span class="tl-dot" [class.tl-dot--active]="menuOpen(run.key)">
+              <button type="button" class="tl-dot__core"
+                [attr.aria-label]="'在地图上定位 ' + run.label"
+                [title]="'在地图上定位：' + run.label"
+                (click)="onDotPress($event, run)"></button>
 
-            @if (thumbOf(run); as url) {
-              <img class="tl-col__thumb" [src]="url" alt="" />
-            }
+              @if (menuOpen(run.key)) {
+                <div class="tl-actions" (click)="$event.stopPropagation()">
+                  <button type="button" class="tl-actions__btn"
+                    (click)="openDetail(run)">详情</button>
+                  @if (run.records.length > 1) {
+                    <button type="button" class="tl-actions__btn"
+                      (click)="toggleExpanded(run.key)">
+                      {{ isExpanded(run.key) ? '收起' : '展开' }}
+                    </button>
+                  }
+                  <button type="button" class="tl-actions__btn tl-actions__btn--delete"
+                    (click)="removeRun(run)">删除</button>
+                </div>
+              }
+            </span>
+
+            <!-- 下半格：奇数节点放城市名；偶数节点放缩略图(若有) -->
+            <div class="tl-cell tl-cell--bottom">
+              @if (i % 2 === 0) {
+                <span class="tl-col__label" [title]="run.label">{{ labelOf(run) }}</span>
+              } @else {
+                @if (thumbOf(run); as url) {
+                  <img class="tl-col__thumb" [src]="url" alt="" />
+                }
+              }
+            </div>
 
             @if (run.records.length > 1 && isExpanded(run.key)) {
               <div class="tl-branch">

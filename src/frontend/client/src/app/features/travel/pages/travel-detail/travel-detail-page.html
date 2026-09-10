@@ -16,6 +16,10 @@
         <p class="detail-time">{{ item.arrivedAt | date:'yyyy-MM-dd HH:mm' }} → {{ item.departedAt ? (item.departedAt | date:'yyyy-MM-dd HH:mm') : '进行中' }}</p>
         @if (!editing()) {
           <div class="detail-actions">
+            <button type="button" class="action-quick" (click)="recordAgain(item)">再来一次</button>
+            @if (!item.departedAt) {
+              <button type="button" class="action-finish" (click)="finishNow()">结束停留</button>
+            }
             <button type="button" class="share-toggle" (click)="shareOpen.set(true)">分享</button>
             <button type="button" class="edit-toggle" (click)="startEdit()">编辑详情</button>
           </div>
@@ -49,6 +53,16 @@
           <app-rich-text-editor [value]="editDescription()" (valueChange)="editDescription.set($event)"
             [placeholder]="'补充这段停留的文字描述（可选），支持加粗、标题、列表等排版'" />
         </div>
+        @if (!item.departedAt) {
+          <div class="edit-field">
+            <div class="edit-field__head">
+              <strong>离开时间（补记结束）</strong>
+            </div>
+            <input class="edit-field__datetime" type="datetime-local" [value]="editDepartAt()"
+              (input)="editDepartAt.set($any($event.target).value)" />
+            <p class="edit-field__hint">本次停留仍在进行中：填写离开时间即结束这段停留（默认已填当前时间，可改；留空则保持进行中）。</p>
+          </div>
+        }
       } @else if (item.description && isRichDescription(item.description)) {
         <div class="rich-text-view" [innerHTML]="safeHtml(item.description)"></div>
       } @else if (item.description) {

@@ -34,8 +34,11 @@ import { TravelMarkerGroup, fmtDateTime, groupRecords } from '../../utils/travel
 const DEFAULT_CENTER = [104.1954, 35.8617] as const; // 中国全国视野
 const DEFAULT_ZOOM = 5;
 const FOCUS_ZOOM = 10;
+/** 时光轴点击节点定位的更高保底 zoom：定位到“具体地点”而非停留在城市视野（ADR-0015）。 */
+const TIMELINE_FOCUS_ZOOM = 12;
 const FIT_PADDING: number[] = [70, 70, 70, 70];
-const PAGE_SIZE = 20;
+/** 停留记录分页大小（每页 10 条）；地图标注与时光轴跟随“当前页”数据（ADR-0004）。 */
+const PAGE_SIZE = 10;
 
 type MapState = 'idle' | 'ready' | 'missing-key' | 'error';
 
@@ -410,17 +413,48 @@ export class MapPage implements AfterViewInit, OnDestroy {
       void this.router.navigate(['/travels', group.records[0]!.id]);
     });
     root.appendChild(detail);
+
+    // “再来一次”：预填该点（名称/坐标/城市）跳新建页
+    const first = group.records[0]!;
+    const again = document.createElement('button');
+    again.type = 'button';
+    again.className = 'tm-info__detail';
+    again.textContent = '＋ 再来一次到访';
+    again.addEventListener('click', () => {
+      this.infoWindow?.close();
+      void this.router.navigate(['/travels/new'], {
+        state: {
+          prefill: {
+            locationName: first.locationName,
+            longitude: first.longitude,
+            latitude: first.latitude,
+            city: first.city ?? null,
+          },
+        },
+      });
+    });
+    root.appendChild(again);
     return root;
   }
 
+  /** 侧栏/搜索选中记录：居中到其 marker 并弹信息窗（保底 FOCUS_ZOOM）。 */
   onRecordSelect(recordId: number): void {
+    this.focusOnMap(recordId, FOCUS_ZOOM);
+  }
+
+  /** 时光轴点击节点（focus 输出）：定位 run 最新一条所在 marker，用更高保底 zoom（ADR-0015）。 */
+  onTimelineFocus(recordId: number): void {
+    this.focusOnMap(recordId, TIMELINE_FOCUS_ZOOM);
+  }
+
+  private focusOnMap(recordId: number, minZoom: number): void {
     this.selectedRecordId.set(recordId);
     const group = this.groupByRecord.get(recordId);
     const position = group ? this.markerPositionByGroupKey.get(group.key) : undefined;
     const map = this.map;
     if (!map || !position) return;
     map.setCenter([...position]);
-    if (map.getZoom() < FOCUS_ZOOM) map.setZoom(FOCUS_ZOOM);
+    if (map.getZoom() < minZoom) map.setZoom(minZoom);
     this.openInfo(group!, position);
   }
 

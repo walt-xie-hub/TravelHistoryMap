@@ -20,19 +20,28 @@
     display: flex;
     gap: 20px;
     min-width: max-content;
-    padding: 30px 6px 10px;
+    padding: 10px 6px 12px;
 
-    // 时间轴基线（穿过各列圆点）
+    // 时间轴基线（穿过各列圆点：top 格 56 + 圆点半径 7 = 63，加 padding-top 10）
     &::before {
       content: '';
       position: absolute;
-      top: 60px;
+      top: 73px;
       left: 0;
       right: 0;
       height: 2px;
       background: var(--border-color);
     }
   }
+}
+
+/* 节点上下等高格子：围绕圆点对称，保证所有圆点落在同一基线上 */
+.tl-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 116px;
+  height: 56px;
 }
 
 .tl-col {
@@ -60,61 +69,94 @@
     color: var(--text-strong);
   }
 
-  &__dot {
-    position: relative;
-    z-index: 1;
-    width: 14px;
-    height: 14px;
-    margin-top: 6px;
-    border-radius: 50%;
-    border: 3px solid var(--surface);
-    background: var(--primary);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 40%, transparent);
-  }
-
   &__thumb {
-    margin-top: 8px;
     width: 52px;
     height: 52px;
     border-radius: 8px;
     object-fit: cover;
     background: var(--surface-hover);
     border: 1px solid var(--border-color);
+    box-shadow: 0 1px 3px rgb(0 0 0 / 10%);
   }
 }
 
-.tl-menu {
+/* —— 节点圆点：激活(悬停/触屏点击)时轻微放大+主题描边，上方浮出“节点操作条”（ADR-0015）—— */
+.tl-dot {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+
+  &--active {
+    z-index: 6;
+  }
+
+  // 圆点本体 = 定位按钮：点击把 run 最新一条定位到地图
+  &__core {
+    display: block;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 3px solid var(--surface);
+    border-radius: 50%;
+    background: var(--primary);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 40%, transparent);
+    cursor: pointer;
+    transition: transform 150ms ease, box-shadow 150ms ease;
+
+    &:hover,
+    .tl-dot--active & {
+      transform: scale(1.45);
+      box-shadow:
+        0 0 0 3px color-mix(in srgb, var(--primary) 55%, transparent),
+        0 3px 10px color-mix(in srgb, var(--primary) 40%, transparent);
+    }
+  }
+}
+
+/* 节点操作条：一体式圆角条，浮在圆点上方（详情｜展开/收起｜删除） */
+.tl-actions {
   position: absolute;
-  z-index: 6;
-  top: -14px;
   left: 50%;
+  bottom: calc(100% + 8px);
   transform: translateX(-50%);
+  z-index: 8;
   display: flex;
-  gap: 4px;
-  padding: 4px;
-  background: var(--surface);
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
   border: 1px solid var(--border-color);
-  border-radius: 10px;
-  box-shadow: var(--shadow-md);
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 14%);
+  white-space: nowrap;
 
   &__btn {
-    padding: 4px 10px;
     border: 0;
-    border-radius: 6px;
-    background: var(--surface-hover);
-    color: var(--text);
+    border-radius: 999px;
+    padding: 5px 12px;
+    background: transparent;
+    color: var(--text-strong);
     font-size: 12px;
     font-weight: 600;
-    white-space: nowrap;
+    line-height: 1;
     cursor: pointer;
+    transition: background 120ms ease, color 120ms ease;
 
     &:hover {
-      background: var(--primary);
-      color: #fff;
+      background: var(--primary-soft);
+      color: var(--text-strong);
     }
 
-    &--danger:hover {
-      background: var(--danger);
+    &--delete {
+      color: var(--danger);
+
+      &:hover {
+        background: var(--danger);
+        color: #fff;
+      }
     }
   }
 }

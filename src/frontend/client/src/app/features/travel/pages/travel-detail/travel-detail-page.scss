@@ -14,6 +14,48 @@
 .edit-toggle { padding: 8px 14px; border: 0; border-radius: 8px; background: var(--primary); color: #fff; font-weight: 700; cursor: pointer; }
 .edit-toggle:hover { opacity: .9; }
 
+.action-quick {
+  padding: 8px 14px;
+  border: 1px solid color-mix(in srgb, var(--primary) 45%, transparent);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--primary);
+  font-weight: 700;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--primary-soft);
+  }
+}
+
+.action-finish {
+  padding: 8px 14px;
+  border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--danger);
+  font-weight: 700;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--danger-soft, #fee9e7);
+  }
+}
+
+.edit-field__datetime {
+  padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+
+.edit-field__hint {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
 .edit-field { display: grid; gap: 7px; margin-top: 16px; color: var(--text-strong); }
 .edit-field__head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-weight: 600; }
 .edit-field__count { font-weight: 400; font-size: 13px; color: var(--text-muted); }

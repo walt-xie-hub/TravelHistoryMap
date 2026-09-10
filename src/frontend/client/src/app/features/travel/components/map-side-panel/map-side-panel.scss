@@ -203,30 +203,6 @@
 }
 
 .record-list {
-
-  .pagination {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    padding-top: 10px;
-    color: var(--text-muted, #6b7280);
-    font-size: 12px;
-  }
-
-  .pagination__button {
-    padding: 5px 9px;
-    border: 1px solid var(--border-color, #d1d5db);
-    border-radius: 6px;
-    background: var(--surface, #ffffff);
-    color: var(--text, #111827);
-    cursor: pointer;
-
-    &:disabled {
-      opacity: 0.45;
-      cursor: not-allowed;
-    }
-  }
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -234,6 +210,54 @@
   flex-direction: column;
   gap: 6px;
   padding-right: 2px;
+}
+
+/* 分页：nav.pagination 是 .record-list 的兄弟节点（位于列表区底部），样式独立于列表 */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-color, #e5e7eb);
+
+  &__button {
+    padding: 5px 14px;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--primary, #2563eb) 38%, transparent);
+    background: var(--surface, #ffffff);
+    color: var(--primary, #2563eb);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.5;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+
+    &:hover:not(:disabled) {
+      background: var(--primary-soft, #eff6ff);
+      border-color: var(--primary, #2563eb);
+    }
+
+    &:disabled {
+      border-color: var(--border-color, #d1d5db);
+      background: var(--surface, #ffffff);
+      color: var(--text-muted, #9ca3af);
+      cursor: default;
+      opacity: 0.75;
+    }
+  }
+
+  &__info {
+    flex: none;
+    padding: 3px 12px;
+    border-radius: 999px;
+    background: var(--primary-soft, #eff6ff);
+    color: var(--primary, #2563eb);
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
 }
 
 .record-row {
@@ -311,6 +335,49 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* 行内快捷操作：右对齐按钮组（结束停留/再来一次 + 详情 + 删除） */
+.record-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  flex: none;
+
+  .record-detail,
+  .record-delete {
+    margin-left: 0;
+  }
+}
+
+.record-again,
+.record-finish {
+  padding: 3px 7px;
+  border-radius: 6px;
+  background: var(--surface, #ffffff);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.record-again {
+  border: 1px solid color-mix(in srgb, var(--primary, #2563eb) 45%, transparent);
+  color: var(--primary, #2563eb);
+
+  &:hover {
+    background: var(--primary-soft, #eff6ff);
+  }
+}
+
+.record-finish {
+  border: 1px solid color-mix(in srgb, var(--danger, #dc2626) 45%, transparent);
+  color: var(--danger, #dc2626);
+
+  &:hover {
+    background: var(--danger-soft, #fee9e7);
+  }
 }
 
 .list-empty {

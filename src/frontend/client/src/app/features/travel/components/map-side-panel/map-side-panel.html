@@ -100,24 +100,35 @@
               @if (!row.record.departedAt) {
                 <span class="badge badge--ongoing">进行中</span>
               }
-              <button
-                type="button"
-                class="record-detail"
-                title="查看停留详情"
-                aria-label="查看停留详情"
-                (click)="onRecordDetail($event, row.record.id)"
-              >
-                详情
-              </button>
-              <button
-                type="button"
-                class="record-delete"
-                title="删除停留记录"
-                aria-label="删除停留记录"
-                (click)="onRecordDelete($event, row.record.id)"
-              >
-                删除
-              </button>
+              <span class="record-actions">
+                @if (!row.record.departedAt) {
+                  <button type="button" class="record-finish" title="结束停留（补记离开时间）"
+                    aria-label="结束停留"
+                    (click)="onRecordFinish($event, row.record)">结束</button>
+                } @else {
+                  <button type="button" class="record-again" title="再来一次（预填该地点新建）"
+                    aria-label="再来一次"
+                    (click)="onRecordAgain($event, row.record)">再来</button>
+                }
+                <button
+                  type="button"
+                  class="record-detail"
+                  title="查看停留详情"
+                  aria-label="查看停留详情"
+                  (click)="onRecordDetail($event, row.record.id)"
+                >
+                  详情
+                </button>
+                <button
+                  type="button"
+                  class="record-delete"
+                  title="删除停留记录"
+                  aria-label="删除停留记录"
+                  (click)="onRecordDelete($event, row.record.id)"
+                >
+                  删除
+                </button>
+              </span>
             </span>
             <span class="record-sub">{{ row.rangeLabel }}</span>
             <span class="record-sub record-sub--duration">停留 {{ row.durationLabel }}</span>
@@ -129,7 +140,7 @@
           <button type="button" class="pagination__button" [disabled]="page() <= 1" (click)="onPageChange(page() - 1)">
             上一页
           </button>
-          <span>第 {{ page() }} / {{ totalPages() }} 页</span>
+          <span class="pagination__info">第 {{ page() }} / {{ totalPages() }} 页</span>
           <button type="button" class="pagination__button" [disabled]="page() >= totalPages()" (click)="onPageChange(page() + 1)">
             下一页
           </button>

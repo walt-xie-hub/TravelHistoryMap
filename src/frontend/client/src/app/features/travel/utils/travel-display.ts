@@ -13,6 +13,11 @@ export function fmtDate(iso: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+/** Date → datetime-local 输入框所需的本地 “yyyy-MM-ddTHH:mm” 值（快捷“再来一次/结束停留”默认值用） */
+export function toDatetimeLocal(d: Date): string {
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 /** UTC ISO → 本地友好日期时间：同年省略年份，如 “9月6日 16:00”，跨年带年份 */
 export function fmtDateTime(iso: string): string {
   const d = new Date(iso);

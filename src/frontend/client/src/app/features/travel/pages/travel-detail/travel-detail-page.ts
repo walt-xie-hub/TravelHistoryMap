@@ -4,6 +4,7 @@ import { ChangeDetectionStrategy, Component, HostListener, OnDestroy, OnInit, co
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { TravelHistoryService } from '../../data-access/travel-history.service';
 import type { TravelImage, TravelRecord } from '../../models/travel-record.model';
+import { toDatetimeLocal } from '../../utils/travel-display';
 import { RichTextEditorComponent } from '../../components/rich-text-editor/rich-text-editor';
 import { TravelShareDialog } from '../../components/travel-share-dialog/travel-share-dialog';
 import { isRichHtml, sanitizeRichTextToTrusted, visibleTextLength } from '../../utils/rich-text.util';
@@ -39,10 +40,12 @@ export class TravelDetailPage implements OnInit, OnDestroy {
   protected readonly error = signal('');
   protected readonly favoriteBusy = signal(false);
 
-  // —— 编辑态：仅“正文 + 图片增删”可编辑；地点快照与到达/离开边界保持只读（见 ADR-0008/0009）——
+  // —— 编辑态：正文 + 图片增删可编辑；进行中记录可“补记离开时间”（地点/到达仍只读，ADR-0008/09）——
   protected readonly editing = signal(false);
   protected readonly shareOpen = signal(false);
   protected readonly editDescription = signal('');
+  /** 进行中收尾：补记的离开时间（datetime-local 值；空=保持进行中） */
+  protected readonly editDepartAt = signal('');
   protected readonly descriptionCount = computed(() => visibleTextLength(this.editDescription()));
   /** 已选但尚未上传（点“保存”才逐张上传）的图片 */
   protected readonly pendingFiles = signal<File[]>([]);
@@ -65,6 +68,11 @@ export class TravelDetailPage implements OnInit, OnDestroy {
         displayImages.push({ ...image, thumbnailSrc: await this.toObjectUrl(image.thumbnailUrl) });
       }
       this.images.set(displayImages);
+      // “结束停留”深链（侧栏入口 ?finish=1）：进入编辑并预填离开时间=现在
+      if (!record.departedAt && this.route.snapshot.queryParamMap.get('finish') === '1') {
+        this.startEdit();
+        this.editDepartAt.set(toDatetimeLocal(new Date()));
+      }
     } catch {
       this.error.set('加载旅游详情失败，请稍后重试。');
     } finally {
@@ -82,6 +90,7 @@ export class TravelDetailPage implements OnInit, OnDestroy {
     const item = this.record();
     if (!item || this.saving()) return;
     this.editDescription.set(item.description ?? '');
+    this.editDepartAt.set('');
     this.pendingFiles.set([]);
     this.error.set('');
     this.editing.set(true);
@@ -92,13 +101,35 @@ export class TravelDetailPage implements OnInit, OnDestroy {
     this.editing.set(false);
     this.pendingFiles.set([]);
     this.editDescription.set('');
+    this.editDepartAt.set('');
     this.error.set('');
+  }
+
+  /** “再来一次”：预填本地点（名称/坐标/城市）跳到新建页，到达=现在、离开留空 */
+  protected recordAgain(item: TravelRecord): void {
+    void this.router.navigate(['/travels/new'], {
+      state: {
+        prefill: {
+          locationName: item.locationName,
+          longitude: item.longitude,
+          latitude: item.latitude,
+          city: item.city ?? null,
+        },
+      },
+    });
+  }
+
+  /** 结束停留：进入编辑并把离开时间预填为现在（可在编辑面板修改后保存） */
+  protected finishNow(): void {
+    this.startEdit();
+    this.editDepartAt.set(toDatetimeLocal(new Date()));
   }
 
   protected hasUnsavedChanges(): boolean {
     if (!this.editing() || !this.record()) return false;
     if (this.pendingFiles().length > 0) return true;
     const item = this.record()!;
+    if (item.departedAt === null && this.editDepartAt() !== '') return true; // 进行中收尾：填了离开时间
     return this.normalizedDescription() !== (item.description ?? null);
   }
 
@@ -214,7 +245,22 @@ export class TravelDetailPage implements OnInit, OnDestroy {
       this.error.set('文字描述最多 4000 字。');
       return;
     }
-    if (description === (item.description ?? null) && this.pendingFiles().length === 0) {
+
+    // 进行中收尾：解析补记的离开时间（默认已在编辑前预填为现在）
+    const leaveInput = this.editDepartAt().trim();
+    const departChanged = item.departedAt === null && leaveInput !== '';
+    let departValue: string | null = item.departedAt;
+    if (departChanged) {
+      const leave = new Date(leaveInput);
+      const arrived = new Date(item.arrivedAt);
+      if (Number.isNaN(leave.getTime()) || leave < arrived) {
+        this.error.set('离开时间不能早于到达时间。');
+        return;
+      }
+      departValue = leave.toISOString();
+    }
+
+    if (description === (item.description ?? null) && !departChanged && this.pendingFiles().length === 0) {
       this.cancelEdit();
       return;
     }
@@ -222,13 +268,13 @@ export class TravelDetailPage implements OnInit, OnDestroy {
     this.saving.set(true);
     this.error.set('');
     try {
-      // 1) 正文：PUT 为全量替换，地点快照与时间沿用已加载的只读值（富文本入库由后端消毒/校验）
+      // 1) PUT 全量替换（富文本入库由后端消毒/校验）；进行中收尾时写回补记的离开时间
       const updated = await this.travel.update(item.id, {
         locationName: item.locationName,
         latitude: item.latitude,
         longitude: item.longitude,
         arrivedAt: item.arrivedAt,
-        departedAt: item.departedAt,
+        departedAt: departValue,
         description,
         // ADR-0014：PUT 全量替换，须回传标签/收藏，否则会被清空；城市同（ADR-0015）
         tags: item.tags ?? [],
@@ -237,6 +283,7 @@ export class TravelDetailPage implements OnInit, OnDestroy {
       });
       this.record.set(updated);
       this.editDescription.set(updated.description ?? '');
+      this.editDepartAt.set('');
 
       // 2) 新增图片：逐张上传；成功的即时入列，失败的保留在待上传清单以便重试
       const failed: string[] = [];

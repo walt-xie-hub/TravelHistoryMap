@@ -1,5 +1,5 @@
-import { ChangeDetectionStrategy, Component, computed, effect, input, output, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal } from '@angular/core';
+import { Router, RouterLink } from '@angular/router';
 import { LoadingSpinner } from '@shared/components/loading-spinner/loading-spinner';
 import type {
   TravelRangeKind,
@@ -38,6 +38,8 @@ function localDayToIso(dateText: string, atEndOfDay: boolean): string {
   styleUrl: './map-side-panel.scss',
 })
 export class MapSidePanel {
+  private readonly router = inject(Router);
+
   readonly records = input<TravelRecord[]>([]);
   readonly travelLoading = input(false);
   readonly selectedRecordId = input<number | null>(null);
@@ -123,6 +125,27 @@ export class MapSidePanel {
   onRecordDetail(event: Event, id: number): void {
     event.stopPropagation();
     this.recordDetail.emit(id);
+  }
+
+  /** “再来一次”：预填本地点（名称/坐标/城市）跳新建页，到达=现在、离开留空 */
+  onRecordAgain(event: Event, record: TravelRecord): void {
+    event.stopPropagation();
+    void this.router.navigate(['/travels/new'], {
+      state: {
+        prefill: {
+          locationName: record.locationName,
+          longitude: record.longitude,
+          latitude: record.latitude,
+          city: record.city ?? null,
+        },
+      },
+    });
+  }
+
+  /** 结束停留（进行中）：跳到详情页并进入“补记离开时间”编辑 */
+  onRecordFinish(event: Event, record: TravelRecord): void {
+    event.stopPropagation();
+    void this.router.navigate(['/travels', record.id], { queryParams: { finish: '1' } });
   }
 
   onPageChange(page: number): void {
