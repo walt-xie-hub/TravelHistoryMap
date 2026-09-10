@@ -271,7 +271,9 @@ export class MapPage implements AfterViewInit, OnDestroy {
         content.appendChild(star);
       }
 
-      if (count > 1) {
+      // 计数徽标：仅「地点标记」（同一坐标多次停留）用；
+      // 城市标记不再显示次数——同城多㳊时标记只表示"这个城市去过"，次数在信息窗里表达（ADR-0017）
+      if (group.kind === 'place' && count > 1) {
         const countBadge = document.createElement('span');
         countBadge.className = 'tm-marker__count';
         countBadge.textContent = String(count);
