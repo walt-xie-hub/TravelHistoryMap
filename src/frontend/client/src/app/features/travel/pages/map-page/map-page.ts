@@ -29,8 +29,8 @@ import { AmapLoaderService } from '../../data-access/amap-loader.service';
 import { TravelHistoryService } from '../../data-access/travel-history.service';
 import type { TravelRangeRequest, TravelRecord } from '../../models/travel-record.model';
 import { wgs84ToGcj02 } from '../../utils/coord';
-import { TravelMarkerGroup, fmtDateTime, groupRecords } from '../../utils/travel-display';
-import { sharedTravelIcon, travelIconMarkup } from '../../utils/travel-icon.util';
+import { MapMarkerGroup, fmtDateTime, groupMapMarkers } from '../../utils/travel-display';
+import { regionalIconKey, sharedTravelIcon, travelIcon, travelIconMarkup } from '../../utils/travel-icon.util';
 
 const DEFAULT_CENTER = [104.1954, 35.8617] as const; // 中国全国视野
 const DEFAULT_ZOOM = 5;
@@ -86,8 +86,9 @@ export class MapPage implements AfterViewInit, OnDestroy {
   private infoWindow: AmapInfoWindow | null = null;
   private markers: AmapMarker[] = [];
   private searchMarker: AmapMarker | null = null;
-  private markerPositionByGroupKey = new Map<string, [number, number]>();
-  private groupByRecord = new Map<number, TravelMarkerGroup>();
+  /** “定位到某次停留”的高亮光圈（ADR-0017） */
+  private focusMarker: AmapMarker | null = null;
+  private groupByRecord = new Map<number, MapMarkerGroup>();
   private range: TravelRangeRequest = { kind: 'all' };
   private loadedKey = '';
   private fetchSeq = 0;
@@ -203,6 +204,8 @@ export class MapPage implements AfterViewInit, OnDestroy {
 
   // ---------- 标注渲染（同坐标合并，见 ADR-0004） ----------
 
+  // ---------- 标注渲染（城市优先，无 City 回退坐标合并：ADR-0017 / ADR-0004） ----------
+
   private renderMarkers(): void {
     const map = this.map;
     const amap = this.amap;
@@ -210,38 +213,34 @@ export class MapPage implements AfterViewInit, OnDestroy {
 
     for (const marker of this.markers) map.remove(marker);
     this.markers = [];
-    this.markerPositionByGroupKey.clear();
+    this.clearFocusRing();
     this.groupByRecord.clear();
     this.infoWindow?.close();
 
-    for (const group of groupRecords(this.records())) {
+    for (const group of groupMapMarkers(this.records())) {
       for (const record of group.records) this.groupByRecord.set(record.id, group);
 
-      const [gcjLng, gcjLat] = wgs84ToGcj02(group.lng, group.lat);
-      const position: [number, number] = [gcjLng, gcjLat];
+      const position = this.positionOf(group);
       const count = group.records.length;
       const ongoing = group.records.some((r) => r.departedAt === null);
-      const markerKind = count > 1 ? 'merged' : ongoing ? 'ongoing' : 'ordinary';
+      const favorite = group.records.some((r) => r.isFavorite);
+      const label = group.kind === 'city' ? group.city! : group.records[0]!.locationName;
 
       const content = document.createElement('div');
-      content.className = [
-        'tm-marker',
-        `tm-marker--${markerKind}`,
-      ]
-        .filter(Boolean)
-        .join(' ');
+      content.className = `tm-marker tm-marker--${ongoing ? 'ongoing' : 'ordinary'}`;
       content.setAttribute(
         'aria-label',
-        count > 1 ? `多次到访，共 ${count} 次` : ongoing ? '进行中' : '普通停留',
+        `${label}：${count} 次停留${ongoing ? '（含进行中）' : ''}${favorite ? '（含精选收藏）' : ''}`,
       );
 
-      // ADR-0016：组内解析图标一致 → 用该图标作为标记；否则回退聚合标记（熊猫）+ 计数
-      const sharedIcon = sharedTravelIcon(group.records);
-      if (sharedIcon) {
+      // ADR-0017：城市标记优先用该城的地区特色图标（城市一致 ⇒ 派生一致）；
+      // 未收录城市回退「组内解析一致的图标」（ADR-0016），再不行用默认标记（熊猫）+ 计数
+      const icon = this.iconForGroup(group);
+      if (icon) {
         content.classList.add('tm-marker--icon');
         const iconHolder = document.createElement('span');
         iconHolder.className = 'tm-marker__icon';
-        iconHolder.innerHTML = travelIconMarkup(sharedIcon, 42);
+        iconHolder.innerHTML = travelIconMarkup(icon, 42);
         content.appendChild(iconHolder);
       } else {
         const earLeft = document.createElement('span');
@@ -260,6 +259,14 @@ export class MapPage implements AfterViewInit, OnDestroy {
         content.append(earLeft, earRight, face);
       }
 
+      if (favorite) {
+        const star = document.createElement('span');
+        star.className = 'tm-marker__star';
+        star.textContent = '★';
+        star.setAttribute('aria-hidden', 'true');
+        content.appendChild(star);
+      }
+
       if (count > 1) {
         const countBadge = document.createElement('span');
         countBadge.className = 'tm-marker__count';
@@ -271,15 +278,37 @@ export class MapPage implements AfterViewInit, OnDestroy {
         position,
         content,
         offset: new amap.Pixel(0, 0),
-        zIndex: ongoing ? 1000 : 500,
-        title: group.records[0]!.locationName,
+        // ADR-0017：城市标记压在「地点标记」之上——质心可能与该城某次停留（或无 City 的旧记录）重合，
+        // 聚合口径优先可点；进行中的标记再抬一档
+        zIndex: (group.kind === 'city' ? 1200 : 600) + (ongoing ? 200 : 0),
+        title: label,
       });
-      marker.on('click', () => this.openInfo(group, position));
+      marker.on('click', () => this.openInfo(group));
       map.add(marker);
 
       this.markers.push(marker);
-      this.markerPositionByGroupKey.set(group.key, position);
     }
+  }
+
+  /** 城市标记优先地区特色图标；地点标记用组内一致图标（ADR-0016 / 0017） */
+  private iconForGroup(group: MapMarkerGroup) {
+    if (group.kind === 'city') {
+      const regional = travelIcon(regionalIconKey(group.city));
+      if (regional) return regional;
+    }
+    return sharedTravelIcon(group.records);
+  }
+
+  /** 组锚点（WGS-84 → GCJ-02） */
+  private positionOf(group: MapMarkerGroup): [number, number] {
+    const [lng, lat] = wgs84ToGcj02(group.lng, group.lat);
+    return [lng, lat];
+  }
+
+  /** 单条记录的坐标（WGS-84 → GCJ-02）：定位到具体一次停留时用 */
+  private positionOfRecord(record: TravelRecord): [number, number] {
+    const [lng, lat] = wgs84ToGcj02(record.longitude, record.latitude);
+    return [lng, lat];
   }
 
   async searchPlace(): Promise<void> {
@@ -365,27 +394,55 @@ export class MapPage implements AfterViewInit, OnDestroy {
 
   // ---------- 气泡与联动 ----------
 
-  private openInfo(group: TravelMarkerGroup, position: readonly [number, number]): void {
+  private openInfo(group: MapMarkerGroup, anchor?: readonly [number, number]): void {
     if (!this.infoWindow) return;
     this.infoWindow.setContent(this.buildInfoContent(group));
-    this.infoWindow.open(this.map!, [...position]);
+    this.infoWindow.open(this.map!, [...(anchor ?? this.positionOf(group))]);
   }
 
-  private buildInfoContent(group: TravelMarkerGroup): HTMLElement {
+  /** “定位到某次停留”的高亮光圈（ADR-0017）：城市标记只能标到质心，具体记录用光圈指出 */
+  private showFocusRing(position: readonly [number, number]): void {
+    const amap = this.amap;
+    const map = this.map;
+    if (!amap || !map) return;
+    this.clearFocusRing();
+    const content = document.createElement('span');
+    content.className = 'tm-focus-ring';
+    const marker = new amap.Marker({
+      position: [...position],
+      content,
+      offset: new amap.Pixel(0, 0),
+      zIndex: 2000,
+    });
+    map.add(marker);
+    this.focusMarker = marker;
+  }
+
+  private clearFocusRing(): void {
+    if (!this.focusMarker) return;
+    this.map?.remove(this.focusMarker);
+    this.focusMarker = null;
+  }
+
+  private buildInfoContent(group: MapMarkerGroup): HTMLElement {
     const root = document.createElement('div');
     root.className = 'tm-info';
 
+    const isCity = group.kind === 'city';
+    const primary = group.records[0]!;
     const head = document.createElement('div');
     head.className = 'tm-info__title';
-    const primary = group.records[0]!;
-    head.textContent = primary.isFavorite ? `★ ${primary.locationName}` : primary.locationName;
+    const title = isCity ? (group.city ?? primary.locationName) : primary.locationName;
+    head.textContent = primary.isFavorite ? `★ ${title}` : title;
     root.appendChild(head);
 
     const sub = document.createElement('p');
     sub.className = 'tm-info__sub';
     sub.textContent =
       group.records.length > 1
-        ? `${group.records.length} 次停留 · ${group.lat.toFixed(5)}, ${group.lng.toFixed(5)}（WGS-84）`
+        ? isCity
+          ? `${group.records.length} 次停留 · 该城市；标记在该城各次停留的中心`
+          : `${group.records.length} 次停留 · 同一地点`
         : `坐标 ${group.lat.toFixed(5)}, ${group.lng.toFixed(5)}（WGS-84）`;
     root.appendChild(sub);
 
@@ -395,6 +452,7 @@ export class MapPage implements AfterViewInit, OnDestroy {
       const row = document.createElement('button');
       row.type = 'button';
       row.className = 'tm-info__row';
+      row.title = '在地图上定位到这次停留';
 
       const line = document.createElement('span');
       line.className = 'tm-info__row-line';
@@ -403,6 +461,13 @@ export class MapPage implements AfterViewInit, OnDestroy {
         star.className = 'tm-info__star';
         star.textContent = '★ ';
         line.appendChild(star);
+      }
+      // 城市标记下同城地点不同，行内带上地点名
+      if (isCity) {
+        const place = document.createElement('span');
+        place.className = 'tm-info__row-place';
+        place.textContent = record.locationName;
+        line.appendChild(place);
       }
       const dates = document.createElement('span');
       dates.textContent = record.departedAt
@@ -416,10 +481,7 @@ export class MapPage implements AfterViewInit, OnDestroy {
         line.appendChild(badge);
       }
       row.appendChild(line);
-      row.addEventListener('click', () => {
-        this.selectedRecordId.set(record.id);
-        this.infoWindow?.close();
-      });
+      row.addEventListener('click', () => this.focusOnMap(record.id, FOCUS_ZOOM));
       list.appendChild(row);
     }
     root.appendChild(list);
@@ -470,12 +532,15 @@ export class MapPage implements AfterViewInit, OnDestroy {
   private focusOnMap(recordId: number, minZoom: number): void {
     this.selectedRecordId.set(recordId);
     const group = this.groupByRecord.get(recordId);
-    const position = group ? this.markerPositionByGroupKey.get(group.key) : undefined;
+    const record = this.records().find((item) => item.id === recordId);
     const map = this.map;
-    if (!map || !position) return;
+    if (!map || !group || !record) return;
+    // ADR-0017：城市标记只是一城一标，定位具体一次停留要落到该记录自己的坐标，并打高亮光圈
+    const position = this.positionOfRecord(record);
     map.setCenter([...position]);
     if (map.getZoom() < minZoom) map.setZoom(minZoom);
-    this.openInfo(group!, position);
+    this.showFocusRing(position);
+    this.openInfo(group, position);
   }
 
   async onRecordDelete(recordId: number): Promise<void> {

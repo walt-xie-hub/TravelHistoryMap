@@ -186,7 +186,25 @@
   background: #16a34a;
   box-shadow: 0 0 0 3px #dcfce7;
 }
-.legend-dot--merged {
-  background: #7c3aed;
-  box-shadow: 0 0 0 3px #ede9fe;
+/* 标记角标图例（收藏星标 / 停留次数） */
+.legend-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #f59e0b;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 800;
+  font-style: normal;
+}
+.legend-badge--count {
+  background: var(--primary);
+}
+.legend-item--hint {
+  color: var(--text-muted);
+  opacity: 0.85;
 }

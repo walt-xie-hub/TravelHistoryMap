@@ -215,13 +215,65 @@ body {
   padding: 0 4px;
   border: 2px solid #ffffff;
   border-radius: 999px;
-  background: #7c3aed;
+  background: var(--marker-color, #ea580c);
   color: #ffffff;
   font-size: 11px;
   font-weight: 800;
   line-height: 14px;
   text-align: center;
   box-shadow: 0 1px 3px rgb(15 23 42 / 0.3);
+}
+
+/* 组内含精选收藏（ADR-0017）：左上角星标 */
+.tm-marker__star {
+  position: absolute;
+  top: -7px;
+  left: -8px;
+  width: 18px;
+  height: 18px;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  background: #f59e0b;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 14px;
+  text-align: center;
+  box-shadow: 0 1px 3px rgb(15 23 42 / 0.3);
+}
+
+/* “定位到某次停留”的高亮光圈（ADR-0017） */
+.tm-focus-ring {
+  display: block;
+  position: relative;
+  width: 20px;
+  height: 20px;
+  transform: translate(-50%, -50%);
+  border: 2px solid var(--primary, #2563eb);
+  border-radius: 50%;
+  box-shadow: 0 0 0 5px rgb(37 99 235 / 0.15);
+  pointer-events: none;
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    border: 2px solid var(--primary, #2563eb);
+    animation: tm-focus-pulse 1.8s ease-out infinite;
+  }
+}
+
+@keyframes tm-focus-pulse {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.9;
+  }
+  70%,
+  100% {
+    transform: scale(1.35);
+    opacity: 0;
+  }
 }
 
 /* 进行中停留：脉冲光环 */

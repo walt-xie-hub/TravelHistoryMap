@@ -1,5 +1,6 @@
 /**
- * 旅行记录的展示辅助：本地时区格式化与分组（同地点多次停留按近似坐标合并，见 docs/adr/0004）。
+ * 旅行记录的展示辅助：本地时区格式化与地图标记分组
+ * （城市优先、无 City 回退近似坐标聚类，见 docs/adr/0017 与 0004）。
  */
 import type { TravelRecord } from '../models/travel-record.model';
 
@@ -55,33 +56,57 @@ export function fmtDuration(record: TravelRecord): string {
   return `${mins} 分钟`;
 }
 
-/** 同地点（近似坐标）合并分组；key 用 WGS-84 4 位小数（约 11 米）聚类 */
-export interface TravelMarkerGroup {
+/**
+ * 地图标记分组（ADR-0017）：
+ * - 有 City 快照的记录 → 按城市合成**城市标记**（一个城市只出一个标记）；
+ * - 无 City 的旧记录 → 保留原行为，按 WGS-84 4 位小数（≈11 米）合成**地点标记**（ADR-0004）。
+ */
+export type MapMarkerKind = 'city' | 'place';
+
+export interface MapMarkerGroup {
+  kind: MapMarkerKind;
+  /** 稳定标识：`city:上海` / `place:31.2304,121.4737` */
   key: string;
-  /** 组内记录，按 arrivedAt 倒序（入参已有序时保持） */
+  /** 城市标记的城市名（地点标记为 undefined） */
+  city?: string;
+  /** 组内记录（保持入参顺序；入参按到达时间倒序） */
   records: TravelRecord[];
-  /** WGS-84 坐标（渲染到高德前经 wgs84ToGcj02 转换） */
+  /** 标记锚点（WGS-84）：城市标记取该城所有记录的**质心**，地点标记取该坐标 */
   lng: number;
   lat: number;
 }
 
-export function groupRecords(records: readonly TravelRecord[]): TravelMarkerGroup[] {
-  const byKey = new Map<string, TravelRecord[]>();
+export function groupMapMarkers(records: readonly TravelRecord[]): MapMarkerGroup[] {
+  const byKey = new Map<string, { kind: MapMarkerKind; city?: string; bucket: TravelRecord[] }>();
   for (const record of records) {
-    const key = `${record.longitude.toFixed(4)},${record.latitude.toFixed(4)}`;
-    const bucket = byKey.get(key);
-    if (bucket) bucket.push(record);
-    else byKey.set(key, [record]);
+    const city = record.city?.trim();
+    const kind: MapMarkerKind = city ? 'city' : 'place';
+    const key = city
+      ? `city:${city}`
+      : `place:${record.longitude.toFixed(4)},${record.latitude.toFixed(4)}`;
+    const existing = byKey.get(key);
+    if (existing) existing.bucket.push(record);
+    else byKey.set(key, { kind, city: city || undefined, bucket: [record] });
   }
+
   return [...byKey.entries()]
-    .map(([key, bucket]) => {
-      const [lngText, latText] = key.split(',');
+    .map(([key, entry]) => {
+      const { kind, city } = entry;
+      // 组内按到达时间倒序（不依赖入参顺序）：信息窗「最新一条在前」，也决定该组的排序键
+      const bucket = [...entry.bucket].sort((a, b) => b.arrivedAt.localeCompare(a.arrivedAt));
+      if (kind === 'city') {
+        const lng = bucket.reduce((sum, r) => sum + r.longitude, 0) / bucket.length;
+        const lat = bucket.reduce((sum, r) => sum + r.latitude, 0) / bucket.length;
+        return { kind, key, city, records: bucket, lng, lat } satisfies MapMarkerGroup;
+      }
+      const [lngText, latText] = key.slice('place:'.length).split(',');
       return {
+        kind,
         key,
         records: bucket,
         lng: Number(lngText),
         lat: Number(latText),
-      } satisfies TravelMarkerGroup;
+      } satisfies MapMarkerGroup;
     })
     // 组间按组内最新到达倒序，保证标注/列表顺序稳定
     .sort((a, b) => b.records[0]!.arrivedAt.localeCompare(a.records[0]!.arrivedAt));
