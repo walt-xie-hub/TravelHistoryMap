@@ -60,15 +60,25 @@
           }
         </p>
 
-        <button
-          type="button"
-          class="btn btn-ghost map-toolbar__share"
-          title="分享侧栏当前页的足迹"
-          (click)="shareOpen.set(true)"
-          [disabled]="!hasRecords()"
-        >
-          分享足迹
-        </button>
+        <div class="map-toolbar__actions">
+          <button
+            type="button"
+            class="btn btn-ghost"
+            (click)="onFitAll()"
+            [disabled]="!hasMapMarkers()"
+          >
+            回到全览
+          </button>
+          <button
+            type="button"
+            class="btn btn-ghost"
+            title="分享侧栏当前页的足迹"
+            (click)="shareOpen.set(true)"
+            [disabled]="!hasRecords()"
+          >
+            分享足迹
+          </button>
+        </div>
       </div>
     }
 
@@ -138,9 +148,6 @@
             同一城市只显示一个图标，点击可查看并定位到该城的每次停留
           </span>
         </div>
-        <button type="button" class="btn btn-ghost map-fit-btn" (click)="onFitAll()">
-          回到全览
-        </button>
       }
   </section>
 </div>
