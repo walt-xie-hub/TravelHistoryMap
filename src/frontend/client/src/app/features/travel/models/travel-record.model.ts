@@ -75,6 +75,12 @@ export interface TravelPagedResult<T> {
   totalPages: number;
 }
 
+/** 带上限的全量拉取结果（ADR-0004「全部足迹」用）：truncated 表示服务端还有更多没取回 */
+export interface TravelListResult {
+  items: TravelRecord[];
+  truncated: boolean;
+}
+
 /** 侧栏时间范围筛选的语义化请求；from/to 为 UTC ISO 字符串（到达时间窗） */
 export type TravelRangeKind = 'all' | 'last30' | 'year' | 'custom';
 

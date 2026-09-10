@@ -33,6 +33,10 @@ import { iconForRecord, sharedTravelIcon, travelIconMarkup } from '../../utils/t
 
 const DEFAULT_CENTER = [104.1954, 35.8617] as const; // 中国全国视野
 const DEFAULT_ZOOM = 5;
+/** 「全部足迹」模式一次最多画多少个停留（防止将来数据量大时卡死地图，ADR-0004） */
+const ALL_RECORDS_LIMIT = 1000;
+/** 一次最多为多少条无 City 快照的记录做派生逆地理（配额保护，超出部分按地点标记渲染，ADR-0017） */
+const DERIVE_LIMIT = 300;
 const FOCUS_ZOOM = 10;
 /** 时光轴点击节点定位的更高保底 zoom：定位到“具体地点”而非停留在城市视野（ADR-0015）。 */
 const TIMELINE_FOCUS_ZOOM = 12;
@@ -41,6 +45,13 @@ const FIT_PADDING: number[] = [70, 70, 70, 70];
 const PAGE_SIZE = 10;
 
 type MapState = 'idle' | 'ready' | 'missing-key' | 'error';
+
+/**
+ * 地图数据范围（ADR-0004）：
+ * - `list`（跟随列表）：只画侧栏当前页的记录，与筛选/分页一致（原行为）；
+ * - `all`（全部足迹）：画该用户的全部停留，忽略时间筛选、★ 筛选与分页。
+ */
+type MapScope = 'list' | 'all';
 
 /**
  * 地图页：加载高德地图 JS API，展示【当前登录用户】的旅行足迹。
@@ -76,8 +87,31 @@ export class MapPage implements AfterViewInit, OnDestroy {
   readonly totalPages = signal(1);
   readonly totalCount = signal(0);
 
-  /** 进行中/过去 的标注计数徽标（legend 用） */
+  /** 侧栏列表（当前页）里是否有记录：分享/列表语义用它 */
   readonly hasRecords = computed(() => this.records().length > 0);
+
+  /** 地图数据范围（ADR-0004）：默认跟随列表，不记忆 */
+  readonly mapScope = signal<MapScope>('list');
+  readonly isAllScope = computed(() => this.mapScope() === 'all');
+  /** 「全部足迹」模式的记录（忽略筛选与分页，最多 ALL_RECORDS_LIMIT 条） */
+  readonly allRecords = signal<TravelRecord[]>([]);
+  readonly allLoading = signal(false);
+  /** 全量是否被上限截断（仅展示提示用） */
+  readonly allTruncated = signal(false);
+  /** 模板用：全量上限（提示文案里的数字） */
+  protected readonly allRecordsLimit = ALL_RECORDS_LIMIT;
+
+  /** 地图实际渲染的记录集：跟范围切换走 */
+  readonly mapSource = computed<readonly TravelRecord[]>(() =>
+    this.isAllScope() ? this.allRecords() : this.records(),
+  );
+
+  /** 当前地图上的标记分组（渲染、数量、签名共用一份计算） */
+  readonly markerGroups = computed(() => groupMapMarkers(this.mapSource(), this.derivedCities()));
+  /** 当前地图上的标记处数（工具条里给用户一个量） */
+  readonly markerCount = computed(() => this.markerGroups().length);
+  /** 地图上是否有标记：图例、「回到全览」、空态都用它（不能看列表，否则「全部足迹」下会被列表的空态盖住） */
+  readonly hasMapMarkers = computed(() => this.mapSource().length > 0);
 
   private amap: AmapNamespace | null = null;
   private map: AmapMap | null = null;
@@ -143,11 +177,10 @@ export class MapPage implements AfterViewInit, OnDestroy {
       closeWhenClickMap: false,
     });
     this.mapState.set('ready');
-    if (this.loadedKey !== this.currentKey()) void this.refreshRecords();
-    else {
-      this.renderMarkers();
-      this.fitView();
-    }
+    // 「全部足迹」模式可能在 SDK 就绪前就已经切过去（此时 renderMarkers 会直接 return），
+    // 所以这里不只看列表的 loadedKey，还要看当前范围
+    if (this.isAllScope() || this.loadedKey === this.currentKey()) this.renderAndFit();
+    else void this.refreshRecords();
   }
 
   // ---------- 数据拉取（归属=登录用户，服务端时间窗过滤） ----------
@@ -184,23 +217,73 @@ export class MapPage implements AfterViewInit, OnDestroy {
       this.totalPages.set(result.totalPages);
       this.totalCount.set(result.totalCount);
       this.loadedKey = key;
-      this.renderMarkers();
-      this.fitView();
+      // 「全部足迹」模式下列表的翻页/筛选不应扰动地图
+      if (!this.isAllScope()) this.renderAndFit();
     } catch {
       if (seq === this.fetchSeq) {
         this.records.set([]);
         this.totalPages.set(1);
         this.totalCount.set(0);
         this.travelError.set('加载旅行记录失败，请检查服务后重试。');
-        this.renderMarkers();
-        this.fitView();
+        if (!this.isAllScope()) this.renderAndFit();
       }
     } finally {
       if (seq === this.fetchSeq) this.travelLoading.set(false);
     }
   }
 
-  // ---------- 标注渲染（同坐标合并，见 ADR-0004） ----------
+  // ---------- 地图数据范围（ADR-0004：跟随列表 / 全部足迹） ----------
+
+  /** 增删后刷新：列表跟着筛选/分页刷新，「全部足迹」模式下地图数据也重拉（ADR-0004） */
+  private async refreshAfterMutation(): Promise<void> {
+    await this.refreshRecords();
+    if (!this.isAllScope()) return;
+    await this.loadAllRecords();
+    this.renderAndFit();
+  }
+
+  /**
+   * 切换「跟随列表 / 全部足迹」（ADR-0004）：重画标记 + 自动全览。
+   * 保留已选中的记录（侧栏仍高亮），但关掉气泡——标记重建后气泡锚点会失效。
+   * 切回「跟随列表」不需要任何数据，所以加载中也能立即切回（不把人锁在加载态）。
+   */
+  protected async setScope(scope: MapScope): Promise<void> {
+    if (this.mapScope() === scope) return;
+    if (scope === 'list') {
+      this.infoWindow?.close();
+      this.mapScope.set('list');
+      this.renderAndFit();
+      return;
+    }
+    if (this.allLoading()) return;
+    this.infoWindow?.close();
+    this.mapScope.set('all');
+    await this.loadAllRecords();
+    this.renderAndFit();
+  }
+
+  /** 拉取全部足迹（忽略筛选与分页，最多 ALL_RECORDS_LIMIT 条）；失败则回退到跟随列表，不把地图留空 */
+  private async loadAllRecords(): Promise<void> {
+    if (this.allLoading()) return;
+    this.allLoading.set(true);
+    try {
+      const { items, truncated } = await this.travelService.getAllUpTo(ALL_RECORDS_LIMIT);
+      this.allRecords.set(items);
+      this.allTruncated.set(truncated);
+    } catch {
+      this.allRecords.set([]);
+      this.allTruncated.set(false);
+      this.mapScope.set('list');
+      this.travelError.set('加载全部足迹失败，已切回跟随列表。');
+    } finally {
+      this.allLoading.set(false);
+    }
+  }
+
+  private renderAndFit(): void {
+    this.renderMarkers();
+    this.fitView();
+  }
 
   // ---------- 标注渲染（城市优先，无 City 回退坐标合并：ADR-0017 / ADR-0004） ----------
 
@@ -221,7 +304,8 @@ export class MapPage implements AfterViewInit, OnDestroy {
     // 无 City 快照的记录先按坐标派生城市（异步，不阻塞首帧），结果回来后再重渲染
     void this.requestDerivedCities();
 
-    for (const group of groupMapMarkers(this.records(), this.derivedCities())) {
+    const groups = this.markerGroups();
+    for (const group of groups) {
       for (const record of group.records) this.groupByRecord.set(record.id, group);
 
       const position = this.positionOf(group);
@@ -301,7 +385,10 @@ export class MapPage implements AfterViewInit, OnDestroy {
    * 先按快照渲染，派生结果到达后重渲染标记；同一批记录只发起一次。
    */
   private async requestDerivedCities(): Promise<void> {
-    const pending = this.records().filter((record) => !record.city?.trim());
+    // 规模保护：一次最多派生 DERIVE_LIMIT 个坐标，超出部分按地点标记渲染（不把逆地理配额打爆）
+    const pending = this.mapSource()
+      .filter((record) => !record.city?.trim())
+      .slice(0, DERIVE_LIMIT);
     if (pending.length === 0) {
       this.lastRequestedIds = '';
       return;
@@ -339,7 +426,7 @@ export class MapPage implements AfterViewInit, OnDestroy {
 
   /** 标记集合签名（kind + 城市名 + 组内 id）：相同则不需要重渲染 */
   private markerSignature(derivedCities: ReadonlyMap<number, string>): string {
-    return groupMapMarkers(this.records(), derivedCities)
+    return groupMapMarkers(this.mapSource(), derivedCities)
       .map((group) => `${group.key}[${group.records.map((r) => r.id).join('|')}]`)
       .join(';');
   }
@@ -534,7 +621,7 @@ export class MapPage implements AfterViewInit, OnDestroy {
   private focusOnMap(recordId: number, minZoom: number): void {
     this.selectedRecordId.set(recordId);
     const group = this.groupByRecord.get(recordId);
-    const record = this.records().find((item) => item.id === recordId);
+    const record = this.mapSource().find((item) => item.id === recordId);
     const map = this.map;
     if (!map || !group || !record) return;
     // ADR-0017：城市标记只是一城一标，定位具体一次停留要落到该记录自己的坐标，并打高亮光圈
@@ -546,7 +633,10 @@ export class MapPage implements AfterViewInit, OnDestroy {
   }
 
   async onRecordDelete(recordId: number): Promise<void> {
-    const record = this.records().find((item) => item.id === recordId);
+    // 全量模式被上限截断时，侧栏里那条可能不在「最近 N 条」里，所以先查列表再查地图集
+    const record =
+      this.records().find((item) => item.id === recordId) ??
+      this.mapSource().find((item) => item.id === recordId);
     if (!record) return;
     // ADR-0013：删除 = 移入回收站，可随时恢复；彻底删除请在回收站操作
     const confirmed = window.confirm(
@@ -563,7 +653,7 @@ export class MapPage implements AfterViewInit, OnDestroy {
       if (this.records().length === 1 && this.page() > 1) {
         this.page.update(value => value - 1);
       }
-      await this.refreshRecords();
+      await this.refreshAfterMutation();
     } catch {
       this.travelError.set('移入回收站失败，请稍后重试。');
     } finally {
@@ -588,7 +678,7 @@ export class MapPage implements AfterViewInit, OnDestroy {
       if (this.records().length === ids.length && this.page() > 1) {
         this.page.update((value) => value - 1);
       }
-      await this.refreshRecords();
+      await this.refreshAfterMutation();
     } catch {
       this.travelError.set('移入回收站失败，请稍后重试。');
     } finally {

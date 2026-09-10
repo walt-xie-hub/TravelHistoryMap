@@ -21,7 +21,58 @@
     (pageChange)="onPageChange($event)"
   />
 
-  <section class="map-stage">
+  <div class="map-main">
+    <!-- 地图数据范围 + 地图级操作（都放在地图外面，不遮挡地图内容） -->
+    @if (mapState() === 'ready') {
+      <div class="map-toolbar">
+        <div class="map-scope" role="group" aria-label="地图显示范围">
+          <button
+            type="button"
+            class="map-scope__option"
+            [class.is-active]="mapScope() === 'list'"
+            [attr.aria-pressed]="mapScope() === 'list'"
+            (click)="setScope('list')"
+          >
+            跟随列表
+          </button>
+          <button
+            type="button"
+            class="map-scope__option"
+            [class.is-active]="mapScope() === 'all'"
+            [attr.aria-pressed]="mapScope() === 'all'"
+            [disabled]="allLoading()"
+            (click)="setScope('all')"
+          >
+            全部足迹
+          </button>
+        </div>
+
+        <p class="map-toolbar__summary" role="status">
+          @if (allLoading()) {
+            正在加载全部足迹…
+          } @else if (mapScope() === 'all') {
+            地图：全部 {{ mapSource().length }} 条足迹 · {{ markerCount() }} 处标记
+            @if (allTruncated()) {
+              （仅显示最近 {{ allRecordsLimit }} 条）
+            }
+          } @else {
+            地图跟随侧栏列表：本页 {{ mapSource().length }} 条 · {{ markerCount() }} 处标记
+          }
+        </p>
+
+        <button
+          type="button"
+          class="btn btn-ghost map-toolbar__share"
+          title="分享侧栏当前页的足迹"
+          (click)="shareOpen.set(true)"
+          [disabled]="!hasRecords()"
+        >
+          分享足迹
+        </button>
+      </div>
+    }
+
+    <section class="map-stage">
     <div #mapContainer class="map-canvas" aria-label="旅行足迹地图"></div>
 
     @if (mapState() === 'missing-key') {
@@ -66,35 +117,31 @@
             <button type="button" class="btn btn-primary" (click)="onRetry()">重试</button>
           </app-empty-state>
         </div>
-      } @else if (records().length === 0) {
+      } @else if (mapSource().length === 0) {
         <div class="map-overlay map-overlay--ghost">
           <app-empty-state
             icon="🧳"
             title="暂无停留记录"
-            description="当前时间范围内还没有足迹。可切换时间范围，或通过 travel-history API 录入。"
+            [description]="mapScope() === 'all' ? '这个账号还没有任何足迹。' : '当前时间范围内还没有足迹。可切换时间范围，或点「全部足迹」看全部记录。'"
           />
         </div>
       }
     }
 
-    @if (mapState() === 'ready' && hasRecords()) {
-      <div class="map-legend">
-        <span class="legend-item"><i class="legend-dot"></i>普通停留</span>
-        <span class="legend-item"><i class="legend-dot legend-dot--ongoing"></i>进行中</span>
-        <span class="legend-item"><i class="legend-badge">★</i>精选收藏</span>
-        <span class="legend-item"><i class="legend-badge legend-badge--count">3</i>同一地点的停留次数</span>
-        <span class="legend-item legend-item--hint">
-          同一城市只显示一个图标，点击可查看并定位到该城的每次停留
-        </span>
-      </div>
-      <button type="button" class="btn btn-ghost map-fit-btn" (click)="onFitAll()">
-        回到全览
-      </button>
-    }
-
-    <button type="button" class="btn btn-ghost map-share-btn" (click)="shareOpen.set(true)" [disabled]="!hasRecords()">
-      分享足迹
-    </button>
+      @if (mapState() === 'ready' && hasMapMarkers()) {
+        <div class="map-legend">
+          <span class="legend-item"><i class="legend-dot"></i>普通停留</span>
+          <span class="legend-item"><i class="legend-dot legend-dot--ongoing"></i>进行中</span>
+          <span class="legend-item"><i class="legend-badge">★</i>精选收藏</span>
+          <span class="legend-item"><i class="legend-badge legend-badge--count">3</i>同一地点的停留次数</span>
+          <span class="legend-item legend-item--hint">
+            同一城市只显示一个图标，点击可查看并定位到该城的每次停留
+          </span>
+        </div>
+        <button type="button" class="btn btn-ghost map-fit-btn" (click)="onFitAll()">
+          回到全览
+        </button>
+      }
   </section>
 </div>
 

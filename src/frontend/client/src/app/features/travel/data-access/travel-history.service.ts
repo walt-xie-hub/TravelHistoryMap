@@ -12,6 +12,7 @@ import {
   CreateTravelRequest,
   PublicShareSnapshot,
   ShareCreated,
+  TravelListResult,
   TravelPagedResult,
   TravelImage,
   TravelRecord,
@@ -40,20 +41,38 @@ export class TravelHistoryService {
   }
 
   /** 全量拉取当前登录用户的停留记录（可选到达时间窗，UTC ISO），自动翻页，按到达时间倒序。 */
-  async getAll(
-    opts: { from?: string; to?: string } = {},
-  ): Promise<TravelRecord[]> {
-    const pageSize = 100;
-    const collected: TravelRecord[] = [];
+  async getAll(opts: { from?: string; to?: string } = {}): Promise<TravelRecord[]> {
+    const { items } = await this.collectPages((page) => this.getPaged(page, 100, opts.from, opts.to));
+    return items;
+  }
+
+  /**
+   * 全量拉取当前登录用户的停留记录，带**上限保护**（ADR-0004 的「全部足迹」用）：
+   * 最多取 limit 条（100/页自动翻页），并按服务端总数告知是否被截断。
+   */
+  async getAllUpTo(limit: number): Promise<TravelListResult> {
+    const { items, totalCount } = await this.collectPages((page) =>
+      this.getPaged(page, Math.min(100, Math.max(1, limit))),
+    );
+    return { items: items.slice(0, limit), truncated: totalCount > items.length };
+  }
+
+  /** 逐页收集（最多到 limit 条）：全量拉取与回收站共用，避免三份相同的翻页循环 */
+  private async collectPages(
+    fetchPage: (page: number) => Promise<TravelPagedResult<TravelRecord>>,
+    limit = Number.POSITIVE_INFINITY,
+  ): Promise<{ items: TravelRecord[]; totalCount: number }> {
+    const items: TravelRecord[] = [];
+    let totalCount = 0;
     let page = 1;
-    // eslint-disable-next-line no-constant-condition
-    while (true) {
-      const result = await this.getPaged(page, pageSize, opts.from, opts.to);
-      collected.push(...result.items);
-      if (collected.length >= result.totalCount || page >= result.totalPages) break;
+    while (items.length < limit) {
+      const result = await fetchPage(page);
+      totalCount = result.totalCount;
+      items.push(...result.items);
+      if (result.items.length === 0 || page >= result.totalPages) break;
       page += 1;
     }
-    return collected;
+    return { items, totalCount };
   }
 
   create(request: CreateTravelRequest): Promise<TravelRecord> {
@@ -78,17 +97,8 @@ export class TravelHistoryService {
 
   /** 回收站全量拉取（自动翻页）。 */
   async getAllTrash(): Promise<TravelRecord[]> {
-    const pageSize = 100;
-    const collected: TravelRecord[] = [];
-    let page = 1;
-    // eslint-disable-next-line no-constant-condition
-    while (true) {
-      const result = await this.getTrashPaged(page, pageSize);
-      collected.push(...result.items);
-      if (collected.length >= result.totalCount || page >= result.totalPages) break;
-      page += 1;
-    }
-    return collected;
+    const { items } = await this.collectPages((page) => this.getTrashPaged(page, 100));
+    return items;
   }
 
   /** 从回收站恢复记录。 */
