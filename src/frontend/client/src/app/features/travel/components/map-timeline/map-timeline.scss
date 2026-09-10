@@ -78,6 +78,12 @@
     border: 1px solid var(--border-color);
     box-shadow: 0 1px 3px rgb(0 0 0 / 10%);
   }
+
+  /* 精选收藏星标：与城市名同排的小图标 */
+  &__star {
+    margin-right: 2px;
+    color: var(--primary);
+  }
 }
 
 /* —— 节点圆点：激活(悬停/触屏点击)时轻微放大+主题描边，上方浮出“节点操作条”（ADR-0015）—— */

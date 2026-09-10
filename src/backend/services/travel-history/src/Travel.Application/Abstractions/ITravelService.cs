@@ -8,7 +8,7 @@ namespace Travel.Application.Abstractions;
 public interface ITravelService
 {
     /// <summary>
-    /// 按用户分页查询旅行记录。from/to 为可选到达时间窗（UTC），按到达时间倒序。
+    /// 按用户分页查询旅行记录。from/to 为可选到达时间窗（UTC）；favoriteOnly 只取精选收藏（ADR-0014）；按到达时间倒序。
     /// </summary>
     Task<Domain.Common.PagedResult<DTOs.TravelRecordDto>> GetPagedAsync(
         int userId,
@@ -16,6 +16,7 @@ public interface ITravelService
         DateTimeOffset? to,
         int page,
         int pageSize,
+        bool favoriteOnly = false,
         CancellationToken cancellationToken = default);
 
     /// <summary>按主键读取记录；记录不属于该用户时返回 null（不泄露存在性）。</summary>

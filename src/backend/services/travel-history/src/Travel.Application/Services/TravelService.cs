@@ -27,9 +27,10 @@ public class TravelService : ITravelService
         DateTimeOffset? to,
         int page,
         int pageSize,
+        bool favoriteOnly = false,
         CancellationToken ct = default)
     {
-        var result = await _repository.GetPagedAsync(userId, from, to, page, pageSize, ct);
+        var result = await _repository.GetPagedAsync(userId, from, to, page, pageSize, favoriteOnly, ct);
         var items = result.Items.Select(ToDto).ToList();
         return new PagedResult<TravelRecordDto>(items, result.Page, result.PageSize, result.TotalCount, result.TotalPages);
     }

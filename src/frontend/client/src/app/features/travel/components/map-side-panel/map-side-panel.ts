@@ -54,6 +54,8 @@ export class MapSidePanel {
   readonly pageChange = output<number>();
 
   readonly kind = signal<TravelRangeKind>('all');
+  /** 只看精选收藏（ADR-0014） */
+  readonly favoriteOnly = signal(false);
   readonly customFrom = signal<string>(STORAGE_NONE);
   readonly customTo = signal<string>(STORAGE_NONE);
 
@@ -99,6 +101,17 @@ export class MapSidePanel {
       this.kind.set('all');
       this.emitFilter();
     }
+  }
+
+  /** “★ 收藏”开关：只看精选收藏（与时间范围叠加）；自定义时间未填全时不生效（避免与已应用筛选脱节） */
+  toggleFavoriteOnly(): void {
+    this.favoriteOnly.update((value) => !value);
+    const request = this.buildRequest();
+    if (!request) {
+      this.favoriteOnly.update((value) => !value);
+      return;
+    }
+    this.filterChange.emit(request);
   }
 
   onCustomFrom(value: string): void {
@@ -159,18 +172,19 @@ export class MapSidePanel {
 
   private buildRequest(): TravelRangeRequest | null {
     const kind = this.kind();
-    if (kind === 'all') return { kind };
+    const favoriteOnly = this.favoriteOnly();
+    if (kind === 'all') return { kind, favoriteOnly };
 
     const now = Date.now();
     if (kind === 'last30') {
-      return { kind, from: new Date(now - 30 * DAY_MS).toISOString(), to: new Date(now).toISOString() };
+      return { kind, from: new Date(now - 30 * DAY_MS).toISOString(), to: new Date(now).toISOString(), favoriteOnly };
     }
     if (kind === 'year') {
       const startOfYear = new Date(new Date().getFullYear(), 0, 1);
-      return { kind, from: startOfYear.toISOString(), to: new Date(now).toISOString() };
+      return { kind, from: startOfYear.toISOString(), to: new Date(now).toISOString(), favoriteOnly };
     }
     const from = localDayToIso(this.customFrom(), false);
     const to = localDayToIso(this.customTo(), true);
-    return from && to ? { kind, from, to } : null;
+    return from && to ? { kind, from, to, favoriteOnly } : null;
   }
 }

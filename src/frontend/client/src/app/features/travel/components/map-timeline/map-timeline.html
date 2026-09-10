@@ -17,7 +17,11 @@
                   <img class="tl-col__thumb" [src]="url" alt="" />
                 }
               } @else {
-                <span class="tl-col__label" [title]="run.label">{{ labelOf(run) }}</span>
+                <span class="tl-col__label" [title]="run.label">
+                  @if (hasFavorite(run)) {
+                    <span class="tl-col__star" aria-hidden="true">★</span>
+                  }{{ labelOf(run) }}
+                </span>
               }
             </div>
 
@@ -46,7 +50,11 @@
             <!-- 下半格：奇数节点放城市名；偶数节点放缩略图(若有) -->
             <div class="tl-cell tl-cell--bottom">
               @if (i % 2 === 0) {
-                <span class="tl-col__label" [title]="run.label">{{ labelOf(run) }}</span>
+                <span class="tl-col__label" [title]="run.label">
+                  @if (hasFavorite(run)) {
+                    <span class="tl-col__star" aria-hidden="true">★</span>
+                  }{{ labelOf(run) }}
+                </span>
               } @else {
                 @if (thumbOf(run); as url) {
                   <img class="tl-col__thumb" [src]="url" alt="" />

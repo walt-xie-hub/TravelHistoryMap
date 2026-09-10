@@ -12,7 +12,7 @@
   </div>
 
   <div class="panel-block">
-    <div class="chips" role="group" aria-label="时间范围筛选">
+    <div class="chips" role="group" aria-label="筛选（时间范围 / 精选收藏）">
       <button type="button" class="chip" [class.is-active]="isKind('all')" (click)="selectKind('all')">
         全部
       </button>
@@ -34,6 +34,15 @@
         (click)="selectKind('custom')"
       >
         自定义
+      </button>
+      <button
+        type="button"
+        class="chip chip--favorite"
+        [class.is-active]="favoriteOnly()"
+        title="只看精选收藏"
+        (click)="toggleFavoriteOnly()"
+      >
+        ★ 收藏
       </button>
     </div>
 
@@ -83,7 +92,11 @@
     } @else if (rows().length === 0) {
       <div class="list-empty">
         <span class="list-empty__icon" aria-hidden="true">🗺️</span>
-        <p>该时间范围内暂无停留记录。</p>
+        <p>
+          {{ favoriteOnly()
+            ? '还没有精选收藏的停留：在详情页点“★ 收藏”即可标记。'
+            : '该时间范围内暂无停留记录。' }}
+        </p>
       </div>
     } @else {
       <div class="record-list" role="list">
@@ -97,6 +110,9 @@
           >
             <span class="record-main">
               <span class="record-name">{{ row.record.locationName }}</span>
+              @if (row.record.isFavorite) {
+                <span class="record-star" title="精选收藏" aria-label="精选收藏">★</span>
+              }
               @if (!row.record.departedAt) {
                 <span class="badge badge--ongoing">进行中</span>
               }

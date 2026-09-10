@@ -109,6 +109,16 @@
   }
 }
 
+/* “★ 收藏”筛选：未选中时也用主色提示这是一类筛选项 */
+.chip--favorite {
+  color: var(--primary, #2563eb);
+  border-color: color-mix(in srgb, var(--primary, #2563eb) 40%, transparent);
+
+  &.is-active {
+    color: #ffffff;
+  }
+}
+
 .custom-range {
   margin-top: 10px;
   display: flex;
@@ -335,6 +345,13 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.record-star {
+  flex: none;
+  color: var(--primary, #2563eb);
+  font-size: 12px;
+  line-height: 1;
 }
 
 /* 行内快捷操作：右对齐按钮组（结束停留/再来一次 + 详情 + 删除） */

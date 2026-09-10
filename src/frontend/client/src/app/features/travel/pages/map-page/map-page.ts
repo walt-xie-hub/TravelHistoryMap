@@ -161,7 +161,7 @@ export class MapPage implements AfterViewInit, OnDestroy {
   }
 
   private currentKey(): string {
-    return `${this.range.kind}|${this.range.from ?? ''}|${this.range.to ?? ''}|${this.page()}`;
+    return `${this.range.kind}|${this.range.from ?? ''}|${this.range.to ?? ''}|${this.range.favoriteOnly === true}|${this.page()}`;
   }
 
   private async refreshRecords(): Promise<void> {
@@ -177,6 +177,7 @@ export class MapPage implements AfterViewInit, OnDestroy {
         PAGE_SIZE,
         this.range.from,
         this.range.to,
+        this.range.favoriteOnly === true,
       );
       if (seq !== this.fetchSeq) return;
       this.records.set(result.items);
@@ -365,7 +366,8 @@ export class MapPage implements AfterViewInit, OnDestroy {
 
     const head = document.createElement('div');
     head.className = 'tm-info__title';
-    head.textContent = group.records[0]!.locationName;
+    const primary = group.records[0]!;
+    head.textContent = primary.isFavorite ? `★ ${primary.locationName}` : primary.locationName;
     root.appendChild(head);
 
     const sub = document.createElement('p');
@@ -385,6 +387,12 @@ export class MapPage implements AfterViewInit, OnDestroy {
 
       const line = document.createElement('span');
       line.className = 'tm-info__row-line';
+      if (record.isFavorite) {
+        const star = document.createElement('span');
+        star.className = 'tm-info__star';
+        star.textContent = '★ ';
+        line.appendChild(star);
+      }
       const dates = document.createElement('span');
       dates.textContent = record.departedAt
         ? `${fmtDateTime(record.arrivedAt)} → ${fmtDateTime(record.departedAt)}`

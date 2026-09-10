@@ -58,12 +58,24 @@
           placeholder="例如：亲子游 / 独自旅行 / 徒步，回车添加" />
         <button type="button" [disabled]="loading()" (click)="addTag()">添加</button>
       </div>
-      <label class="favorite-toggle">
+    </div>
+
+    <div class="favorite-field">
+      <div class="favorite-field__head">
+        <strong>精选收藏</strong>
+        <span>可选</span>
+      </div>
+      <label class="favorite-toggle" [class.favorite-toggle--on]="favorite()">
         <input type="checkbox" [checked]="favorite()" [disabled]="loading()"
           (change)="favorite.set($any($event.target).checked)" />
-        <span>标为精选收藏 ★（重点回味的足迹）</span>
+        <span class="favorite-toggle__star" aria-hidden="true">{{ favorite() ? '★' : '☆' }}</span>
+        <span class="favorite-toggle__text">
+          <strong>{{ favorite() ? '已标为精选收藏' : '标为精选收藏' }}</strong>
+          <em>把这条停留标为值得重点回味的足迹；可在详情页随时取消。</em>
+        </span>
       </label>
     </div>
+
     <section class="image-picker">
       <div class="image-picker__head">
         <strong class="image-picker__title">图片（{{ files().length }}/9）</strong>

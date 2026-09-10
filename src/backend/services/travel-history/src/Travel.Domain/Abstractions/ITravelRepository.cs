@@ -9,8 +9,8 @@ namespace Travel.Domain.Abstractions;
 public interface ITravelRepository
 {
     /// <summary>
-    /// 按用户分页查询旅行记录（仅活动记录：未移入回收站）。page 从 1 开始；可按到达时间窗 [from, to] 过滤；
-    /// 按到达时间倒序（最新在前）。返回本页数据、总条数与总页数。
+    /// 按用户分页查询旅行记录（仅活动记录：未移入回收站）。page 从 1 开始；可按到达时间窗 [from, to] 过滤、
+    /// 可只取精选收藏（favoriteOnly，ADR-0014）；按到达时间倒序（最新在前）。返回本页数据、总条数与总页数。
     /// </summary>
     Task<PagedResult<TravelRecord>> GetPagedAsync(
         int userId,
@@ -18,6 +18,7 @@ public interface ITravelRepository
         DateTimeOffset? to,
         int page,
         int pageSize,
+        bool favoriteOnly = false,
         CancellationToken cancellationToken = default);
 
     /// <summary>

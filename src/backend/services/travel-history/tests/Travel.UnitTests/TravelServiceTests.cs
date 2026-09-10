@@ -51,7 +51,7 @@ public class TravelServiceTests
             TotalPages: 1);
 
         _repositoryMock.Setup(r => r.GetPagedAsync(userId, It.IsAny<DateTimeOffset?>(), It.IsAny<DateTimeOffset?>(),
-                                                   page, pageSize, It.IsAny<CancellationToken>()))
+                                                   page, pageSize, It.IsAny<bool>(), It.IsAny<CancellationToken>()))
                        .ReturnsAsync(paged);
 
         // Act
@@ -77,7 +77,7 @@ public class TravelServiceTests
         const int pageSize = 20;
         var from = new DateTimeOffset(2026, 4, 1, 0, 0, 0, TimeSpan.Zero);
         var to = new DateTimeOffset(2026, 6, 1, 0, 0, 0, TimeSpan.Zero);
-        _repositoryMock.Setup(r => r.GetPagedAsync(userId, from, to, page, pageSize, It.IsAny<CancellationToken>()))
+        _repositoryMock.Setup(r => r.GetPagedAsync(userId, from, to, page, pageSize, It.IsAny<bool>(), It.IsAny<CancellationToken>()))
                        .ReturnsAsync(new PagedResult<TravelRecord>(
                            new List<TravelRecord>(), page, pageSize, TotalCount: 0, TotalPages: 1));
 
@@ -86,7 +86,29 @@ public class TravelServiceTests
 
         // Assert
         _repositoryMock.Verify(
-            r => r.GetPagedAsync(userId, from, to, page, pageSize, It.IsAny<CancellationToken>()),
+            r => r.GetPagedAsync(userId, from, to, page, pageSize, It.IsAny<bool>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task GetPagedAsync_ForwardsFavoriteOnlyToRepository()
+    {
+        // Arrange
+        const int userId = 10;
+        const int page = 1;
+        const int pageSize = 10;
+        _repositoryMock.Setup(r => r.GetPagedAsync(userId, It.IsAny<DateTimeOffset?>(), It.IsAny<DateTimeOffset?>(),
+                                                   page, pageSize, true, It.IsAny<CancellationToken>()))
+                       .ReturnsAsync(new PagedResult<TravelRecord>(
+                           new List<TravelRecord>(), page, pageSize, TotalCount: 0, TotalPages: 1));
+
+        // Act
+        await _sut.GetPagedAsync(userId, from: null, to: null, page, pageSize, favoriteOnly: true);
+
+        // Assert
+        _repositoryMock.Verify(
+            r => r.GetPagedAsync(userId, It.IsAny<DateTimeOffset?>(), It.IsAny<DateTimeOffset?>(), page, pageSize,
+                                 true, It.IsAny<CancellationToken>()),
             Times.Once);
     }
 

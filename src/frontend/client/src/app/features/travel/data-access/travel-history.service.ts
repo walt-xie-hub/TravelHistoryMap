@@ -22,18 +22,20 @@ export class TravelHistoryService {
   private readonly http = inject(HttpClient);
   private readonly base = environment.travelApiBaseUrl.replace(/\/+$/, '');
 
-  /** 单页查询（后端上限 pageSize=100，越界会被钳制为 10） */
+  /** 单页查询（后端上限 pageSize=100，越界会被钳制为 10）；favoriteOnly 只看精选收藏（ADR-0014） */
   getPaged(
     page: number,
     pageSize: number,
     from?: string,
     to?: string,
+    favoriteOnly = false,
   ): Promise<TravelPagedResult<TravelRecord>> {
     let params = new HttpParams()
       .set('page', String(page))
       .set('pageSize', String(pageSize));
     if (from) params = params.set('from', from);
     if (to) params = params.set('to', to);
+    if (favoriteOnly) params = params.set('favoriteOnly', 'true');
     return lastValueFrom(this.http.get<TravelPagedResult<TravelRecord>>(`${this.base}/travels`, { params }));
   }
 

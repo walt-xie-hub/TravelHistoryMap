@@ -22,15 +22,18 @@ public class TravelRepository : ITravelRepository
         DateTimeOffset? to,
         int page,
         int pageSize,
+        bool favoriteOnly = false,
         CancellationToken ct = default)
     {
-        // 主查询：按用户 + 仅活动记录（未移入回收站）+ 可选到达时间窗过滤，按到达时间倒序（最新在前）
+        // 主查询：按用户 + 仅活动记录（未移入回收站）+ 可选到达时间窗/精选收藏过滤，按到达时间倒序（最新在前）
         var query = _db.TravelRecords.AsNoTracking()
             .Where(t => t.UserId == userId && t.DeletedAt == null);
         if (from.HasValue)
             query = query.Where(t => t.ArrivedAt >= from.Value);
         if (to.HasValue)
             query = query.Where(t => t.ArrivedAt <= to.Value);
+        if (favoriteOnly)
+            query = query.Where(t => t.IsFavorite);
 
         query = query.OrderByDescending(t => t.ArrivedAt);
 

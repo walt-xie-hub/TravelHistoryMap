@@ -168,4 +168,9 @@ export class MapTimeline implements OnDestroy {
   protected labelOf(run: TimelineRun): string {
     return run.records.length > 1 ? `${run.label} · ${run.records.length} 段` : run.label;
   }
+
+  /** 该节点是否含精选收藏（ADR-0014）：模板据此在标签前渲染 ★ 徽标 */
+  protected hasFavorite(run: TimelineRun): boolean {
+    return run.records.some((record) => record.isFavorite);
+  }
 }

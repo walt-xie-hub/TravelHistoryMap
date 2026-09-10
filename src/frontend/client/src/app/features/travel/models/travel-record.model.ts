@@ -76,6 +76,8 @@ export interface TravelRangeRequest {
   kind: TravelRangeKind;
   from?: string;
   to?: string;
+  /** 只看精选收藏（ADR-0014） */
+  favoriteOnly?: boolean;
 }
 
 /** 分享（ADR-0012）：创建返回 token 与相对路径 */

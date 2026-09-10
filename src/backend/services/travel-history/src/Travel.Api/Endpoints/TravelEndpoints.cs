@@ -15,16 +15,17 @@ public static class TravelEndpoints
     {
         var group = app.MapGroup("/api/travels").RequireAuthorization();
 
-        // 当前用户的分页列表（只能看到自己的记录）；from/to 为可选到达时间窗（UTC）；按到达时间倒序。
+        // 当前用户的分页列表（只能看到自己的记录）；from/to 为可选到达时间窗（UTC）；favoriteOnly 只看精选收藏；按到达时间倒序。
         group.MapGet("/", async (ClaimsPrincipal principal, ITravelService svc, CancellationToken ct,
             DateTimeOffset? from = null,
             DateTimeOffset? to = null,
+            bool favoriteOnly = false,
             int page = 1,
             int pageSize = 10) =>
         {
             page = page < 1 ? 1 : page;
             pageSize = pageSize is < 1 or > 100 ? 10 : pageSize;
-            return Results.Ok(await svc.GetPagedAsync(CurrentUserId(principal), from, to, page, pageSize, ct));
+            return Results.Ok(await svc.GetPagedAsync(CurrentUserId(principal), from, to, page, pageSize, favoriteOnly, ct));
         });
 
         group.MapGet("/{id:int}", async (int id, ClaimsPrincipal principal, ITravelService svc, CancellationToken ct) =>
