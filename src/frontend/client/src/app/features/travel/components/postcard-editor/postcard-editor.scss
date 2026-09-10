@@ -1,0 +1,298 @@
+/* 明信片编辑器（ADR-0018）：左模板 / 中预览 / 右面板。
+   预览与缩略图都是同一套画面组件，靠父容器 scale —— 导出节点本身始终是 1181×1748。 */
+
+:host {
+  display: block;
+  --pce-thumb-scale: 0.118;
+  --pce-preview-scale: 0.36;
+}
+
+.pce {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-height: calc(100dvh - 96px);
+}
+
+.pce__head {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+
+  h2 {
+    margin: 0;
+    font-size: 20px;
+  }
+}
+
+.pce__sub {
+  margin: 6px 0 0;
+  color: var(--text-muted, #6b7280);
+  font-size: var(--text-xs, 12px);
+}
+
+.pce__head-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex: none;
+}
+
+.pce__body {
+  display: grid;
+  grid-template-columns: 168px minmax(0, 1fr) 344px;
+  gap: 16px;
+  min-height: 0;
+  flex: 1;
+}
+
+/* ---------- 左：模板列表 ---------- */
+.pce-templates {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.pce-template {
+  display: block;
+  padding: 8px;
+  border: 1px solid var(--border-color, #d1d5db);
+  border-radius: var(--radius-md, 10px);
+  background: var(--surface, #fff);
+  text-align: left;
+  cursor: pointer;
+
+  &.is-active {
+    border-color: var(--primary, #ea580c);
+    box-shadow: 0 0 0 2px rgb(234 88 12 / 0.18);
+  }
+}
+
+.pce-template__thumb {
+  display: block;
+  width: calc(1181px * var(--pce-thumb-scale));
+  height: calc(1748px * var(--pce-thumb-scale));
+  margin: 0 auto;
+  overflow: hidden;
+  border-radius: 4px;
+  background: #fff;
+
+  app-postcard-canvas {
+    transform: scale(var(--pce-thumb-scale));
+    transform-origin: top left;
+  }
+}
+
+.pce-template__name {
+  display: block;
+  margin-top: 6px;
+  font-size: var(--text-sm, 13px);
+  font-weight: 600;
+}
+
+.pce-template__meta {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-muted, #6b7280);
+  font-size: var(--text-xs, 12px);
+}
+
+/* ---------- 中：预览 ---------- */
+.pce-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+  justify-content: flex-start;
+  overflow: auto;
+  padding: 4px;
+}
+
+.pce-preview__frame {
+  width: calc(1181px * var(--pce-preview-scale));
+  height: calc(1748px * var(--pce-preview-scale));
+  overflow: hidden;
+  border-radius: 8px;
+  box-shadow: 0 12px 30px rgb(15 23 42 / 0.22);
+}
+
+/* 缩放必须挂在这一层：导出的是里面那份未缩放的画面（html-to-image 会把计算样式里的
+   transform 一并复制到克隆上，若缩放挂在导出节点上，成品只有一部分且周围留白） */
+.pce-preview__scaler {
+  transform: scale(var(--pce-preview-scale));
+  transform-origin: top left;
+
+  app-postcard-canvas {
+    display: block;
+  }
+}
+
+.pce-hint {
+  margin: 0;
+  color: var(--text-muted, #6b7280);
+  font-size: var(--text-xs, 12px);
+  line-height: 1.6;
+}
+
+.pce-note {
+  margin: 0 0 8px;
+  font-size: var(--text-sm, 13px);
+  line-height: 1.6;
+}
+
+/* ---------- 右：面板 ---------- */
+.pce-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.pce-group {
+  border: 1px solid var(--border-color, #d1d5db);
+  border-radius: var(--radius-md, 10px);
+  background: var(--surface, #fff);
+
+  > summary {
+    padding: 10px 12px;
+    font-size: var(--text-sm, 13px);
+    font-weight: 600;
+    cursor: pointer;
+  }
+}
+
+.pce-group__body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 12px 12px;
+}
+
+.pce-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  > span {
+    color: var(--text-muted, #6b7280);
+    font-size: var(--text-xs, 12px);
+  }
+
+  input,
+  select,
+  textarea {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid var(--border-color, #d1d5db);
+    border-radius: var(--radius-sm, 6px);
+    background: var(--surface, #fff);
+    color: inherit;
+    font: inherit;
+    font-size: var(--text-sm, 13px);
+  }
+
+  textarea {
+    resize: vertical;
+  }
+}
+
+.pce-field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.pce-check {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: var(--text-sm, 13px);
+}
+
+.pce-tag {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgb(107 114 128 / 0.14);
+  color: var(--text-muted, #6b7280);
+  font-size: var(--text-xs, 12px);
+}
+
+.pce-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pce-upload {
+  position: relative;
+  cursor: pointer;
+
+  input[type='file'] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+}
+
+.pce-images {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.pce-image {
+  position: relative;
+  padding: 0;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 2px solid transparent;
+  border-radius: var(--radius-sm, 6px);
+  background: rgb(107 114 128 / 0.12);
+  cursor: pointer;
+
+  &.is-active {
+    border-color: var(--primary, #ea580c);
+  }
+
+  img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+}
+
+/* 窄屏：预览优先，模板与面板堆到下面 */
+@media (max-width: 1180px) {
+  .pce {
+    max-height: none;
+  }
+
+  .pce__body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'preview'
+      'templates'
+      'panel';
+  }
+
+  .pce-preview {
+    grid-area: preview;
+  }
+
+  .pce-templates {
+    grid-area: templates;
+    flex-direction: row;
+    overflow-x: auto;
+  }
+
+  .pce-panel {
+    grid-area: panel;
+    overflow: visible;
+  }
+}

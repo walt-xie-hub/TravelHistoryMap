@@ -1,17 +1,34 @@
-import { ChangeDetectionStrategy, Component, effect, inject, input, output, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  effect,
+  inject,
+  input,
+  output,
+  signal,
+} from '@angular/core';
 import { TravelHistoryService } from '../../data-access/travel-history.service';
 import type { TravelRecord } from '../../models/travel-record.model';
-import { buildShareText, canvasToPngUrl, renderShareCard, toCardRows } from '../../share/share-card';
+import {
+  buildShareText,
+  canvasToPngUrl,
+  renderShareCard,
+  toCardRows,
+} from '../../share/share-card';
+import { PostcardEditor } from '../postcard-editor/postcard-editor';
 
 /**
- * 分享弹层（M1/达人分享）：
+ * 分享弹层（M1/达人分享 + ADR-0018 明信片）：
  * ① 足迹分享卡：canvas 合成 → 下载 PNG / 复制文案（纯本地）；
- * ② 只读分享链接：调 POST /api/travels/share 生成 token → 复制 /s/{token} 链接。
+ * ② 明信片：10 款模板 + 可选照片与模块，编辑器里改内容 → 导出图片（纯本地，ADR-0018）；
+ * ③ 只读分享链接：调 POST /api/travels/share 生成 token → 复制 /s/{token} 链接。
+ *
+ * 两种图片形态共享同一个弹层（不新开路由），默认仍是足迹卡——它信息密度高、看一眼就懂。
  */
 @Component({
   selector: 'app-travel-share-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [],
+  imports: [PostcardEditor],
   templateUrl: './travel-share-dialog.html',
   styleUrl: './travel-share-dialog.scss',
 })
@@ -20,6 +37,9 @@ export class TravelShareDialog {
   readonly close = output<void>();
 
   private readonly travel = inject(TravelHistoryService);
+
+  /** 图片形态：足迹卡（默认）/ 明信片 */
+  protected readonly mode = signal<'card' | 'postcard'>('card');
 
   protected readonly cardUrl = signal('');
   protected readonly caption = signal('');
@@ -34,7 +54,11 @@ export class TravelShareDialog {
       const records = this.records();
       if (!records.length) return;
       const sorted = [...records].sort((a, b) => a.arrivedAt.localeCompare(b.arrivedAt));
-      this.title.set(sorted.length === 1 ? sorted[0]!.locationName : `${sorted[0]!.locationName} 等 ${sorted.length} 站`);
+      this.title.set(
+        sorted.length === 1
+          ? sorted[0]!.locationName
+          : `${sorted[0]!.locationName} 等 ${sorted.length} 站`,
+      );
       const input = { title: this.title(), rows: toCardRows(sorted) };
       this.caption.set(buildShareText(input));
       if (!this.cardUrl()) {

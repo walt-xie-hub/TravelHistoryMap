@@ -16,6 +16,39 @@
   border-radius: var(--radius-lg, 16px);
   background: var(--surface);
   box-shadow: var(--shadow-md);
+
+  /* 明信片编辑器要摆下模板列 + 预览 + 面板，因此弹层在明信片模式下加宽 */
+  &--wide {
+    width: min(1420px, 100%);
+  }
+}
+
+.share-dialog__modes {
+  display: flex;
+  gap: 4px;
+  margin-right: auto;
+  margin-left: 18px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--surface-hover);
+}
+
+.mode-btn {
+  padding: 5px 14px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted, #6b7280);
+  font: inherit;
+  font-size: var(--text-sm, 13px);
+  cursor: pointer;
+
+  &.is-active {
+    background: var(--surface);
+    color: var(--text-strong);
+    font-weight: 600;
+    box-shadow: var(--shadow-sm, 0 1px 2px rgb(15 23 42 / 0.12));
+  }
 }
 
 .share-dialog__head {

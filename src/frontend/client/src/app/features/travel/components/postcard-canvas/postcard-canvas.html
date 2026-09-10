@@ -1,0 +1,418 @@
+<!--
+  明信片画面（ADR-0018）：1181×1748 固定画布，10 款版式由模板 id 切换。
+  所有子块（邮票 / 邮戳 / 足迹清单 / 收件人栏 / 旅行标识 / 坐标）都是共享片段，
+  版式只负责摆放；模块开关决定片段是否出现。这份 DOM 同时是屏幕预览与导出源。
+-->
+<!-- data-postcard-template：当前版式 id，供调试与 E2E 断言（样式不依赖它） -->
+<div class="pc" [class]="'pc--' + template().id" [attr.data-postcard-template]="template().id">
+  @switch (template().id) {
+    @case ('classic-post') {
+      <div
+        class="pc-photo pc-photo--inset"
+        [style.background-image]="photoAt(0) ? 'url(' + photoAt(0) + ')' : null"
+      >
+        @if (!photoAt(0)) {
+          <span class="pc-photo__empty">还没有照片</span>
+        }
+      </div>
+      <div class="pc-cluster pc-cluster--tr">
+        <ng-container [ngTemplateOutlet]="stampCluster" />
+      </div>
+      <div class="pc-caption pc-caption--strip">
+        <ng-container [ngTemplateOutlet]="captionLine" />
+        @if (content().modules.coord) {
+          <span class="pc-coord"><ng-container [ngTemplateOutlet]="coordLine" /></span>
+        }
+        <ng-container [ngTemplateOutlet]="messageBlock" />
+      </div>
+      @if (showTrail()) {
+        <div class="pc-trail pc-trail--strip"><ng-container [ngTemplateOutlet]="trailList" /></div>
+      }
+      @if (content().modules.icon && mainIcon()) {
+        <div class="pc-icon pc-icon--br"><ng-container [ngTemplateOutlet]="iconBadge" /></div>
+      }
+    }
+
+    @case ('air-mail') {
+      <div class="pc-airmail pc-airmail--top"></div>
+      <div class="pc-airmail pc-airmail--bottom"></div>
+      <div
+        class="pc-photo pc-photo--center"
+        [style.background-image]="photoAt(0) ? 'url(' + photoAt(0) + ')' : null"
+      >
+        @if (!photoAt(0)) {
+          <span class="pc-photo__empty">还没有照片</span>
+        }
+      </div>
+      <div class="pc-caption">
+        <ng-container [ngTemplateOutlet]="captionLine" />
+        <ng-container [ngTemplateOutlet]="messageBlock" />
+      </div>
+      @if (showTrail()) {
+        <div class="pc-trail pc-trail--left"><ng-container [ngTemplateOutlet]="trailList" /></div>
+      }
+      <div class="pc-cluster pc-cluster--bl">
+        <ng-container [ngTemplateOutlet]="stampCluster" />
+      </div>
+      @if (content().modules.icon && mainIcon()) {
+        <div class="pc-icon pc-icon--tr"><ng-container [ngTemplateOutlet]="iconBadge" /></div>
+      }
+    }
+
+    @case ('polaroid') {
+      <div class="pc-polaroid">
+        <div
+          class="pc-polaroid__photo"
+          [style.background-image]="photoAt(0) ? 'url(' + photoAt(0) + ')' : null"
+        >
+          @if (!photoAt(0)) {
+            <span class="pc-photo__empty">还没有照片</span>
+          }
+        </div>
+        <div class="pc-polaroid__caption">
+          <ng-container [ngTemplateOutlet]="captionLine" />
+          <ng-container [ngTemplateOutlet]="messageBlock" />
+        </div>
+      </div>
+      @if (showTrail()) {
+        <div class="pc-trail pc-trail--hand"><ng-container [ngTemplateOutlet]="trailList" /></div>
+      }
+      <div class="pc-cluster pc-cluster--br pc-cluster--small">
+        <ng-container [ngTemplateOutlet]="stampCluster" />
+      </div>
+      @if (content().modules.icon && mainIcon()) {
+        <div class="pc-icon pc-icon--tl"><ng-container [ngTemplateOutlet]="iconBadge" /></div>
+      }
+    }
+
+    @case ('collage') {
+      <div class="pc-collage">
+        <div
+          class="pc-collage__item pc-collage__item--a"
+          [style.background-image]="photoAt(0) ? 'url(' + photoAt(0) + ')' : null"
+        >
+          @if (!photoAt(0)) {
+            <span class="pc-photo__empty">照片 1</span>
+          }
+        </div>
+        <div
+          class="pc-collage__item pc-collage__item--b"
+          [style.background-image]="photoAt(1) ? 'url(' + photoAt(1) + ')' : null"
+        >
+          @if (!photoAt(1)) {
+            <span class="pc-photo__empty">再加 1 张照片</span>
+          }
+        </div>
+        <div
+          class="pc-collage__item pc-collage__item--c"
+          [style.background-image]="photoAt(2) ? 'url(' + photoAt(2) + ')' : null"
+        >
+          @if (!photoAt(2)) {
+            <span class="pc-photo__empty">再加 1 张照片</span>
+          }
+        </div>
+        <span class="pc-tape pc-tape--a"></span>
+        <span class="pc-tape pc-tape--b"></span>
+      </div>
+      <div class="pc-caption pc-caption--hand">
+        <ng-container [ngTemplateOutlet]="captionLine" />
+        <ng-container [ngTemplateOutlet]="messageBlock" />
+      </div>
+      @if (showTrail()) {
+        <div class="pc-trail pc-trail--hand"><ng-container [ngTemplateOutlet]="trailList" /></div>
+      }
+      <div class="pc-cluster pc-cluster--br">
+        <ng-container [ngTemplateOutlet]="stampCluster" />
+      </div>
+      @if (content().modules.icon && mainIcon()) {
+        <div class="pc-icon pc-icon--tr"><ng-container [ngTemplateOutlet]="iconBadge" /></div>
+      }
+    }
+
+    @case ('pinned-map') {
+      <div class="pc-split">
+        <div
+          class="pc-split__cell"
+          [style.background-image]="photoAt(0) ? 'url(' + photoAt(0) + ')' : null"
+        >
+          @if (!photoAt(0)) {
+            <span class="pc-photo__empty">照片 1</span>
+          }
+        </div>
+        <div
+          class="pc-split__cell"
+          [style.background-image]="photoAt(1) ? 'url(' + photoAt(1) + ')' : null"
+        >
+          @if (!photoAt(1)) {
+            <span class="pc-photo__empty">再加 1 张照片</span>
+          }
+        </div>
+      </div>
+      <div class="pc-panel">
+        <ng-container [ngTemplateOutlet]="captionLine" />
+        @if (content().modules.coord) {
+          <span class="pc-coord"><ng-container [ngTemplateOutlet]="coordLine" /></span>
+        }
+        <ng-container [ngTemplateOutlet]="messageBlock" />
+        @if (showTrail()) {
+          <div class="pc-trail pc-trail--panel">
+            <ng-container [ngTemplateOutlet]="trailList" />
+          </div>
+        }
+      </div>
+      <span class="pc-pin"></span>
+      <div class="pc-cluster pc-cluster--bl">
+        <ng-container [ngTemplateOutlet]="stampCluster" />
+      </div>
+    }
+
+    @case ('ink-minimal') {
+      <div class="pc-frame"></div>
+      <div
+        class="pc-photo pc-photo--minimal"
+        [style.background-image]="photoAt(0) ? 'url(' + photoAt(0) + ')' : null"
+      >
+        @if (!photoAt(0)) {
+          <span class="pc-photo__empty">还没有照片</span>
+        }
+      </div>
+      <div class="pc-caption pc-caption--minimal">
+        <ng-container [ngTemplateOutlet]="captionLine" />
+        <ng-container [ngTemplateOutlet]="messageBlock" />
+      </div>
+      @if (showTrail()) {
+        <div class="pc-trail pc-trail--minimal">
+          <ng-container [ngTemplateOutlet]="trailList" />
+        </div>
+      }
+      <div class="pc-cluster pc-cluster--tr pc-cluster--small">
+        <ng-container [ngTemplateOutlet]="stampCluster" />
+      </div>
+    }
+
+    @case ('film-strip') {
+      <div class="pc-film">
+        <div
+          class="pc-film__cell"
+          [style.background-image]="photoAt(0) ? 'url(' + photoAt(0) + ')' : null"
+        >
+          @if (!photoAt(0)) {
+            <span class="pc-photo__empty">照片 1</span>
+          }
+        </div>
+        <div
+          class="pc-film__cell"
+          [style.background-image]="photoAt(1) ? 'url(' + photoAt(1) + ')' : null"
+        >
+          @if (!photoAt(1)) {
+            <span class="pc-photo__empty">再加 1 张照片</span>
+          }
+        </div>
+      </div>
+      <div class="pc-caption pc-caption--mono">
+        <ng-container [ngTemplateOutlet]="captionLine" />
+        <ng-container [ngTemplateOutlet]="messageBlock" />
+      </div>
+      @if (showTrail()) {
+        <div class="pc-trail pc-trail--mono"><ng-container [ngTemplateOutlet]="trailList" /></div>
+      }
+      <div class="pc-cluster pc-cluster--br pc-cluster--small">
+        <ng-container [ngTemplateOutlet]="stampCluster" />
+      </div>
+    }
+
+    @case ('sunrise') {
+      <div
+        class="pc-photo pc-photo--sunrise"
+        [style.background-image]="photoAt(0) ? 'url(' + photoAt(0) + ')' : null"
+      >
+        @if (!photoAt(0)) {
+          <span class="pc-photo__empty">还没有照片</span>
+        }
+      </div>
+      <div class="pc-hero">
+        <ng-container [ngTemplateOutlet]="captionLine" />
+        <ng-container [ngTemplateOutlet]="messageBlock" />
+      </div>
+      @if (showTrail()) {
+        <div class="pc-trail pc-trail--sunrise">
+          <ng-container [ngTemplateOutlet]="trailList" />
+        </div>
+      }
+      <div class="pc-cluster pc-cluster--tr">
+        <ng-container [ngTemplateOutlet]="stampCluster" />
+      </div>
+    }
+
+    @case ('back-letter') {
+      <div
+        class="pc-photo pc-photo--stamp-corner"
+        [style.background-image]="photoAt(0) ? 'url(' + photoAt(0) + ')' : null"
+      >
+        @if (!photoAt(0)) {
+          <span class="pc-photo__empty">照片</span>
+        }
+      </div>
+      <div class="pc-letter">
+        <ng-container [ngTemplateOutlet]="messageBlock" />
+        @if (content().fields.signature) {
+          <p class="pc-letter__sign">{{ content().fields.signature }}</p>
+        }
+      </div>
+      @if (showTrail()) {
+        <div class="pc-trail pc-trail--letter"><ng-container [ngTemplateOutlet]="trailList" /></div>
+      }
+      <div class="pc-caption pc-caption--corner">
+        <ng-container [ngTemplateOutlet]="captionLine" />
+      </div>
+      @if (content().modules.recipient) {
+        <div class="pc-recipient"><ng-container [ngTemplateOutlet]="recipientBlock" /></div>
+      }
+      <div class="pc-cluster pc-cluster--tr">
+        <ng-container [ngTemplateOutlet]="stampCluster" />
+      </div>
+    }
+
+    @case ('back-plain') {
+      <div class="pc-plain">
+        <ng-container [ngTemplateOutlet]="messageBlock" />
+        @if (content().fields.signature) {
+          <p class="pc-plain__sign">{{ content().fields.signature }}</p>
+        }
+      </div>
+      @if (showTrail()) {
+        <div class="pc-trail pc-trail--plain"><ng-container [ngTemplateOutlet]="trailList" /></div>
+      }
+      <div class="pc-caption pc-caption--plain">
+        <ng-container [ngTemplateOutlet]="captionLine" />
+      </div>
+      @if (content().modules.recipient) {
+        <div class="pc-recipient pc-recipient--wide">
+          <ng-container [ngTemplateOutlet]="recipientBlock" />
+        </div>
+      }
+      <div class="pc-cluster pc-cluster--bl pc-cluster--small">
+        <ng-container [ngTemplateOutlet]="stampCluster" />
+      </div>
+    }
+  }
+</div>
+
+<!-- ===== 共享片段 ===== -->
+<ng-template #stampCluster>
+  <div class="pc-stamp-cluster">
+    @if (content().modules.stamp) {
+      <div class="pc-stamp" [attr.aria-label]="stampLabel()">
+        @if (content().stamp.customImageDataUrl) {
+          <img class="pc-stamp__custom" [src]="content().stamp.customImageDataUrl" alt="" />
+        } @else {
+          <div class="pc-stamp__face">
+            @if (stampIcon(); as icon) {
+              <app-travel-icon [icon]="icon" [size]="108" />
+            } @else {
+              <span class="pc-stamp__zodiac">{{ zodiac() }}</span>
+            }
+            <span class="pc-stamp__country">中国邮政</span>
+            <span class="pc-stamp__denom">{{ content().stamp.denomination }}</span>
+            <span class="pc-stamp__year">{{ year() }}</span>
+          </div>
+        }
+      </div>
+    }
+    @if (content().modules.postmark) {
+      <div class="pc-postmark" [style.transform]="'rotate(' + cancelAngle() + 'deg)'">
+        <svg [attr.viewBox]="postmarkViewBox()" role="img" [attr.aria-label]="postmarkLabel()">
+          <defs>
+            <path [attr.id]="uid + '-place'" [attr.d]="postmark().placeArc" fill="none"></path>
+            <path [attr.id]="uid + '-date'" [attr.d]="postmark().dateArc" fill="none"></path>
+          </defs>
+          <circle class="pc-postmark__ring" [attr.r]="postmark().size / 2 - 3"></circle>
+          <circle
+            class="pc-postmark__ring pc-postmark__ring--inner"
+            [attr.r]="postmark().innerRadius"
+          ></circle>
+          <line
+            class="pc-postmark__rule"
+            [attr.x1]="-postmark().noteWidth / 2"
+            [attr.x2]="postmark().noteWidth / 2"
+            y1="-30"
+            y2="-30"
+          ></line>
+          <line
+            class="pc-postmark__rule"
+            [attr.x1]="-postmark().noteWidth / 2"
+            [attr.x2]="postmark().noteWidth / 2"
+            y1="30"
+            y2="30"
+          ></line>
+          <text class="pc-postmark__note" y="16">{{ postmarkNote }}</text>
+          <text class="pc-postmark__arc">
+            <textPath [attr.href]="'#' + uid + '-place'" startOffset="50%" text-anchor="middle">
+              {{ content().fields.place }}
+            </textPath>
+          </text>
+          <text class="pc-postmark__date">
+            <textPath [attr.href]="'#' + uid + '-date'" startOffset="50%" text-anchor="middle">
+              {{ content().fields.date }}
+            </textPath>
+          </text>
+        </svg>
+      </div>
+    }
+  </div>
+</ng-template>
+
+<ng-template #captionLine>
+  @if (content().modules.caption) {
+    <span class="pc-title">{{ content().fields.title }}</span>
+    <span class="pc-meta">{{ content().fields.place }} · {{ content().fields.date }}</span>
+  }
+</ng-template>
+
+<ng-template #messageBlock>
+  @if (content().fields.message) {
+    <p class="pc-message">{{ content().fields.message }}</p>
+  }
+</ng-template>
+
+<ng-template #coordLine>{{ coordinates() }}</ng-template>
+
+<ng-template #iconBadge>
+  @if (mainIcon(); as icon) {
+    <app-travel-icon [icon]="icon" [size]="92" />
+  }
+</ng-template>
+
+<ng-template #trailList>
+  <ol class="pc-trail__list">
+    @for (row of trail().rows; track row.recordId) {
+      <li class="pc-trail__row">
+        <span class="pc-trail__index">{{ row.index }}</span>
+        <span class="pc-trail__main">
+          <span class="pc-trail__place">{{ row.place }}</span>
+          <span class="pc-trail__range">{{ row.range }}</span>
+          @if (row.snippet) {
+            <span class="pc-trail__snippet">{{ row.snippet }}</span>
+          }
+        </span>
+      </li>
+    }
+  </ol>
+  @if (trail().hidden > 0) {
+    <p class="pc-trail__more">……还有 {{ trail().hidden }} 站旅程</p>
+  }
+</ng-template>
+
+<ng-template #recipientBlock>
+  <span class="pc-recipient__label">收件人</span>
+  <span class="pc-recipient__name">{{ content().fields.recipient }}</span>
+  <span class="pc-recipient__line"></span>
+  <span class="pc-recipient__label">地址</span>
+  <span class="pc-recipient__address">{{ content().fields.address }}</span>
+  <span class="pc-recipient__line"></span>
+  <span class="pc-recipient__postal">
+    @for (digit of postalDigits(); track $index) {
+      <span class="pc-recipient__digit">{{ digit }}</span>
+    }
+  </span>
+</ng-template>

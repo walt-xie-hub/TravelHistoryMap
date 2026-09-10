@@ -1,0 +1,309 @@
+<div class="pce">
+  <header class="pce__head">
+    <div>
+      <h2>明信片</h2>
+      <p class="pce__sub">
+        选一款模板，挑照片、写几句话，导出成图片即可发出去 · 共 {{ records().length }} 条足迹参与
+      </p>
+    </div>
+    <div class="pce__head-actions">
+      <button
+        type="button"
+        class="btn btn-primary"
+        (click)="export('png')"
+        [disabled]="exporting() || !records().length"
+      >
+        {{ exporting() ? '导出中…' : '下载明信片 PNG' }}
+      </button>
+      <button
+        type="button"
+        class="btn"
+        (click)="export('jpeg')"
+        [disabled]="exporting() || !records().length"
+      >
+        下载压缩版 JPEG
+      </button>
+      <button type="button" class="icon-btn" aria-label="关闭" (click)="close.emit()">✕</button>
+    </div>
+  </header>
+
+  <div class="pce__body">
+    <!-- 左：模板缩略图（同一套画面组件缩放预览，不是位图资产） -->
+    <aside class="pce-templates" aria-label="明信片模板">
+      @for (item of templates; track item.id) {
+        <button
+          type="button"
+          class="pce-template"
+          [class.is-active]="item.id === content().templateId"
+          [attr.aria-pressed]="item.id === content().templateId"
+          (click)="selectTemplate(item.id)"
+        >
+          <span class="pce-template__thumb">
+            <app-postcard-canvas
+              [content]="content()"
+              [records]="records()"
+              [imageUrls]="imageUrls()"
+            />
+          </span>
+          <span class="pce-template__name">{{ item.name }}</span>
+          <span class="pce-template__meta">
+            {{ item.imageCount === 0 ? '纯文字' : item.imageCount + ' 图' }} · 足迹≤{{
+              item.trailLimit
+            }}
+          </span>
+        </button>
+      }
+    </aside>
+
+    <!-- 中：实时预览（就是导出的那份 DOM；缩放挂在这一层上，导出节点本身不带 transform） -->
+    <section class="pce-preview">
+      <div class="pce-preview__frame">
+        <div class="pce-preview__scaler">
+          <app-postcard-canvas
+            #previewCanvas
+            [content]="content()"
+            [records]="records()"
+            [imageUrls]="imageUrls()"
+          />
+        </div>
+      </div>
+      @if (missingImages() > 0) {
+        <p class="pce-hint" role="status">
+          「{{ template().name }}」需要 {{ template().imageCount }} 张照片，还差
+          {{ missingImages() }} 张
+          @if (mainImages().length === 0) {
+            （这条足迹还没有照片）
+          }
+        </p>
+      }
+    </section>
+
+    <!-- 右：内容与模块 -->
+    <aside class="pce-panel">
+      <details class="pce-group" open>
+        <summary>主记录</summary>
+        <div class="pce-group__body">
+          @if (isMulti()) {
+            <label class="pce-field">
+              <span>明信片主角（决定主图、邮戳地点与日期）</span>
+              <select [value]="content().mainRecordId" (change)="selectMainRecord($event)">
+                @for (record of records(); track record.id) {
+                  <option [value]="record.id">{{ record.locationName }}</option>
+                }
+              </select>
+            </label>
+          } @else {
+            <p class="pce-note">只有一条足迹：它既是主角，也不再显示足迹清单。</p>
+          }
+        </div>
+      </details>
+
+      <details class="pce-group" open>
+        <summary>照片</summary>
+        <div class="pce-group__body">
+          @if (template().imageCount === 0) {
+            <p class="pce-note">这款模板是纯文字明信片，不用照片。</p>
+          } @else if (imagesLoading()) {
+            <p class="pce-note">照片加载中…</p>
+          } @else if (mainImages().length === 0) {
+            <p class="pce-note">这条足迹还没有照片，可以先选别的模板或去详情页补图。</p>
+          } @else {
+            <div class="pce-images">
+              @for (image of mainImages(); track image.id) {
+                <button
+                  type="button"
+                  class="pce-image"
+                  [class.is-active]="isImageSelected(image.id)"
+                  [attr.aria-pressed]="isImageSelected(image.id)"
+                  [attr.aria-label]="
+                    '使用第 ' + ($index + 1) + ' 张照片：' + image.originalFileName
+                  "
+                  (click)="toggleImage(image.id)"
+                >
+                  @if (thumbUrls().get(image.id); as url) {
+                    <img [src]="url" alt="" />
+                  }
+                </button>
+              }
+            </div>
+            <p class="pce-hint">按点击顺序就是版面顺序，最多 {{ template().imageCount }} 张。</p>
+          }
+        </div>
+      </details>
+
+      <details class="pce-group" open>
+        <summary>文字</summary>
+        <div class="pce-group__body">
+          <label class="pce-field">
+            <span>标题</span>
+            <input
+              type="text"
+              [attr.maxlength]="limits.title"
+              [value]="content().fields.title"
+              (input)="updateField('title', $event)"
+            />
+          </label>
+          <label class="pce-field">
+            <span>寄语（最多 {{ limits.message }} 字）</span>
+            <textarea
+              rows="4"
+              [attr.maxlength]="limits.message"
+              [value]="content().fields.message"
+              (input)="updateField('message', $event)"
+            ></textarea>
+          </label>
+          <label class="pce-field">
+            <span>落款</span>
+            <input
+              type="text"
+              [attr.maxlength]="limits.signature"
+              [value]="content().fields.signature"
+              (input)="updateField('signature', $event)"
+            />
+          </label>
+          <div class="pce-field-row">
+            <label class="pce-field">
+              <span>地点（邮戳上弧）</span>
+              <input
+                type="text"
+                [attr.maxlength]="limits.place"
+                [value]="content().fields.place"
+                (input)="updateField('place', $event)"
+              />
+            </label>
+            <label class="pce-field">
+              <span>日期（邮戳下弧）</span>
+              <input
+                type="text"
+                [attr.maxlength]="limits.date"
+                [value]="content().fields.date"
+                (input)="updateField('date', $event)"
+              />
+            </label>
+          </div>
+          @if (content().modules.recipient) {
+            <label class="pce-field">
+              <span>收件人</span>
+              <input
+                type="text"
+                [attr.maxlength]="limits.recipient"
+                [value]="content().fields.recipient"
+                (input)="updateField('recipient', $event)"
+              />
+            </label>
+            <label class="pce-field">
+              <span>地址</span>
+              <input
+                type="text"
+                [attr.maxlength]="limits.address"
+                [value]="content().fields.address"
+                (input)="updateField('address', $event)"
+              />
+            </label>
+            <label class="pce-field">
+              <span>邮编（6 位）</span>
+              <input
+                type="text"
+                [attr.maxlength]="limits.postalCode"
+                [value]="content().fields.postalCode"
+                (input)="updateField('postalCode', $event)"
+              />
+            </label>
+            <p class="pce-hint">留空也可以——寄出时手写更有味道。</p>
+          }
+        </div>
+      </details>
+
+      <details class="pce-group" open>
+        <summary>邮票与邮戳</summary>
+        <div class="pce-group__body">
+          <p class="pce-note">{{ stampLabel() }}</p>
+          <div class="pce-field-row">
+            <label class="pce-field">
+              <span>年份（生肖票按当年）</span>
+              <input
+                type="number"
+                min="1900"
+                max="2100"
+                [value]="content().stamp.year"
+                (change)="changeStampYear($event)"
+              />
+            </label>
+            <label class="pce-field">
+              <span>面值（元）</span>
+              <select
+                [value]="content().stamp.denomination"
+                (change)="changeStampDenomination($event)"
+              >
+                @for (value of denominations; track value) {
+                  <option [value]="value">{{ value }}</option>
+                }
+              </select>
+            </label>
+          </div>
+          <div class="pce-actions">
+            <label class="btn pce-upload">
+              用自己的邮票图
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                (change)="onStampFile($event)"
+              />
+            </label>
+            @if (content().stamp.customImageDataUrl) {
+              <button type="button" class="btn" (click)="clearStampImage()">用回自绘票面</button>
+            } @else {
+              <button type="button" class="btn" (click)="resetStampFace()">恢复默认票面</button>
+            }
+          </div>
+          @if (content().stamp.customImageName) {
+            <p class="pce-hint">
+              已使用：{{ content().stamp.customImageName }}（只用于本次绘制，不会上传）
+            </p>
+          } @else {
+            <p class="pce-hint">票面为自绘的当年生肖纪念票（真实邮票票面受版权保护，不内置）。</p>
+          }
+        </div>
+      </details>
+
+      <details class="pce-group" open>
+        <summary>模块</summary>
+        <div class="pce-group__body">
+          <p class="pce-hint">这款模板支持的模块；换模板时只有你改过的开关会保留。</p>
+          @for (moduleId of moduleSwitches(); track moduleId) {
+            <label class="pce-check">
+              <input
+                type="checkbox"
+                [checked]="content().modules[moduleId]"
+                (change)="toggleModule(moduleId, $event)"
+              />
+              <span>{{ moduleLabels[moduleId] }}</span>
+            </label>
+          }
+        </div>
+      </details>
+
+      @if (isMulti() && content().modules.trail) {
+        <details class="pce-group" open>
+          <summary>足迹清单（取消勾选即不写入）</summary>
+          <div class="pce-group__body">
+            @for (record of records(); track record.id) {
+              <label class="pce-check">
+                <input
+                  type="checkbox"
+                  [checked]="isInTrail(record.id)"
+                  (change)="toggleTrail(record.id)"
+                />
+                <span>{{ record.locationName }}</span>
+              </label>
+            }
+          </div>
+        </details>
+      }
+    </aside>
+  </div>
+
+  @if (error()) {
+    <p class="error" role="alert">{{ error() }}</p>
+  }
+</div>

@@ -1,0 +1,390 @@
+/* 明信片 10 款版式（ADR-0018）：每款只改纸面配色、照片排布与文字质感。
+   与 postcard-canvas.scss 同属一个组件（两文件只是为了让单文件体积可控）；
+   公共块（照片 / 邮票 / 邮戳 / 清单 / 图标 / 收件人栏）的样式在前者。 */
+
+/* 1. 经典邮政：白边 + 满幅照片 + 右上邮票 + 底部信息条 */
+.pc--classic-post {
+  --pc-paper: #f7f3ea;
+  padding: 44px;
+  border: 16px solid #fff;
+
+  .pc-photo--inset {
+    inset: 44px;
+    border: 12px solid #fff;
+  }
+}
+
+/* 2. 航空邮简：上下航空条纹 + 中间照片 */
+.pc--air-mail {
+  --pc-paper: #eef3f8;
+
+  .pc-airmail {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 84px;
+    background: repeating-linear-gradient(
+      135deg,
+      #b3261e 0 28px,
+      #fff 28px 56px,
+      #1d4ed8 56px 84px,
+      #fff 84px 112px
+    );
+    opacity: 0.85;
+
+    &--top {
+      top: 0;
+    }
+
+    &--bottom {
+      bottom: 0;
+    }
+  }
+
+  .pc-photo--center {
+    inset: 168px 96px 520px;
+    border: 14px solid #fff;
+  }
+
+  .pc-caption {
+    left: 96px;
+    top: 1328px;
+  }
+}
+
+/* 3. 拍立得：相纸 + 手写说明 */
+.pc--polaroid {
+  --pc-paper: #33403a;
+  --pc-ink: #2b241c;
+
+  .pc-polaroid {
+    position: absolute;
+    top: 150px;
+    left: 96px;
+    width: 900px;
+    padding: 40px 40px 150px;
+    background: #fffdf7;
+    box-shadow: 0 18px 40px rgb(0 0 0 / 0.32);
+    transform: rotate(-2deg);
+  }
+
+  .pc-polaroid__photo {
+    height: 820px;
+    background-color: rgb(0 0 0 / 0.08);
+    background-position: center;
+    background-size: cover;
+  }
+
+  .pc-polaroid__caption {
+    margin-top: 44px;
+    color: #2b241c;
+    font-family: var(--pc-font-hand);
+
+    .pc-title {
+      font-size: 58px;
+    }
+  }
+
+  .pc-message {
+    font-family: var(--pc-font-hand);
+  }
+
+  .pc-trail {
+    color: #f4efe4;
+  }
+}
+
+/* 4. 拼贴铁盒：三张错落 + 胶带 */
+.pc--collage {
+  --pc-paper: #e9dcc6;
+
+  .pc-collage {
+    position: absolute;
+    inset: 0;
+  }
+
+  .pc-collage__item {
+    position: absolute;
+    background-color: rgb(0 0 0 / 0.08);
+    background-position: center;
+    background-size: cover;
+    border: 16px solid #fffdf7;
+    box-shadow: 0 12px 26px rgb(0 0 0 / 0.24);
+  }
+
+  .pc-collage__item--a {
+    top: 128px;
+    left: 96px;
+    width: 620px;
+    height: 460px;
+    transform: rotate(-3deg);
+  }
+
+  .pc-collage__item--b {
+    top: 356px;
+    left: 520px;
+    width: 564px;
+    height: 420px;
+    transform: rotate(2.5deg);
+  }
+
+  .pc-collage__item--c {
+    top: 660px;
+    left: 168px;
+    width: 700px;
+    height: 440px;
+    transform: rotate(-1.5deg);
+  }
+
+  .pc-tape {
+    position: absolute;
+    width: 168px;
+    height: 44px;
+    background: rgb(255 255 255 / 0.62);
+    box-shadow: 0 2px 6px rgb(0 0 0 / 0.12);
+
+    &--a {
+      top: 96px;
+      left: 340px;
+      transform: rotate(-8deg);
+    }
+
+    &--b {
+      top: 640px;
+      right: 200px;
+      transform: rotate(6deg);
+    }
+  }
+
+  .pc-message {
+    font-family: var(--pc-font-hand);
+  }
+}
+
+/* 5. 图钉地图：双图 + 下方信息面板 */
+.pc--pinned-map {
+  --pc-paper: #efe6d5;
+  background-image:
+    linear-gradient(rgb(0 0 0 / 0.05) 2px, transparent 2px),
+    linear-gradient(90deg, rgb(0 0 0 / 0.05) 2px, transparent 2px);
+  background-size: 74px 74px;
+
+  .pc-split {
+    position: absolute;
+    top: 128px;
+    left: 96px;
+    right: 96px;
+    display: flex;
+    gap: 28px;
+  }
+
+  .pc-split__cell {
+    flex: 1;
+    height: 620px;
+    background-color: rgb(0 0 0 / 0.08);
+    background-position: center;
+    background-size: cover;
+    border: 14px solid #fffdf7;
+    box-shadow: 0 10px 22px rgb(0 0 0 / 0.2);
+  }
+
+  .pc-panel {
+    position: absolute;
+    left: 96px;
+    right: 96px;
+    top: 830px;
+    padding: 44px;
+    background: #fffdf7;
+    box-shadow: 0 10px 22px rgb(0 0 0 / 0.16);
+  }
+
+  .pc-pin {
+    position: absolute;
+    top: 806px;
+    left: 50%;
+    width: 40px;
+    height: 40px;
+    margin-left: -20px;
+    border-radius: 50%;
+    background: #b3261e;
+    box-shadow: 0 6px 12px rgb(0 0 0 / 0.32);
+  }
+}
+
+/* 6. 极简墨白：大留白 + 细线框 */
+.pc--ink-minimal {
+  --pc-paper: #fbfbf9;
+  --pc-ink: #17171a;
+
+  .pc-frame {
+    position: absolute;
+    inset: 72px;
+    border: 2px solid rgb(0 0 0 / 0.35);
+  }
+
+  .pc-photo--minimal {
+    position: absolute;
+    top: 320px;
+    left: 288px;
+    width: 605px;
+    height: 700px;
+  }
+
+  .pc-caption--minimal .pc-title {
+    font-size: 46px;
+    font-weight: 400;
+    letter-spacing: 0.32em;
+  }
+
+  .pc-caption--minimal .pc-meta {
+    font-size: 24px;
+    letter-spacing: 0.24em;
+  }
+
+  .pc-message {
+    font-size: 26px;
+    letter-spacing: 0.1em;
+  }
+}
+
+/* 7. 胶片条：竖向两格 + 齿孔边 */
+.pc--film-strip {
+  --pc-paper: #131518;
+  --pc-ink: #f4f2ee;
+
+  .pc-film {
+    position: absolute;
+    top: 132px;
+    left: 316px;
+    width: 549px;
+    padding: 34px 42px;
+    background: #05060a;
+    background-image:
+      radial-gradient(circle 12px at 21px 50%, transparent 98%, #05060a 100%),
+      radial-gradient(circle 12px at calc(100% - 21px) 50%, transparent 98%, #05060a 100%);
+    background-size:
+      42px 62px,
+      42px 62px;
+    background-repeat: repeat-y, repeat-y;
+    background-position: left, right;
+    box-shadow: 0 16px 34px rgb(0 0 0 / 0.4);
+  }
+
+  .pc-film__cell {
+    height: 620px;
+    background-color: rgb(255 255 255 / 0.08);
+    background-position: center;
+    background-size: cover;
+
+    & + & {
+      margin-top: 26px;
+    }
+  }
+
+  .pc-caption--mono .pc-title {
+    font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+    font-size: 44px;
+  }
+
+  .pc-message {
+    font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+    font-size: 26px;
+  }
+}
+
+/* 8. 日出渐变：大字寄语压在图上 */
+.pc--sunrise {
+  --pc-paper: #ffb26b;
+  --pc-ink: #3a1f14;
+  background: linear-gradient(170deg, #ffd7a1 0%, #ff9e6d 42%, #c6555f 78%, #6b2f5b 100%);
+
+  .pc-photo--sunrise {
+    position: absolute;
+    inset: 96px 96px 700px;
+    border-radius: 28px;
+    box-shadow: 0 20px 40px rgb(0 0 0 / 0.28);
+  }
+
+  .pc-hero {
+    position: absolute;
+    left: 120px;
+    right: 120px;
+    top: 1060px;
+  }
+
+  .pc-message {
+    font-size: 40px;
+    line-height: 1.5;
+  }
+}
+
+/* 9. 背面·写信：左侧寄语 + 右侧收件人 + 角贴小图 */
+.pc--back-letter {
+  --pc-paper: #f8f4ea;
+  background-image: repeating-linear-gradient(transparent 0 63px, rgb(0 0 0 / 0.07) 63px 65px);
+  background-position: 0 120px;
+
+  .pc-photo--stamp-corner {
+    position: absolute;
+    top: 120px;
+    left: 96px;
+    width: 300px;
+    height: 220px;
+    border: 12px solid #fffdf7;
+    transform: rotate(-4deg);
+    box-shadow: 0 8px 18px rgb(0 0 0 / 0.2);
+  }
+
+  .pc-letter {
+    position: absolute;
+    left: 96px;
+    right: 620px;
+    top: 400px;
+    font-family: var(--pc-font-hand);
+  }
+
+  .pc-message {
+    margin: 0;
+    font-size: 40px;
+    line-height: 1.65;
+  }
+
+  .pc-letter__sign {
+    margin: 28px 0 0;
+    font-size: 34px;
+    text-align: right;
+  }
+}
+
+/* 10. 背面·纯文：纸面 + 手写寄语 + 收件人 */
+.pc--back-plain {
+  --pc-paper: #fdfcf9;
+  --pc-ink: #22201d;
+
+  .pc-plain {
+    position: absolute;
+    left: 158px;
+    right: 158px;
+    top: 220px;
+    font-family: var(--pc-font-hand);
+  }
+
+  .pc-message {
+    margin: 0;
+    font-size: 44px;
+    line-height: 1.7;
+  }
+
+  .pc-plain__sign {
+    margin: 30px 0 0;
+    font-size: 36px;
+    text-align: right;
+  }
+
+  .pc-recipient--wide {
+    left: 158px;
+    right: 158px;
+    top: 1290px;
+    width: auto;
+  }
+}

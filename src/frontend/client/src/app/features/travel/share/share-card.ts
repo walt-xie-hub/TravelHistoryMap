@@ -3,6 +3,7 @@
  * 输出 4:5 竖版卡片 PNG（下载）与可复制的分享文案。
  */
 import type { TravelRecord } from '../models/travel-record.model';
+import { plainTextSnippet } from '../utils/rich-text.util';
 
 export interface ShareCardRow {
   locationName: string;
@@ -34,7 +35,9 @@ function fmtTime(iso: string): string {
 
 export function cardRowRange(row: ShareCardRow): string {
   const start = `${fmtDate(row.arrivedAt)} ${fmtTime(row.arrivedAt)}`;
-  return row.departedAt ? `${start} → ${fmtDate(row.departedAt)} ${fmtTime(row.departedAt)}` : `${start} · 进行中`;
+  return row.departedAt
+    ? `${start} → ${fmtDate(row.departedAt)} ${fmtTime(row.departedAt)}`
+    : `${start} · 进行中`;
 }
 
 export function toCardRows(records: readonly TravelRecord[]): ShareCardRow[] {
@@ -48,26 +51,30 @@ export function toCardRows(records: readonly TravelRecord[]): ShareCardRow[] {
     }));
 }
 
-function stripHtml(html: string | null | undefined): string {
-  if (!html) return '';
-  const text = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-  const div = document.createElement('div');
-  div.innerHTML = text;
-  return div.textContent ?? '';
+/** 正文 → 单行纯文本（实现见 utils/rich-text.util.ts 的 plainTextSnippet，与明信片清单共用） */
+function stripHtml(html: string | null | undefined, max?: number): string {
+  return plainTextSnippet(html, max);
 }
 
 /** 复制用文案（小红书/朋友圈友好） */
 export function buildShareText(input: ShareCardInput): string {
   const lines = input.rows.slice(0, 12).map((row, i) => {
-    const snip = stripHtml(row.description);
-    const desc = snip ? ` · ${snip.slice(0, 30)}${snip.length > 30 ? '…' : ''}` : '';
+    const snip = stripHtml(row.description, 30);
+    const desc = snip ? ` · ${snip}` : '';
     return `${i + 1}. ${row.locationName}（${cardRowRange(row)}）${desc}`;
   });
   const more = input.rows.length > 12 ? `\n……还有 ${input.rows.length - 12} 站` : '';
   return `🧭 我的旅行足迹「${input.title}」${lines.length} 站\n\n${lines.join('\n')}${more}\n\n—— 用 Travel Map 记录每一次出发 ✈️`;
 }
 
-function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
+function roundRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number,
+): void {
   ctx.beginPath();
   ctx.moveTo(x + r, y);
   ctx.arcTo(x + w, y, x + w, y + h, r);
@@ -113,10 +120,14 @@ export function renderShareCard(input: ShareCardInput): HTMLCanvasElement {
   // 装饰圆
   ctx.globalAlpha = 0.5;
   ctx.fillStyle = '#ffb57a';
-  ctx.beginPath(); ctx.arc(960, 170, 210, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath();
+  ctx.arc(960, 170, 210, 0, Math.PI * 2);
+  ctx.fill();
   ctx.globalAlpha = 0.35;
   ctx.fillStyle = '#ea580c';
-  ctx.beginPath(); ctx.arc(90, 1180, 240, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath();
+  ctx.arc(90, 1180, 240, 0, Math.PI * 2);
+  ctx.fill();
   ctx.globalAlpha = 1;
 
   ctx.textBaseline = 'top';
@@ -132,13 +143,18 @@ export function renderShareCard(input: ShareCardInput): HTMLCanvasElement {
   // 标题
   ctx.fillStyle = '#2a1c10';
   ctx.font = '800 64px "PingFang SC","Microsoft YaHei",sans-serif';
-  const titleLines = wrap(ctx, input.title.length > 22 ? input.title.slice(0, 22) + '…' : input.title, W - 180);
+  const titleLines = wrap(
+    ctx,
+    input.title.length > 22 ? input.title.slice(0, 22) + '…' : input.title,
+    W - 180,
+  );
   titleLines.forEach((line, i) => ctx.fillText(line, 72, 250 + i * 84));
   const titleBottom = 250 + titleLines.length * 84;
 
   // 计数徽章
   ctx.fillStyle = '#ea580c';
-  roundRect(ctx, 72, titleBottom + 30, 300, 68, 34); ctx.fill();
+  roundRect(ctx, 72, titleBottom + 30, 300, 68, 34);
+  ctx.fill();
   ctx.fillStyle = '#ffffff';
   ctx.font = '700 36px "PingFang SC","Microsoft YaHei",sans-serif';
   ctx.fillText(`共 ${input.rows.length} 站足迹`, 96, titleBottom + 46);
@@ -164,7 +180,11 @@ export function renderShareCard(input: ShareCardInput): HTMLCanvasElement {
     // 地点
     ctx.fillStyle = '#241a12';
     ctx.font = '700 48px "PingFang SC","Microsoft YaHei",sans-serif';
-    ctx.fillText(row.locationName.length > 16 ? row.locationName.slice(0, 16) + '…' : row.locationName, 176, y + 2);
+    ctx.fillText(
+      row.locationName.length > 16 ? row.locationName.slice(0, 16) + '…' : row.locationName,
+      176,
+      y + 2,
+    );
 
     // 时间
     ctx.fillStyle = '#8b7a6a';
@@ -172,11 +192,11 @@ export function renderShareCard(input: ShareCardInput): HTMLCanvasElement {
     ctx.fillText(cardRowRange(row), 176, y + 74);
 
     // 描述摘录（仅第一行缩进内联）
-    const snip = stripHtml(row.description);
+    const snip = stripHtml(row.description, 30);
     if (snip && i < 3) {
       ctx.fillStyle = '#5a4634';
       ctx.font = '400 28px "PingFang SC","Microsoft YaHei",sans-serif';
-      const line = `「${snip.length > 30 ? snip.slice(0, 30) + '…' : snip}」`;
+      const line = `「${snip}」`;
       ctx.fillText(line.length > 34 ? line.slice(0, 34) + '…' : line, 176, y + 40);
     }
   }

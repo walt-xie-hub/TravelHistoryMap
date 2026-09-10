@@ -1,0 +1,512 @@
+/* 明信片画面（ADR-0018）：1181×1748 固定画布 + 10 款版式。
+   尺寸单位一律 px（画布坐标），因为这份 DOM 会被按 1:1 截成图片。
+   邮票齿孔用 CSS mask 挖透明缺口（不依赖任何图片资产）；邮戳尺寸 180px 与
+   postcard-postmark.ts 的 POSTMARK_SIZE 一致。 */
+
+:host {
+  display: block;
+  /* 与 postcard-template.ts 的 POSTCARD_WIDTH / POSTCARD_HEIGHT 一致（100×148mm @300dpi） */
+  width: 1181px;
+  height: 1748px;
+}
+
+.pc {
+  /* 纸面与墨色默认值；每款版式用 .pc--{id} 覆盖 */
+  --pc-paper: #f7f3ea;
+  --pc-ink: #241a12;
+  --pc-font: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --pc-font-hand: 'KaiTi', 'STKaiti', 'Kaiti SC', 'PingFang SC', serif;
+  /* 邮票墨色（生肖字 / 边框），邮戳墨色由 .pc-postmark 的 color 决定 */
+  --pc-stamp-ink: #b3261e;
+  /* 与 postcard-postmark.ts 的 POSTMARK_SIZE 一致 */
+  --pc-postmark: 180px;
+
+  position: relative;
+  width: 1181px;
+  height: 1748px;
+  overflow: hidden;
+  background: var(--pc-paper);
+  color: var(--pc-ink);
+  font-family: var(--pc-font);
+}
+
+/* ---------- 照片 ---------- */
+.pc-photo {
+  position: absolute;
+  background-color: rgb(0 0 0 / 0.06);
+  background-position: center;
+  background-size: cover;
+
+  &__empty {
+    display: grid;
+    place-items: center;
+    width: 100%;
+    height: 100%;
+    border: 3px dashed rgb(0 0 0 / 0.18);
+    color: rgb(0 0 0 / 0.38);
+    font-size: 26px;
+  }
+}
+
+/* ---------- 邮票（齿孔 mask） ---------- */
+.pc-stamp {
+  --tooth: 9px;
+  --tooth-gap: 30px;
+
+  position: relative;
+  width: 236px;
+  height: 288px;
+  background: #fffdf8;
+  box-shadow: 0 6px 14px rgb(0 0 0 / 0.18);
+  mask-image:
+    linear-gradient(#000, #000),
+    radial-gradient(circle var(--tooth) at 50% 0, #000 99%, transparent 100%),
+    radial-gradient(circle var(--tooth) at 50% 100%, #000 99%, transparent 100%),
+    radial-gradient(circle var(--tooth) at 0 50%, #000 99%, transparent 100%),
+    radial-gradient(circle var(--tooth) at 100% 50%, #000 99%, transparent 100%);
+  mask-size:
+    100% 100%,
+    var(--tooth-gap) calc(var(--tooth) * 2),
+    var(--tooth-gap) calc(var(--tooth) * 2),
+    calc(var(--tooth) * 2) var(--tooth-gap),
+    calc(var(--tooth) * 2) var(--tooth-gap);
+  mask-repeat: no-repeat, repeat-x, repeat-x, repeat-y, repeat-y;
+  mask-position:
+    0 0,
+    calc(var(--tooth-gap) / 2) top,
+    calc(var(--tooth-gap) / 2) bottom,
+    left calc(var(--tooth-gap) / 2),
+    right calc(var(--tooth-gap) / 2);
+  mask-composite: add, subtract, subtract, subtract, subtract;
+
+  &__custom {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  &__face {
+    position: absolute;
+    inset: 24px 20px;
+    display: grid;
+    place-items: center;
+    border: 3px solid var(--pc-stamp-ink);
+    background: color-mix(in srgb, var(--pc-stamp-ink) 8%, #fffdf8);
+  }
+
+  &__zodiac {
+    font-family: var(--pc-font-hand);
+    font-size: 132px;
+    line-height: 1;
+    color: var(--pc-stamp-ink);
+  }
+
+  &__icon {
+    display: block;
+    width: 116px;
+    height: 116px;
+    color: var(--pc-stamp-ink);
+  }
+
+  &__country {
+    position: absolute;
+    top: 26px;
+    left: 10px;
+    color: var(--pc-stamp-ink);
+    font-size: 19px;
+    letter-spacing: 0.06em;
+    writing-mode: vertical-rl;
+  }
+
+  &__denom {
+    position: absolute;
+    right: 12px;
+    bottom: 14px;
+    color: var(--pc-stamp-ink);
+    font-size: 26px;
+    font-weight: 700;
+  }
+
+  &__year {
+    position: absolute;
+    bottom: 16px;
+    left: 14px;
+    color: var(--pc-stamp-ink);
+    font-size: 17px;
+    letter-spacing: 0.04em;
+  }
+}
+
+/* ---------- 邮票簇：邮票 + 压在上面的邮戳（销票） ---------- */
+.pc-stamp-cluster {
+  position: relative;
+  width: 236px;
+  height: 288px;
+}
+
+.pc-postmark {
+  position: absolute;
+  top: 132px;
+  left: 128px;
+  width: var(--pc-postmark);
+  height: var(--pc-postmark);
+  color: #3f3a34;
+  opacity: 0.9;
+
+  svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  &__ring {
+    fill: none;
+    stroke: currentcolor;
+    stroke-width: 4;
+  }
+
+  &__ring--inner {
+    stroke-width: 2;
+  }
+
+  &__rule {
+    stroke: currentcolor;
+    stroke-width: 3;
+  }
+
+  &__note {
+    fill: currentcolor;
+    font-family: var(--pc-font);
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-anchor: middle;
+  }
+
+  &__arc {
+    fill: currentcolor;
+    font-family: var(--pc-font);
+    font-size: 24px;
+    letter-spacing: 0.06em;
+  }
+
+  &__date {
+    fill: currentcolor;
+    font-family: var(--pc-font);
+    font-size: 22px;
+    letter-spacing: 0.04em;
+  }
+}
+
+.pc-cluster {
+  position: absolute;
+  z-index: 4;
+
+  &--tr {
+    top: 104px;
+    right: 96px;
+  }
+
+  &--bl {
+    bottom: 118px;
+    left: 96px;
+  }
+
+  &--br {
+    right: 104px;
+    bottom: 132px;
+  }
+
+  /* 小尺寸摆位：整簇等比缩小（含邮戳，保持销票关系） */
+  &--small {
+    transform: scale(0.72);
+    transform-origin: top right;
+  }
+}
+
+/* ---------- 文字块 ---------- */
+.pc-title {
+  display: block;
+  font-size: 54px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+}
+
+.pc-meta {
+  display: block;
+  margin-top: 10px;
+  font-size: 28px;
+  letter-spacing: 0.08em;
+  opacity: 0.72;
+}
+
+.pc-coord {
+  display: block;
+  margin-top: 8px;
+  font-size: 22px;
+  letter-spacing: 0.12em;
+  opacity: 0.56;
+}
+
+/* 寄语：10 款版式共用一个段落，位置与字体由版式改（换行保留） */
+.pc-message {
+  margin: 22px 0 0;
+  font-size: 30px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.pc-caption {
+  position: absolute;
+  z-index: 2;
+
+  &--strip {
+    left: 96px;
+    right: 96px;
+    bottom: 296px;
+  }
+
+  &--hand {
+    left: 104px;
+    bottom: 300px;
+    font-family: var(--pc-font-hand);
+  }
+
+  &--minimal {
+    left: 214px;
+    right: 214px;
+    bottom: 300px;
+    text-align: center;
+  }
+
+  &--mono {
+    left: 120px;
+    bottom: 292px;
+    font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+    letter-spacing: 0.02em;
+  }
+
+  &--corner {
+    left: 96px;
+    bottom: 96px;
+    max-width: 560px;
+  }
+
+  &--plain {
+    left: 158px;
+    bottom: 128px;
+  }
+}
+
+/* ---------- 足迹清单（所有版式共用一份结构） ---------- */
+.pc-trail {
+  position: absolute;
+  z-index: 2;
+
+  &__list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  &__row {
+    display: flex;
+    gap: 18px;
+    align-items: baseline;
+    padding: 10px 0;
+  }
+
+  &__index {
+    flex: none;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--pc-ink);
+    color: var(--pc-paper);
+    font-size: 24px;
+    line-height: 44px;
+    text-align: center;
+  }
+
+  &__place {
+    display: block;
+    font-size: 30px;
+    font-weight: 600;
+  }
+
+  &__range {
+    display: block;
+    margin-top: 4px;
+    font-size: 22px;
+    opacity: 0.66;
+  }
+
+  &__snippet {
+    display: block;
+    margin-top: 6px;
+    font-size: 22px;
+    opacity: 0.82;
+  }
+
+  &__more {
+    margin: 12px 0 0;
+    font-size: 24px;
+    opacity: 0.6;
+  }
+
+  &--strip {
+    left: 96px;
+    right: 96px;
+    bottom: 132px;
+    max-height: 340px;
+    overflow: hidden;
+  }
+
+  &--left {
+    left: 96px;
+    right: 560px;
+    top: 1180px;
+  }
+
+  &--hand {
+    left: 104px;
+    right: 104px;
+    bottom: 470px;
+    font-family: var(--pc-font-hand);
+
+    .pc-trail__index {
+      background: transparent;
+      color: var(--pc-ink);
+      font-family: var(--pc-font-hand);
+      font-weight: 700;
+    }
+  }
+
+  &--panel {
+    margin-top: 26px;
+  }
+
+  &--minimal {
+    left: 214px;
+    right: 214px;
+    bottom: 96px;
+
+    .pc-trail__index {
+      background: transparent;
+      color: var(--pc-ink);
+      font-weight: 400;
+    }
+  }
+
+  &--mono {
+    left: 120px;
+    right: 120px;
+    bottom: 96px;
+
+    .pc-trail__index {
+      background: transparent;
+      color: var(--pc-ink);
+      font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+    }
+  }
+
+  &--sunrise {
+    left: 120px;
+    right: 120px;
+    bottom: 96px;
+
+    .pc-trail__index {
+      background: rgb(255 255 255 / 0.85);
+      color: var(--pc-ink);
+    }
+  }
+
+  &--letter {
+    left: 96px;
+    top: 1180px;
+    right: 600px;
+  }
+
+  &--plain {
+    left: 158px;
+    right: 158px;
+    top: 1000px;
+  }
+}
+
+/* ---------- 旅行标识（图标模块） ---------- */
+.pc-icon {
+  position: absolute;
+  z-index: 3;
+  color: var(--pc-ink);
+  opacity: 0.9;
+
+  &--br {
+    right: 96px;
+    bottom: 96px;
+  }
+
+  &--tr {
+    top: 96px;
+    right: 96px;
+  }
+
+  &--tl {
+    top: 96px;
+    left: 96px;
+  }
+}
+
+/* ---------- 收件人栏（背面式） ---------- */
+.pc-recipient {
+  position: absolute;
+  right: 96px;
+  top: 620px;
+  width: 452px;
+  font-size: 26px;
+
+  &__label {
+    display: block;
+    margin-top: 26px;
+    font-size: 20px;
+    letter-spacing: 0.2em;
+    opacity: 0.5;
+  }
+
+  &__name,
+  &__address {
+    display: block;
+    min-height: 44px;
+    font-family: var(--pc-font-hand);
+    font-size: 34px;
+  }
+
+  &__line {
+    display: block;
+    margin-top: 6px;
+    border-bottom: 2px solid rgb(0 0 0 / 0.28);
+  }
+
+  &__postal {
+    display: flex;
+    gap: 8px;
+    margin-top: 30px;
+  }
+
+  &__digit {
+    display: grid;
+    place-items: center;
+    width: 46px;
+    height: 56px;
+    border: 2px solid rgb(0 0 0 / 0.5);
+    font-size: 32px;
+    font-weight: 700;
+  }
+}
+
+/* ============================================================
+   10 款版式的排布与配色见 postcard-layouts.scss（同属本组件，
+   拆文件只为让单个样式文件体积可控）
+   ============================================================ */

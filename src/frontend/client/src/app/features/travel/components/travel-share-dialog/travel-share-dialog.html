@@ -1,41 +1,92 @@
 <div class="share-backdrop" (click)="close.emit()">
-  <div class="share-dialog" role="dialog" aria-modal="true" aria-label="分享足迹" (click)="$event.stopPropagation()">
+  <div
+    class="share-dialog"
+    [class.share-dialog--wide]="mode() === 'postcard'"
+    role="dialog"
+    aria-modal="true"
+    aria-label="分享足迹"
+    (click)="$event.stopPropagation()"
+  >
     <div class="share-dialog__head">
       <h2>分享足迹</h2>
+      <div class="share-dialog__modes" role="group" aria-label="分享形式">
+        <button
+          type="button"
+          class="mode-btn"
+          [class.is-active]="mode() === 'card'"
+          [attr.aria-pressed]="mode() === 'card'"
+          (click)="mode.set('card')"
+          title="一眼看懂全部足迹的清单卡片"
+        >
+          足迹卡
+        </button>
+        <button
+          type="button"
+          class="mode-btn"
+          [class.is-active]="mode() === 'postcard'"
+          [attr.aria-pressed]="mode() === 'postcard'"
+          (click)="mode.set('postcard')"
+          title="10 款明信片模板：选照片、写寄语、盖邮戳"
+        >
+          明信片
+        </button>
+      </div>
       <button type="button" class="icon-btn" aria-label="关闭" (click)="close.emit()">✕</button>
     </div>
 
-    <section class="share-dialog__body">
-      <div class="card-panel">
-        <div class="card-panel__title">足迹分享卡</div>
-        @if (cardUrl()) {
-          <img class="card-panel__img" [src]="cardUrl()" alt="足迹分享卡预览" />
-        } @else {
-          <p class="hint">没有可分享的足迹。</p>
-        }
-        <div class="actions">
-          <button type="button" class="btn btn-primary" (click)="download()" [disabled]="!cardUrl()">下载图片</button>
-          <button type="button" class="btn" (click)="copyCaption()" [disabled]="!caption()">复制文案</button>
-        </div>
-      </div>
-
-      <div class="link-panel">
-        <div class="link-panel__title">只读分享链接</div>
-        <p class="hint">生成一个只读链接，朋友无需登录即可查看这份足迹清单。</p>
-        @if (!link()) {
-          <button type="button" class="btn btn-primary" (click)="generateLink()" [disabled]="busy() || !records().length">
-            {{ busy() ? '生成中…' : '生成分享链接' }}
-          </button>
-        } @else {
-          <input class="link-input" readonly [value]="link()" aria-label="分享链接" />
+    @if (mode() === 'postcard') {
+      <app-postcard-editor [records]="records()" (close)="close.emit()" />
+    } @else {
+      <section class="share-dialog__body">
+        <div class="card-panel">
+          <div class="card-panel__title">足迹分享卡</div>
+          @if (cardUrl()) {
+            <img class="card-panel__img" [src]="cardUrl()" alt="足迹分享卡预览" />
+          } @else {
+            <p class="hint">没有可分享的足迹。</p>
+          }
           <div class="actions">
-            <button type="button" class="btn btn-primary" (click)="copyLink()">复制链接</button>
-            <a class="btn" [href]="link()" target="_blank" rel="noopener">打开预览</a>
+            <button
+              type="button"
+              class="btn btn-primary"
+              (click)="download()"
+              [disabled]="!cardUrl()"
+            >
+              下载图片
+            </button>
+            <button type="button" class="btn" (click)="copyCaption()" [disabled]="!caption()">
+              复制文案
+            </button>
           </div>
-        }
-        @if (error()) { <p class="error" role="alert">{{ error() }}</p> }
-        @if (copied()) { <p class="ok">{{ copied() }}</p> }
-      </div>
-    </section>
+        </div>
+
+        <div class="link-panel">
+          <div class="link-panel__title">只读分享链接</div>
+          <p class="hint">生成一个只读链接，朋友无需登录即可查看这份足迹清单。</p>
+          @if (!link()) {
+            <button
+              type="button"
+              class="btn btn-primary"
+              (click)="generateLink()"
+              [disabled]="busy() || !records().length"
+            >
+              {{ busy() ? '生成中…' : '生成分享链接' }}
+            </button>
+          } @else {
+            <input class="link-input" readonly [value]="link()" aria-label="分享链接" />
+            <div class="actions">
+              <button type="button" class="btn btn-primary" (click)="copyLink()">复制链接</button>
+              <a class="btn" [href]="link()" target="_blank" rel="noopener">打开预览</a>
+            </div>
+          }
+          @if (error()) {
+            <p class="error" role="alert">{{ error() }}</p>
+          }
+          @if (copied()) {
+            <p class="ok">{{ copied() }}</p>
+          }
+        </div>
+      </section>
+    }
   </div>
 </div>
