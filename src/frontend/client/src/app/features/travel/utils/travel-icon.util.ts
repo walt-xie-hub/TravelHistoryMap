@@ -6,9 +6,9 @@
  * - 本文件是 key / 标签 / 分类 / 造型与地区映射的唯一事实来源；没有独立的资产文件。
  * - 优先级：显式选择（record.iconKey）> 地区特色（city）> 无（回退默认标记）。
  */
+import { stripAdminSuffix } from './amap-city.util';
 
 export type TravelIconCategory = 'animal' | 'food' | 'architecture' | 'plant';
-
 /**
  * 一个剪影子形。
  * 单个 path 使用偶数环绕序（evenodd）：其内部子路径即镂空（眼窝、门洞、方孔等）。
@@ -707,16 +707,13 @@ const REGIONAL_ICON_KEYS: Readonly<Record<string, string>> = {
   贵阳: 'plant-orchid',
 };
 
-function normalizeCityName(city: string): string {
-  return city.trim().replace(/(自治州|地区|盟|市)$/, '');
-}
-
 /** 按城市短名取地区特色 icon key（未收录/空 → undefined） */
 export function regionalIconKey(city: string | null | undefined): string | undefined {
   if (!city) return undefined;
   const trimmed = city.trim();
   if (!trimmed) return undefined;
-  const key = REGIONAL_ICON_KEYS[normalizeCityName(trimmed)] ?? REGIONAL_ICON_KEYS[trimmed];
+  const short = stripAdminSuffix(trimmed);
+  const key = REGIONAL_ICON_KEYS[short] ?? REGIONAL_ICON_KEYS[trimmed];
   return travelIcon(key)?.key;
 }
 

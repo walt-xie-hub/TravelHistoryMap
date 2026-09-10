@@ -26,11 +26,12 @@ import { TravelShareDialog } from '../../components/travel-share-dialog/travel-s
 import { MapTimeline } from '../../components/map-timeline/map-timeline';
 import type { TimelineRun } from '../../utils/timeline.util';
 import { AmapLoaderService } from '../../data-access/amap-loader.service';
+import { AmapReverseGeocodeService } from '../../data-access/amap-reverse-geocode.service';
 import { TravelHistoryService } from '../../data-access/travel-history.service';
 import type { TravelRangeRequest, TravelRecord } from '../../models/travel-record.model';
 import { wgs84ToGcj02 } from '../../utils/coord';
-import { MapMarkerGroup, fmtDateTime, groupMapMarkers } from '../../utils/travel-display';
-import { regionalIconKey, sharedTravelIcon, travelIcon, travelIconMarkup } from '../../utils/travel-icon.util';
+import { MapMarkerGroup, effectiveCity, fmtDateTime, groupMapMarkers, iconSourceOf } from '../../utils/travel-display';
+import { iconForRecord, sharedTravelIcon, travelIconMarkup } from '../../utils/travel-icon.util';
 
 const DEFAULT_CENTER = [104.1954, 35.8617] as const; // 中国全国视野
 const DEFAULT_ZOOM = 5;
@@ -59,6 +60,7 @@ export class MapPage implements AfterViewInit, OnDestroy {
   private readonly travelService = inject(TravelHistoryService);
   private readonly router = inject(Router);
   private readonly amapLoader = inject(AmapLoaderService);
+  private readonly reverseGeocode = inject(AmapReverseGeocodeService);
 
   private readonly mapContainer =
     viewChild.required<ElementRef<HTMLDivElement>>('mapContainer');
@@ -71,6 +73,8 @@ export class MapPage implements AfterViewInit, OnDestroy {
   readonly mapErrorMsg = signal('');
   readonly selectedRecordId = signal<number | null>(null);
   readonly page = signal(1);
+  /** 无 City 快照记录的**派生城市**（recordId → 城市短名）：只用于地图分组，ADR-0017 */
+  readonly derivedCities = signal<ReadonlyMap<number, string>>(new Map());
   readonly totalPages = signal(1);
   readonly totalCount = signal(0);
   readonly searchKeyword = signal('');
@@ -92,6 +96,8 @@ export class MapPage implements AfterViewInit, OnDestroy {
   private range: TravelRangeRequest = { kind: 'all' };
   private loadedKey = '';
   private fetchSeq = 0;
+  /** 已发起过派生逆地理的记录 id（去重记忆 + 过期令牌：异步回来后不匹配就丢弃结果） */
+  private lastRequestedIds = '';
 
   ngAfterViewInit(): void {
     this.initMap();
@@ -206,7 +212,10 @@ export class MapPage implements AfterViewInit, OnDestroy {
 
   // ---------- 标注渲染（城市优先，无 City 回退坐标合并：ADR-0017 / ADR-0004） ----------
 
-  private renderMarkers(): void {
+  /**
+   * @param preserveView 为 true 时不关气泡、也不重置视野：异步派生回来的重渲染不应抢用户的视口/关掉已打开的信息窗（ADR-0017）
+   */
+  private renderMarkers(preserveView = false): void {
     const map = this.map;
     const amap = this.amap;
     if (!map || !amap) return;
@@ -215,9 +224,12 @@ export class MapPage implements AfterViewInit, OnDestroy {
     this.markers = [];
     this.clearFocusRing();
     this.groupByRecord.clear();
-    this.infoWindow?.close();
+    if (!preserveView) this.infoWindow?.close();
 
-    for (const group of groupMapMarkers(this.records())) {
+    // 无 City 快照的记录先按坐标派生城市（异步，不阻塞首帧），结果回来后再重渲染
+    void this.requestDerivedCities();
+
+    for (const group of groupMapMarkers(this.records(), this.derivedCities())) {
       for (const record of group.records) this.groupByRecord.set(record.id, group);
 
       const position = this.positionOf(group);
@@ -233,8 +245,8 @@ export class MapPage implements AfterViewInit, OnDestroy {
         `${label}：${count} 次停留${ongoing ? '（含进行中）' : ''}${favorite ? '（含精选收藏）' : ''}`,
       );
 
-      // ADR-0017：城市标记优先用该城的地区特色图标（城市一致 ⇒ 派生一致）；
-      // 未收录城市回退「组内解析一致的图标」（ADR-0016），再不行用默认标记（熊猫）+ 计数
+      // ADR-0017：城市标记 = 该城**首次到访**那条记录的解析结果（显式 iconKey > Regional icon）；
+      // 地点标记仍要求组内解析一致（ADR-0016），否则回退默认标记（熊猫）+ 计数
       const icon = this.iconForGroup(group);
       if (icon) {
         content.classList.add('tm-marker--icon');
@@ -290,11 +302,65 @@ export class MapPage implements AfterViewInit, OnDestroy {
     }
   }
 
-  /** 城市标记优先地区特色图标；地点标记用组内一致图标（ADR-0016 / 0017） */
+  /**
+   * 无 City 快照的记录按坐标派生城市（ADR-0017）：只影响分组，不写库。
+   * 先按快照渲染，派生结果到达后重渲染标记；同一批记录只发起一次。
+   */
+  private async requestDerivedCities(): Promise<void> {
+    const pending = this.records().filter((record) => !record.city?.trim());
+    if (pending.length === 0) {
+      this.lastRequestedIds = '';
+      return;
+    }
+
+    // 排序后再拼 id：同一批记录不管顺序如何都只算一次（避免多余的重渲染）
+    const ids = pending.map((record) => record.id).sort((a, b) => a - b);
+    const key = ids.join(',');
+    if (key === this.lastRequestedIds) return;
+    this.lastRequestedIds = key;
+
+    const cities = await this.reverseGeocode.resolveCities(
+      pending.map((record) => ({ lng: record.longitude, lat: record.latitude })),
+    );
+    // 期间翻页/换筛选 → 丢弃过期结果
+    if (this.lastRequestedIds !== key) return;
+
+    const byRecord = new Map<number, string>();
+    pending.forEach((record, index) => {
+      const city = cities[index];
+      if (city) byRecord.set(record.id, city);
+    });
+
+    // 分组结果没变就不重渲染：避免异步回来时把用户已打开的气泡/已缩放的视野重置
+    const before = this.markerSignature(this.derivedCities());
+    const after = this.markerSignature(byRecord);
+    this.derivedCities.set(byRecord);
+    if (before === after) return;
+
+    // 用户已经选过某条记录/打开过气泡时不再抢视口
+    const engaged = this.selectedRecordId() !== null;
+    this.renderMarkers(engaged);
+    if (!engaged) this.fitView();
+  }
+
+  /** 标记集合签名（kind + 城市名 + 组内 id）：相同则不需要重渲染 */
+  private markerSignature(derivedCities: ReadonlyMap<number, string>): string {
+    return groupMapMarkers(this.records(), derivedCities)
+      .map((group) => `${group.key}[${group.records.map((r) => r.id).join('|')}]`)
+      .join(';');
+  }
+
+  /**
+   * 城市标记取该城**首条记录**（首次到访）的图标；地点标记要求组内一致（ADR-0017 / 0016）。
+   * 图标解析用**有效城市**：快照优先，派生城市补空缺（否则无快照的旧记录拿不到地区特色图标）。
+   */
   private iconForGroup(group: MapMarkerGroup) {
     if (group.kind === 'city') {
-      const regional = travelIcon(regionalIconKey(group.city));
-      if (regional) return regional;
+      const source = iconSourceOf(group);
+      return iconForRecord({
+        iconKey: source.iconKey,
+        city: effectiveCity(source, this.derivedCities()) ?? group.city,
+      });
     }
     return sharedTravelIcon(group.records);
   }
@@ -449,10 +515,15 @@ export class MapPage implements AfterViewInit, OnDestroy {
     const list = document.createElement('div');
     list.className = 'tm-info__list';
     for (const record of group.records) {
-      const row = document.createElement('button');
-      row.type = 'button';
+      // 一行 = 一条停留：左侧是信息（点它=在地图上定位到这次停留），右侧是该条的快捷操作
+      const row = document.createElement('div');
       row.className = 'tm-info__row';
-      row.title = '在地图上定位到这次停留';
+
+      const main = document.createElement('button');
+      main.type = 'button';
+      main.className = 'tm-info__row-main';
+      main.title = '在地图上定位到这次停留';
+      main.setAttribute('aria-label', `在地图上定位到 ${record.locationName}`);
 
       const line = document.createElement('span');
       line.className = 'tm-info__row-line';
@@ -480,42 +551,50 @@ export class MapPage implements AfterViewInit, OnDestroy {
         badge.textContent = '进行中';
         line.appendChild(badge);
       }
-      row.appendChild(line);
-      row.addEventListener('click', () => this.focusOnMap(record.id, FOCUS_ZOOM));
+      main.appendChild(line);
+      main.addEventListener('click', () => this.focusOnMap(record.id, FOCUS_ZOOM));
+
+      const actions = document.createElement('span');
+      actions.className = 'tm-info__row-actions';
+
+      const detail = document.createElement('button');
+      detail.type = 'button';
+      detail.className = 'row-action';
+      detail.textContent = '详情';
+      detail.title = '查看这条停留的详情';
+      detail.setAttribute('aria-label', `查看 ${record.locationName} 的详情`);
+      detail.addEventListener('click', () => {
+        this.infoWindow?.close();
+        void this.router.navigate(['/travels', record.id]);
+      });
+
+      const again = document.createElement('button');
+      again.type = 'button';
+      again.className = 'row-action row-action--primary';
+      again.textContent = '再来';
+      again.title = '再来一次（预填这个地点新建）';
+      again.setAttribute('aria-label', `再来一次（${record.locationName}）`);
+      again.addEventListener('click', () => {
+        this.infoWindow?.close();
+        void this.router.navigate(['/travels/new'], {
+          state: {
+            prefill: {
+              locationName: record.locationName,
+              longitude: record.longitude,
+              latitude: record.latitude,
+              // 无快照时把派生城市一并带入：新记录因此拿到城市快照（ADR-0017）
+              city: effectiveCity(record, this.derivedCities()) ?? null,
+              iconKey: record.iconKey ?? null,
+            },
+          },
+        });
+      });
+
+      actions.append(detail, again);
+      row.append(main, actions);
       list.appendChild(row);
     }
     root.appendChild(list);
-    const detail = document.createElement('button');
-    detail.type = 'button';
-    detail.className = 'tm-info__detail';
-    detail.textContent = '查看旅游详情';
-    detail.addEventListener('click', () => {
-      this.infoWindow?.close();
-      void this.router.navigate(['/travels', group.records[0]!.id]);
-    });
-    root.appendChild(detail);
-
-    // “再来一次”：预填该点（名称/坐标/城市）跳新建页
-    const first = group.records[0]!;
-    const again = document.createElement('button');
-    again.type = 'button';
-    again.className = 'tm-info__detail';
-    again.textContent = '＋ 再来一次到访';
-    again.addEventListener('click', () => {
-      this.infoWindow?.close();
-      void this.router.navigate(['/travels/new'], {
-        state: {
-          prefill: {
-            locationName: first.locationName,
-            longitude: first.longitude,
-            latitude: first.latitude,
-            city: first.city ?? null,
-            iconKey: first.iconKey ?? null,
-          },
-        },
-      });
-    });
-    root.appendChild(again);
     return root;
   }
 

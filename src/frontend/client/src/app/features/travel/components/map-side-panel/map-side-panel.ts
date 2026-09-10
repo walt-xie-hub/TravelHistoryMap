@@ -7,6 +7,7 @@ import type {
   TravelRecord,
 } from '../../models/travel-record.model';
 import { fmtDuration, fmtRange } from '../../utils/travel-display';
+import { effectiveCity } from '../../utils/travel-display';
 import { iconForRecord } from '../../utils/travel-icon.util';
 import { TravelIconComponent } from '../travel-icon/travel-icon';
 
@@ -43,6 +44,8 @@ export class MapSidePanel {
   private readonly router = inject(Router);
 
   readonly records = input<TravelRecord[]>([]);
+  /** 无 City 快照记录的派生城市（recordId → 城市）：与地图同一口径（ADR-0017） */
+  readonly derivedCities = input<ReadonlyMap<number, string>>(new Map());
   readonly travelLoading = input(false);
   readonly selectedRecordId = input<number | null>(null);
   readonly page = input(1);
@@ -132,9 +135,9 @@ export class MapSidePanel {
     this.recordSelect.emit(id);
   }
 
-  /** 行内旅行标识图标（ADR-0016）：显式选择 > 城市特色 */
+  /** 行内旅行标识图标（ADR-0016）：显式选择 > 城市特色；无快照时用地图派生的城市（ADR-0017） */
   protected iconOf(record: TravelRecord) {
-    return iconForRecord(record);
+    return iconForRecord({ iconKey: record.iconKey, city: effectiveCity(record, this.derivedCities()) });
   }
 
   onRecordDelete(event: Event, id: number): void {
@@ -156,7 +159,8 @@ export class MapSidePanel {
           locationName: record.locationName,
           longitude: record.longitude,
           latitude: record.latitude,
-          city: record.city ?? null,
+          // 无快照时把派生城市一并带入：新记录因此拿到城市快照（ADR-0017）
+          city: effectiveCity(record, this.derivedCities()) ?? null,
           iconKey: record.iconKey ?? null,
         },
       },

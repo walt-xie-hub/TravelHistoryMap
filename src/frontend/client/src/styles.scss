@@ -30,6 +30,9 @@
   --warning: #d97706;
   --warning-soft: #fef3c7;
 
+  /* 精选收藏星标（地图角标 / 列表 / 信息窗同色） */
+  --star: #f59e0b;
+
   /* 几何与层次 */
   --radius-sm: 6px;
   --radius: 8px;
@@ -233,7 +236,7 @@ body {
   height: 18px;
   border: 2px solid #ffffff;
   border-radius: 50%;
-  background: #f59e0b;
+  background: var(--star, #f59e0b);
   color: #ffffff;
   font-size: 11px;
   font-weight: 800;
@@ -303,10 +306,46 @@ body {
   }
 }
 
+/* 行内快捷操作按钮（侧栏行与地图信息窗共用，避免各写一套） */
+.row-action {
+  margin-left: 0;
+  padding: 3px 8px;
+  border: 1px solid var(--border-color, #d1d5db);
+  border-radius: 6px;
+  background: var(--surface, #ffffff);
+  color: var(--primary, #2563eb);
+  font: inherit;
+  font-size: 11px;
+  line-height: 1.6;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+
+  &:hover {
+    background: var(--primary-soft, #eff6ff);
+  }
+
+  &--primary {
+    border-color: color-mix(in srgb, var(--primary, #2563eb) 45%, transparent);
+  }
+
+  &--danger {
+    border-color: color-mix(in srgb, var(--danger, #dc2626) 45%, transparent);
+    background: var(--danger-soft, #fee9e7);
+    color: var(--danger, #dc2626);
+
+    &:hover {
+      background: var(--danger-border, #f6b5b1);
+    }
+  }
+}
+
 /* 气泡内容 */
 .tm-info {
-  min-width: 230px;
-  max-width: 300px;
+  min-width: 260px;
+  max-width: 340px;
   font-family: inherit;
 }
 
@@ -336,24 +375,55 @@ body {
 }
 
 .tm-info__row {
-  display: block;
-  width: 100%;
-  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 8px;
+  background: var(--surface-hover);
+
+  &:not(:last-child) {
+    border-bottom: 1px solid var(--border-color);
+  }
+}
+
+/* 行的可点区域：定位到这次停留 */
+.tm-info__row-main {
+  flex: 1;
+  min-width: 0;
   padding: 7px 9px;
   border: none;
   border-radius: 8px;
-  background: var(--surface-hover);
+  background: none;
   font: inherit;
+  text-align: left;
   cursor: pointer;
   transition: background 0.15s;
 
   &:hover {
     background: var(--primary-soft);
   }
+}
 
-  &:not(:last-child) {
-    border-bottom: 1px solid var(--border-color);
-  }
+/* 行尾快捷操作：详情 / 再来（与侧栏行同款 .row-action） */
+.tm-info__row-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  padding-right: 7px;
+}
+
+.tm-info__row-place {
+  max-width: 130px;
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tm-info__star {
+  flex: none;
+  color: var(--star, #f59e0b);
 }
 
 .tm-info__row-line {

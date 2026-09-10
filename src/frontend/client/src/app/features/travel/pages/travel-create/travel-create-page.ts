@@ -17,6 +17,7 @@ import { AmapLoaderService } from '../../data-access/amap-loader.service';
 import { TravelHistoryService } from '../../data-access/travel-history.service';
 import type { TravelCreatePrefill } from '../../models/travel-record.model';
 import { toDatetimeLocal } from '../../utils/travel-display';
+import { cityFromComponents, cityFromPlace } from '../../utils/amap-city.util';
 import { HttpErrorResponse } from '@angular/common/http';
 import { RichTextEditorComponent } from '../../components/rich-text-editor/rich-text-editor';
 import { TravelIconPicker } from '../../components/travel-icon-picker/travel-icon-picker';
@@ -28,30 +29,6 @@ import { acceptImageFiles, pastedImageFiles } from '../../utils/staged-images.ut
 interface SelectedImage {
   file: File;
   url: string;
-}
-
-/** 去掉行政后缀（上海市→上海、中山市→中山、地区/盟），让时间轴节点短。 */
-function stripAdminSuffix(name: string): string {
-  return name.replace(/(自治州|地区|盟)$/, '').replace(/市$/, '');
-}
-
-function firstString(value: unknown): string {
-  return typeof value === 'string' && value.trim() ? value.trim() : '';
-}
-
-/** 从 AMap 搜索候选提取城市（ADR-0015）：cityname ?? pname。 */
-function cityFromPlace(place: AmapPlaceResult): string {
-  const extended = place as unknown as { cityname?: unknown; pname?: unknown };
-  const raw = firstString(extended.cityname) || firstString(extended.pname);
-  return raw ? stripAdminSuffix(raw) : '';
-}
-
-/** 从逆地理 addressComponent 提取城市：city ?? province。 */
-function cityFromComponents(comp?: { province?: string; city?: string | string[] }): string {
-  const cityValue = comp?.city;
-  const city = typeof cityValue === 'string' ? cityValue : Array.isArray(cityValue) ? cityValue[0] ?? '' : '';
-  const raw = firstString(city) || firstString(comp?.province);
-  return raw ? stripAdminSuffix(raw) : '';
 }
 
 @Component({

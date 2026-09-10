@@ -8,6 +8,7 @@
 <div class="map-layout">
   <app-map-side-panel
     [records]="records()"
+    [derivedCities]="derivedCities()"
     [travelLoading]="travelLoading()"
     [selectedRecordId]="selectedRecordId()"
     (filterChange)="onFilterChange($event)"

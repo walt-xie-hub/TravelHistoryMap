@@ -195,7 +195,7 @@
   height: 16px;
   padding: 0 4px;
   border-radius: 999px;
-  background: #f59e0b;
+  background: var(--star, #f59e0b);
   color: #ffffff;
   font-size: 10px;
   font-weight: 800;

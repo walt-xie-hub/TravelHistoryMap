@@ -58,8 +58,8 @@ export function fmtDuration(record: TravelRecord): string {
 
 /**
  * 地图标记分组（ADR-0017）：
- * - 有 City 快照的记录 → 按城市合成**城市标记**（一个城市只出一个标记）；
- * - 无 City 的旧记录 → 保留原行为，按 WGS-84 4 位小数（≈11 米）合成**地点标记**（ADR-0004）。
+ * - 有 City 快照（或能派生到城市）的记录 → 按城市合成**城市标记**（一个城市只出一个标记）；
+ * - 既无快照又无派生的记录 → 按 WGS-84 4 位小数（≈11 米）合成**地点标记**（ADR-0004）。
  */
 export type MapMarkerKind = 'city' | 'place';
 
@@ -69,17 +69,35 @@ export interface MapMarkerGroup {
   key: string;
   /** 城市标记的城市名（地点标记为 undefined） */
   city?: string;
-  /** 组内记录（保持入参顺序；入参按到达时间倒序） */
+  /** 组内记录（按到达时间**倒序**，与入参顺序无关） */
   records: TravelRecord[];
   /** 标记锚点（WGS-84）：城市标记取该城所有记录的**质心**，地点标记取该坐标 */
   lng: number;
   lat: number;
 }
 
-export function groupMapMarkers(records: readonly TravelRecord[]): MapMarkerGroup[] {
+/**
+ * **有效城市**（ADR-0017 决策 2）：快照优先，派生城市只补空缺。
+ * 地图分组、行内图标、 「再来」预填都走这一个实现，避免口径不一。
+ */
+export function effectiveCity(
+  record: { id: number; city?: string | null },
+  derivedCities?: ReadonlyMap<number, string>,
+): string | undefined {
+  return record.city?.trim() || derivedCities?.get(record.id)?.trim() || undefined;
+}
+
+/**
+ * @param derivedCities 无 City 快照记录的**派生城市**（recordId → 城市短名）。
+ *   只作用于快照为空的记录；快照优先，派生只补空缺；派生结果不落库（ADR-0017）。
+ */
+export function groupMapMarkers(
+  records: readonly TravelRecord[],
+  derivedCities?: ReadonlyMap<number, string>,
+): MapMarkerGroup[] {
   const byKey = new Map<string, { kind: MapMarkerKind; city?: string; bucket: TravelRecord[] }>();
   for (const record of records) {
-    const city = record.city?.trim();
+    const city = effectiveCity(record, derivedCities) ?? '';
     const kind: MapMarkerKind = city ? 'city' : 'place';
     const key = city
       ? `city:${city}`
@@ -110,4 +128,12 @@ export function groupMapMarkers(records: readonly TravelRecord[]): MapMarkerGrou
     })
     // 组间按组内最新到达倒序，保证标注/列表顺序稳定
     .sort((a, b) => b.records[0]!.arrivedAt.localeCompare(a.records[0]!.arrivedAt));
+}
+
+/**
+ * 城市标记图标来源：该城**首次到访**（最早）的那条记录（ADR-0017）。
+ * 地点标记不用它（走 `sharedTravelIcon` 的组内一致性规则）。
+ */
+export function iconSourceOf(group: MapMarkerGroup): TravelRecord {
+  return group.records[group.records.length - 1]!;
 }
