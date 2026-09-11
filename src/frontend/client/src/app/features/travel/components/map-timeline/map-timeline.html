@@ -71,10 +71,25 @@
             @if (run.records.length > 1 && isExpanded(run.key)) {
               <div class="tl-branch">
                 @for (record of run.records; track record.id) {
-                  <button type="button" class="tl-branch__row" (click)="focusRecord(record.id)">
-                    <span class="tl-branch__name">{{ record.locationName }}</span>
-                    <span class="tl-branch__meta">{{ rangeOf(record) }} · {{ durationOf(record) }}</span>
-                  </button>
+                  <div class="tl-branch__row">
+                    <button
+                      type="button"
+                      class="tl-branch__main"
+                      [title]="'在地图上定位：' + record.locationName"
+                      (click)="focusRecord(record.id)"
+                    >
+                      <span class="tl-branch__name">{{ record.locationName }}</span>
+                      <span class="tl-branch__meta">{{ rangeOf(record) }} · {{ durationOf(record) }}</span>
+                    </button>
+                    <button
+                      type="button"
+                      class="row-action"
+                      [title]="'查看 ' + record.locationName + ' 的详情'"
+                      (click)="openRecordDetail(record)"
+                    >
+                      详情
+                    </button>
+                  </div>
                 }
               </div>
             }

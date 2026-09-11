@@ -15,6 +15,7 @@ import { TravelIconComponent } from '../travel-icon/travel-icon';
  * 悬停(桌面)/点击(触屏)节点时圆点轻微放大并浮现“节点操作条”：详情（run 最新一条）/
  * 展开|收起（N>1）/ 删除（确认后整段移入回收站）；点击圆点本体触发 focus，宿主在地图上
  * 定位到 run 最新一条的地点（保底 zoom 见 map-page 的 TIMELINE_FOCUS_ZOOM）。
+ * 展开后每一行＝"在地图上定位该条" + 行内「详情」（直接进该次停留的详情页）。
  */
 @Component({
   selector: 'app-map-timeline',
@@ -143,6 +144,11 @@ export class MapTimeline implements OnDestroy {
 
   protected openDetail(run: TimelineRun): void {
     this.detail.emit(newestOf(run).id);
+  }
+
+  /** 展开后的每行都有「详情」：直接跳该次停留的详情页（与圆点定位、行内定位互不干扰） */
+  protected openRecordDetail(record: TravelRecord): void {
+    this.detail.emit(record.id);
   }
 
   protected focusRecord(id: number): void {

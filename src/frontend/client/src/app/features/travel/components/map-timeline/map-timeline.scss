@@ -179,26 +179,38 @@
   flex-direction: column;
   gap: 6px;
   margin-top: 10px;
-  width: 170px;
+  /* 比原来宽一些：行内要同时放名字/时间与「详情」按钮 */
+  width: 200px;
   padding: 8px;
   border-left: 3px solid var(--primary);
   border-radius: 0 10px 10px 0;
   background: var(--primary-soft);
 
+  /* 一行 = 可点的主体（在地图上定位）+ 行内「详情」（跳详情页） */
   &__row {
-    display: grid;
-    gap: 2px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
     width: 100%;
-    padding: 5px 8px;
-    border: 0;
+    padding: 5px 6px 5px 8px;
     border-radius: 8px;
     background: var(--surface);
-    text-align: left;
-    cursor: pointer;
 
     &:hover {
       background: color-mix(in srgb, var(--surface) 60%, var(--primary-soft));
     }
+  }
+
+  &__main {
+    display: grid;
+    flex: 1;
+    gap: 2px;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    text-align: left;
+    cursor: pointer;
   }
 
   &__name {
