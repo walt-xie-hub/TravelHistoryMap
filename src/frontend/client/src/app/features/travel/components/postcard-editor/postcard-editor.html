@@ -40,7 +40,7 @@
         >
           <span class="pce-template__thumb">
             <app-postcard-canvas
-              [content]="content()"
+              [content]="thumbnailContents().get(item.id) ?? content()"
               [records]="records()"
               [imageUrls]="imageUrls()"
             />

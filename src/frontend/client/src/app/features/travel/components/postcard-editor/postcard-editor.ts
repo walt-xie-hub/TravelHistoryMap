@@ -78,8 +78,7 @@ export class PostcardEditor {
 
   protected readonly templates = POSTCARD_TEMPLATES;
   protected readonly moduleLabels = POSTCARD_MODULE_LABELS;
-  protected readonly denominations = STAMP_DENOMINATIONS;
-  protected readonly limits = {
+  protected readonly denominations = STAMP_DENOMINATIONS;  protected readonly limits = {
     title: POSTCARD_TITLE_MAX,
     message: POSTCARD_MESSAGE_MAX,
     signature: POSTCARD_SIGNATURE_MAX,
@@ -92,6 +91,16 @@ export class PostcardEditor {
 
   protected readonly content = signal<PostcardContent>(createPostcardContent({ records: [] }));
   protected readonly template = computed(() => postcardTemplateById(this.content().templateId));
+  /**
+   * 缩略图用的内容：每个模板一份“若用这款模板会是怎样”的快照。
+   * 不能直接把当前 content 给缩略图——那样 10 个缩略图的 templateId 都是选中那款，
+   * 于是“点一款、全部跟着变”。这里复用 changePostcardTemplate（模块按模板能力收敛、
+   * 图片按模板张数截断），所以缩略图既各自独立、又跟用户当下的选择一致。
+   */
+  protected readonly thumbnailContents = computed(() => {
+    const content = this.content();
+    return new Map(POSTCARD_TEMPLATES.map((item) => [item.id, changePostcardTemplate(content, item.id)]));
+  });
   /** 面板里真正该出现的开关：单条记录时不给「足迹清单」（它本就无处可列，不摆空操作开关） */
   protected readonly moduleSwitches = computed(() =>
     switchableModules(this.template()).filter((moduleId) => moduleId !== 'trail' || this.isMulti()),
