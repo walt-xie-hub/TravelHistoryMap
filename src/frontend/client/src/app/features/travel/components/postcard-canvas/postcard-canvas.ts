@@ -14,7 +14,7 @@ import {
   stampCancelAngle,
   POSTMARK_NOTE,
 } from '../../postcard/postcard-postmark';
-import { stampCaption, zodiacIconKey } from '../../postcard/postcard-stamp';
+import { stampCaption, stampGeometry, stampViewBox, zodiacIconKey } from '../../postcard/postcard-stamp';
 import { postcardTemplateById } from '../../postcard/postcard-template';
 import type { PostcardContent } from '../../postcard/postcard-model';
 
@@ -89,6 +89,15 @@ export class PostcardCanvas {
     const key = zodiacIconKey(this.content().stamp.zodiac);
     return key ? travelIcon(key) : undefined;
   });
+
+  /**
+   * 邮票齿孔几何（ADR-0018）：四边等距的缺口圆心，用 SVG mask 挖出来。
+   * 用 SVG mask 而不是 CSS mask —— 导出时组件样式不会进克隆，
+   * 且 `mask-composite` 在“DOM→SVG→当图片渲染”这条路径上不保证生效，齿孔会整块消失
+   * （实测：用 CSS mask 时导出图里邮票就是一个白方块）。
+   */
+  protected readonly stamp = computed(() => stampGeometry());
+  protected readonly stampBox = computed(() => stampViewBox(this.stamp()));
 
   /** 该次旅行的旅行标识（图标模块）：显式选择 > 地区特色（ADR-0016），解析为空则不渲染 */
   protected readonly mainIcon = computed(() => {

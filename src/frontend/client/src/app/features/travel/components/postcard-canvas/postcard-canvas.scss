@@ -48,41 +48,17 @@
   }
 }
 
-/* ---------- 邮票（齿孔 mask） ---------- */
+/* ---------- 邮票：票体与齿孔由 SVG mask 画（见模板注释），这里只管尺寸与摆位 ---------- */
 .pc-stamp {
-  --tooth: 9px;
-  --tooth-gap: 30px;
-
   position: relative;
-  width: 236px;
-  height: 288px;
-  background: #fffdf8;
-  box-shadow: 0 6px 14px rgb(0 0 0 / 0.18);
-  mask-image:
-    linear-gradient(#000, #000),
-    radial-gradient(circle var(--tooth) at 50% 0, #000 99%, transparent 100%),
-    radial-gradient(circle var(--tooth) at 50% 100%, #000 99%, transparent 100%),
-    radial-gradient(circle var(--tooth) at 0 50%, #000 99%, transparent 100%),
-    radial-gradient(circle var(--tooth) at 100% 50%, #000 99%, transparent 100%);
-  mask-size:
-    100% 100%,
-    var(--tooth-gap) calc(var(--tooth) * 2),
-    var(--tooth-gap) calc(var(--tooth) * 2),
-    calc(var(--tooth) * 2) var(--tooth-gap),
-    calc(var(--tooth) * 2) var(--tooth-gap);
-  mask-repeat: no-repeat, repeat-x, repeat-x, repeat-y, repeat-y;
-  mask-position:
-    0 0,
-    calc(var(--tooth-gap) / 2) top,
-    calc(var(--tooth-gap) / 2) bottom,
-    left calc(var(--tooth-gap) / 2),
-    right calc(var(--tooth-gap) / 2);
-  mask-composite: add, subtract, subtract, subtract, subtract;
+  width: 236px; /* = postcard-stamp.ts 的 STAMP_WIDTH */
+  height: 288px; /* = STAMP_HEIGHT */
+  filter: drop-shadow(0 6px 14px rgb(0 0 0 / 0.18));
 
-  &__custom {
+  &__frame {
+    display: block;
     width: 100%;
     height: 100%;
-    object-fit: cover;
   }
 
   &__face {

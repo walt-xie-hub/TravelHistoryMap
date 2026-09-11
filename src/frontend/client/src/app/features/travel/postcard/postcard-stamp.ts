@@ -58,6 +58,65 @@ export interface PostcardStampFace {
   customImageName: string | null;
 }
 
+/** 邮票尺寸（px，画布坐标系）：约 20×24mm 的竖版票 */
+export const STAMP_WIDTH = 236;
+export const STAMP_HEIGHT = 288;
+/** 齿孔半径（缺口咬进票面的深度） */
+export const STAMP_TOOTH_RADIUS = 9;
+/** 齿孔间距的期望值（实际会按边长均分，保证四角正好落在齿上） */
+export const STAMP_TOOTH_SPACING = 30;
+
+/** 一个齿孔缺口（圆心落在票的边线上，圆内是被咬掉的部分） */
+export interface StampTooth {
+  readonly cx: number;
+  readonly cy: number;
+}
+
+export interface StampGeometry {
+  readonly width: number;
+  readonly height: number;
+  readonly toothRadius: number;
+  /** 四边的缺口圆心（左上角从 0 开始等距，四角正好各有一个） */
+  readonly teeth: readonly StampTooth[];
+}
+
+/**
+ * 齿孔几何：沿四条边**等距**排一圈缺口，间距按边长均分（因此四角正好落在齿上）。
+ * 做成纯函数是为了可测（数量/对称/落在框内），也为了让渲染层只负责画。
+ */
+export function stampGeometry(
+  width: number = STAMP_WIDTH,
+  height: number = STAMP_HEIGHT,
+  toothRadius: number = STAMP_TOOTH_RADIUS,
+  spacing: number = STAMP_TOOTH_SPACING,
+): StampGeometry {
+  const xs = axisPositions(width, spacing);
+  const ys = axisPositions(height, spacing);
+  const teeth: StampTooth[] = [
+    ...xs.map((cx) => ({ cx, cy: 0 })),
+    ...xs.map((cx) => ({ cx, cy: height })),
+    ...ys.slice(1, -1).map((cy) => ({ cx: 0, cy })),
+    ...ys.slice(1, -1).map((cy) => ({ cx: width, cy })),
+  ];
+  return { width, height, toothRadius, teeth };
+}
+
+/** 该几何的画布（viewBox 从 0 0 起，与邮戳同样的绝对坐标策略） */
+export function stampViewBox(geometry: StampGeometry): string {
+  return `0 0 ${geometry.width} ${geometry.height}`;
+}
+
+/** 一段长度上均分的位置（含两端），因此相邻间距 = 长度 / 段数 */
+function axisPositions(length: number, spacing: number): number[] {
+  const segments = Math.max(1, Math.round(length / spacing));
+  const step = length / segments;
+  return Array.from({ length: segments + 1 }, (_, index) => round2(index * step));
+}
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
 export function defaultStampFace(
   year: number,
   denomination: string = DEFAULT_STAMP_DENOMINATION,

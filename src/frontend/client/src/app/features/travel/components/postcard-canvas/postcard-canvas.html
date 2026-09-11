@@ -303,9 +303,37 @@
   <div class="pc-stamp-cluster">
     @if (content().modules.stamp) {
       <div class="pc-stamp" [attr.aria-label]="stampLabel()">
-        @if (content().stamp.customImageDataUrl) {
-          <img class="pc-stamp__custom" [src]="content().stamp.customImageDataUrl" alt="" />
-        } @else {
+        <!-- 票体 + 齿孔用 SVG mask 画；呈现属性自带样式，导出克隆里不依赖组件 CSS -->
+        <svg
+          class="pc-stamp__frame"
+          [attr.viewBox]="stampBox()"
+          [attr.width]="stamp().width"
+          [attr.height]="stamp().height"
+          aria-hidden="true"
+        >
+          <defs>
+            <mask [attr.id]="uid + '-stamp-mask'">
+              <rect x="0" y="0" [attr.width]="stamp().width" [attr.height]="stamp().height" fill="#fff"></rect>
+              @for (tooth of stamp().teeth; track $index) {
+                <circle [attr.cx]="tooth.cx" [attr.cy]="tooth.cy" [attr.r]="stamp().toothRadius" fill="#000"></circle>
+              }
+            </mask>
+          </defs>
+          <g [attr.mask]="'url(#' + uid + '-stamp-mask)'">
+            <rect x="0" y="0" [attr.width]="stamp().width" [attr.height]="stamp().height" fill="#fffdf8"></rect>
+            @if (content().stamp.customImageDataUrl; as custom) {
+              <image
+                [attr.href]="custom"
+                x="0"
+                y="0"
+                [attr.width]="stamp().width"
+                [attr.height]="stamp().height"
+                preserveAspectRatio="xMidYMid slice"
+              ></image>
+            }
+          </g>
+        </svg>
+        @if (!content().stamp.customImageDataUrl) {
           <div class="pc-stamp__face">
             @if (stampIcon(); as icon) {
               <app-travel-icon [icon]="icon" [size]="108" />

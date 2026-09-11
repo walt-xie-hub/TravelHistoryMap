@@ -3,6 +3,8 @@ import {
   STAMP_IMAGE_MAX_BYTES,
   defaultStampFace,
   stampCaption,
+  stampGeometry,
+  stampViewBox,
   validateStampImage,
   withStampDenomination,
   withStampYear,
@@ -82,6 +84,57 @@ describe('stampCaption（无障碍与图例同一口径）', () => {
     expect(
       stampCaption({ ...defaultStampFace(2026), customImageDataUrl: 'data:image/png;base64,AAA' }),
     ).toBe('自备邮票图（2026 年）');
+  });
+});
+
+describe('stampGeometry（邮票齿孔：沿四条边等距的缺口）', () => {
+  it('四角各有一个齿（间距按边长均分）', () => {
+    const geometry = stampGeometry(100, 60, 5, 20);
+    for (const corner of [
+      { cx: 0, cy: 0 },
+      { cx: 100, cy: 0 },
+      { cx: 0, cy: 60 },
+      { cx: 100, cy: 60 },
+    ]) {
+      expect(geometry.teeth).toContainEqual(corner);
+    }
+  });
+
+  it('缺口圆心全部落在边线上（不会咬到票面内部）', () => {
+    const geometry = stampGeometry(120, 80, 6, 30);
+    for (const tooth of geometry.teeth) {
+      const onEdge = tooth.cx === 0 || tooth.cx === 120 || tooth.cy === 0 || tooth.cy === 80;
+      expect(onEdge).toBe(true);
+      expect(tooth.cx).toBeGreaterThanOrEqual(0);
+      expect(tooth.cx).toBeLessThanOrEqual(120);
+      expect(tooth.cy).toBeGreaterThanOrEqual(0);
+      expect(tooth.cy).toBeLessThanOrEqual(80);
+    }
+  });
+
+  it('上下边齿数相同、左右边内部齿数相同（几何对称）', () => {
+    const geometry = stampGeometry(120, 80, 6, 30);
+    const atTop = geometry.teeth.filter((tooth) => tooth.cy === 0).length;
+    const atBottom = geometry.teeth.filter((tooth) => tooth.cy === 80).length;
+    const leftInner = geometry.teeth.filter((tooth) => tooth.cx === 0 && tooth.cy !== 0 && tooth.cy !== 80).length;
+    const rightInner = geometry.teeth.filter((tooth) => tooth.cx === 120 && tooth.cy !== 0 && tooth.cy !== 80).length;
+    expect(atTop).toBe(atBottom);
+    expect(leftInner).toBe(rightInner);
+    // 四角只在上下边出现一次，左右边不再重复放角上的齿
+    expect(leftInner).toBeGreaterThan(0);
+    expect(geometry.teeth.filter((tooth) => tooth.cx === 0 && tooth.cy === 0)).toHaveLength(1);
+  });
+
+  it('默认尺寸下齿数合理（约每 30px 一个，含四角）', () => {
+    const geometry = stampGeometry();
+    expect(geometry.width).toBe(236);
+    expect(geometry.height).toBe(288);
+    expect(geometry.teeth.length).toBeGreaterThan(20);
+    expect(geometry.teeth.length).toBeLessThan(50);
+  });
+
+  it('viewBox 从原点起（与邮戳同样的绝对坐标策略，导出才不走样）', () => {
+    expect(stampViewBox(stampGeometry(236, 288))).toBe('0 0 236 288');
   });
 });
 
