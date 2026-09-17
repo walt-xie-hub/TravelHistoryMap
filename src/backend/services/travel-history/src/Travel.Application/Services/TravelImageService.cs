@@ -143,10 +143,15 @@ public sealed class TravelImageService(
         }
     }
 
+    /// <summary>
+    /// 资源归属规则（docs/security/authorization.md）：所有权一律取自 token 的用户 id，
+    /// 并且**已软删除的记录视为不存在** —— 与列表接口的过滤条件保持一致；
+    /// 此前的实现没有过滤 DeletedAt，导致已进回收站的记录仍可列/传图片。
+    /// </summary>
     private async Task<bool> OwnsRecordAsync(int userId, int travelRecordId, CancellationToken cancellationToken)
     {
         var record = await repository.GetByIdAsync(travelRecordId, cancellationToken);
-        return record is not null && record.UserId == userId;
+        return record is not null && record.UserId == userId && record.DeletedAt is null;
     }
 
     private static TravelImageDto ToDto(TravelImage image) => new(

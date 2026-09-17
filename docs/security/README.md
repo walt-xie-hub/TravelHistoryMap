@@ -90,6 +90,28 @@
 | 网关加固（P0 ⑤） | `src/gateway/nginx.conf.template`、`src/frontend/client/nginx.conf` |
 | 部署脚本收口（P0 ① 的配置部分） | `deploy-azure.sh`（`SslMode=Require`、自动生成 `Jwt__Key`、`--allow-insecure false`） |
 
+**本次已实现（identity-service 与消费端切换）**：
+
+| 项 | 落地位置 |
+|---|---|
+| identity-service（新服务） | `src/backend/services/identity-service/`（Domain/Application/Infrastructure/Api + 31 个单测） |
+| OIDC 发现 + JWKS + RS256 签发 | `/identity/.well-known/openid-configuration`、`/identity/jwks`，`kid` 多密钥并存 |
+| 登录 / 验证码 / 登出 / 换令牌 | `/identity/login`、`/identity/captcha`、`/identity/logout`、`/identity/token`（refresh_token + client_credentials） |
+| refresh 轮换 + 重用即整族撤销 | `RefreshTokenService`（只存哈希；复用旧令牌 → 撤销整族 + 审计） |
+| 失败计数与锁定 | `AuthenticationService` + `LoginAttempts` 表（跨副本共享，5 次 / 15 分钟窗口 / 锁定 15 分钟） |
+| 凭据只读 + `CredentialVersion` | `NpgsqlCredentialReader`（只读 5 列）、user-service 改密码时自增 |
+| 停用账号不得登录 | identity-service 与 user-service 两边都检查 `IsActive` |
+| 服务身份（默认拒绝） | `ServiceClients` 表 + `ClientCredentialsService`；`AllowedServiceAudiences` 默认为空 |
+| 内部端点骨架 | `/internal/*` + `ServiceIdentity` 策略（服务令牌 aud = 本服务）；用户令牌访问 → 403 |
+| 审计事件 | `LoggerAuditLog`（8 个审计方法，签名里就没有口令/令牌字段） |
+| 签名密钥托管 | `ISigningKeyStore` + `DevFileSigningKeyStore`（本地）/ `KeyVaultSigningKeyStore`（`jwt-signing-<kid>`） |
+| 资源服务不再持有密钥 | `shared/Shared.Security`（RS256 via OIDC 发现 + HS256 共存窗口，两个服务共用一份） |
+| 归属规则覆盖软删除 | `TravelImageService.OwnsRecordAsync` 现在过滤 `DeletedAt` |
+| CORS 配置化 | `Cors:AllowedOrigins`（两个资源服务 + identity-service） |
+| Swagger 仅在 Development | user-service / travel-service / identity-service |
+| 镜像不再自动公开 | `ci.yml` 删除“设为 public”步骤；新增 identity 镜像 |
+| 签名密钥落 Key Vault | `deploy-azure.sh` 创建 KV + 托管身份 + `jwt-signing-<kid>` + 回填 issuer |
+
 **仍未完成**（需要真实凭据或环境操作，我无法代做）：
 
 | 项 | 原因 |

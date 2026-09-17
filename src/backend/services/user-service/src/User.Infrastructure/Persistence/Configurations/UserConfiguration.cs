@@ -38,6 +38,11 @@ public class UserConfiguration : IEntityTypeConfiguration<AppUser>
         builder.Property(u => u.IsActive)
             .HasDefaultValue(true);
 
+        // 凭据版本：identity-service 会读它（ADR-0020），列归属仍是本服务
+        builder.Property(u => u.CredentialVersion)
+            .IsRequired()
+            .HasDefaultValue(1);
+
         builder.Property(u => u.CreatedAt)
             .IsRequired();
 

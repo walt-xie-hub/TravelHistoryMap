@@ -38,6 +38,7 @@ docker compose -f docker-compose.dev.yml up -d
 | 前端 client | http://localhost:4200 |
 | user-service | http://localhost:8080/swagger |
 | travel-history | http://localhost:8081/swagger |
+| identity-service | http://localhost:8090 |
 | Grafana（可观测性） | http://localhost:3000 |
 
 > 宿主端口一律只绑定 `127.0.0.1`（仅本机可访问）：观测栈没有任何鉴权，不应暴露给同网段的其它机器。
@@ -88,6 +89,8 @@ docker compose -f docker-compose.dev.yml down
 ## 账号与登录
 
 应用**只有登录用户才能进入主界面**：`/login`、`/register` 为公开页，其余路由由 `authGuard` 保护，业务请求自动携带 JWT（见 `docs/adr/0005`）。
+
+> 认证已迁移到 **identity-service**（见 `docs/adr/0020`、`docs/adr/0021`）：登录与图片验证码走 `/identity/login`、`/identity/captcha`（本地开发直连 `http://localhost:8090`），注册与档案仍在 user-service。access token 有效期 20 分钟，401 时前端用 refresh token 静默续期（每次刷新即轮换，旧令牌作废）；登出会在服务端撤销整族。
 
 - **注册**：注册是创建账号的唯一途径，注册成功后跳转登录页；登录时需要输入图片验证码。
 - **开发种子账号**（`user-service` 以 Development 启动时幂等创建）：

@@ -20,6 +20,12 @@ export const apiBaseUrlInterceptor: HttpInterceptorFn = (req, next) => {
   const base = environment.apiBaseUrl.replace(/\/+$/, '');
   const path = req.url.startsWith('/') ? req.url : `/${req.url}`;
 
+  // 认证接口有自己的前缀（identity-service，ADR-0020）：不能拼上 /api
+  const identityBase = environment.identityBaseUrl.replace(/\/+$/, '');
+  if (identityBase.startsWith('/') && (path === identityBase || path.startsWith(`${identityBase}/`))) {
+    return next(req);
+  }
+
   // 路径已以 API 基础前缀开头（/api/... 或恰好等于 /api）→ 原样放行
   if (base && (path === base || path.startsWith(`${base}/`))) {
     return next(req);

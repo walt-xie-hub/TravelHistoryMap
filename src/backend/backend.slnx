@@ -21,8 +21,20 @@
   <Folder Name="/services/travel-history/tests/">
     <Project Path="services/travel-history/tests/Travel.UnitTests/Travel.UnitTests.csproj" />
   </Folder>
+  <Folder Name="/services/identity-service/src/">
+    <Project Path="services/identity-service/src/Identity.Domain/Identity.Domain.csproj" />
+    <Project Path="services/identity-service/src/Identity.Application/Identity.Application.csproj" />
+    <Project Path="services/identity-service/src/Identity.Infrastructure/Identity.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/services/identity-service/src/Identity.Api/">
+    <Project Path="services/identity-service/src/Identity.Api/identity.csproj" />
+  </Folder>
+  <Folder Name="/services/identity-service/tests/">
+    <Project Path="services/identity-service/tests/Identity.UnitTests/Identity.UnitTests.csproj" />
+  </Folder>
   <Folder Name="/shared/">
     <Project Path="shared/Shared.Contracts/Shared.Contracts.csproj" />
     <Project Path="shared/Shared.Observability/Shared.Observability.csproj" />
+    <Project Path="shared/Shared.Security/Shared.Security.csproj" />
   </Folder>
 </Solution>

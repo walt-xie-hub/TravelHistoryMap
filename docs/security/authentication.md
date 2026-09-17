@@ -2,7 +2,9 @@
 
 范围：用户认证（凭据核对）、令牌签发、OIDC 发现、令牌校验材料发布。**不含**授权（见 `authorization.md`）与机器身份（见 `service-identity.md`）。
 
-相关决策：ADR-0021（令牌模型，取代 ADR-0005 §1）、ADR-0020（凭据归属）、ADR-0023（密钥托管）。
+相关决策：ADR-0020（凭据归属与 identity-service 职责）、ADR-0021（令牌模型，取代 ADR-0005 §1）、ADR-0023（密钥托管）。
+
+> 实现/未实现的状态只在 [`README.md`](./README.md) 的「实现状态」维护一处；本篇只描述目标形态与验收标准（不要在这里勾选）。
 
 ## 现状
 
@@ -20,6 +22,12 @@
 | 认证审计 | 登录成功/失败/注册/改密**不写任何日志** | `AuthEndpoints.cs` 无 `ILogger` 调用 |
 | 传输 | 两个服务都注释掉了 `UseHttpsRedirection()` | `User.Api/Program.cs:122`、`Travel.Api/Program.cs:119` |
 
+### 失败治理（已定值）
+
+`MaxFailedAttempts=5` / `WindowMinutes=15` / `LockoutMinutes=15`（`Identity:Lockout`）。
+锁定期间**连凭据查询都不做**；对外与口令错误返回同一个 401，真实原因只进审计日志——
+代价是合法用户也看不出被临时锁定，这是刻意选的（不泄露账号状态优先）。
+
 ## 目标形态
 
 identity-service 承担认证与令牌；注册与档案留在 user-service（ADR-0020）。
@@ -33,8 +41,8 @@ identity-service 承担认证与令牌；注册与档案留在 user-service（AD
 | `GET /identity/captcha` | 图片验证码（答案与登录同进程） | 公开 | P1 |
 | `POST /identity/login` | **过渡端点**：验证码 + 凭据 → access + refresh | 公开 | P1 |
 | `POST /identity/token` | refresh 轮换换新（`grant_type=refresh_token`） | 凭 refresh | P1 |
-| `POST /identity/logout` | 撤销该族 refresh | 需 access | P1 |
-| `POST /identity/revoke` | 撤销指定 refresh | 需 access/refresh | P1 |
+| `POST /identity/logout` | 撤销该族 refresh。**只需 refresh token 本身**（持有即可撤销，RFC 7009 的语义）：不要求 access token，因此 access 过期后依然能登出 | 凭 refresh | P1 |
+| ~~`POST /identity/revoke`~~ | 与 logout 合并：撤销 = 撤销该族，单独暴露一个“按令牌撤销”的端点没有额外收益（少一个面） | — | — |
 | `GET /identity/userinfo` | OIDC 用户信息 | 需 access | P2 |
 | `GET /identity/authorize` | Authorization Code + PKCE | — | P2 |
 
@@ -49,7 +57,8 @@ identity-service 承担认证与令牌；注册与档案留在 user-service（AD
 | `aud` | `travel-map-client` | 被调服务标识（**精确匹配**） |
 | `exp` / `iat` / `nbf` | access 15–30 分钟 | ≈5 分钟 |
 | `jti` | 唯一，用于审计关联 | 同左 |
-| `name` / `email` | 有 | 无 |
+| `email` | 有 | 无 |
+| `name` | **不带**：档案归 user-service，不在令牌里冗余复制（ADR-0020）。客户端登录后自行调 `GET /api/users/me` | 无 |
 | 角色 / 权限 | **不放** | 由 `scope` 表达 |
 
 ### 凭据读取与即时失效
@@ -69,7 +78,7 @@ identity-service 承担认证与令牌；注册与档案留在 user-service（AD
 
 ### P0
 
-- [x] **`IsActive` 必须被检查**：已在 `UserService.LoginAsync` 落地（凭据通过后再判停用，且与口令错误返回同一个异常，避免接口变成账号状态探测器）。identity-service 上线后此语义原样迁移。
+- [x] **`IsActive` 必须被检查**：identity-service 的登录与刷新路径都检查（`AuthenticationService` / `RefreshTokenService`）。
 
 ### P1
 

@@ -10,6 +10,8 @@ export const environment = {
   production: true,
   apiBaseUrl: '/api',
   travelApiBaseUrl: '/api',
+  /** identity-service 的公共前缀：经网关同源暴露（ADR-0019 的路径规则） */
+  identityBaseUrl: '/identity',
   /** 高德地图 JS API 2.0 密钥（申请步骤见 README「地图密钥」），
    *  记得在控制台把部署域名加进 key 的域名白名单。 */
   amap: {

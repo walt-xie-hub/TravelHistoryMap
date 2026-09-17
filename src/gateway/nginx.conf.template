@@ -1,5 +1,5 @@
 # 网关路由模板（对应 K8s base/client/ingress.yaml 的路径分流逻辑）
-# 运行时由 nginx 官方镜像 envsubst 替换 ${USER_SERVICE_URL} / ${TRAVEL_SERVICE_URL} / ${CLIENT_URL}
+# 运行时由 nginx 官方镜像 envsubst 替换 ${USER_SERVICE_URL} / ${TRAVEL_SERVICE_URL} / ${IDENTITY_SERVICE_URL} / ${CLIENT_URL}
 #
 # 传输安全与内网调用约定：
 # - TLS 与 http→https 跳转统一由边缘层完成（Azure Container Apps 外部入口
@@ -97,6 +97,21 @@ server {
     # 只读分享快照 → travel-service（公开端点，见 ADR-0012）
     location /api/share-snapshots {
         proxy_pass ${TRAVEL_SERVICE_URL};
+    }
+
+    # identity-service：认证、令牌与 OIDC 发现（ADR-0020/0021）。
+    # 必须显式列在 /api/ 之前，否则会被下面的前缀规则吞掉。
+    #
+    # 认证端点限流：登录 / 验证码 / 换令牌都在 /identity/* 下（登录已不再走 /api/auth/*）。
+    # 正则 location 优先于前缀 location，与下方 /api/auth/* 共用同一个 zone（同一份配额）。
+    location ~ ^/identity/(login|captcha|token)/?$ {
+        limit_req zone=auth burst=5 nodelay;
+        limit_req_status 429;
+        proxy_pass ${IDENTITY_SERVICE_URL};
+    }
+
+    location /identity/ {
+        proxy_pass ${IDENTITY_SERVICE_URL};
     }
 
     # ── 认证类端点：限流 ────────────────────────────────────────

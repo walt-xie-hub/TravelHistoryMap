@@ -1,8 +1,8 @@
 using Microsoft.Extensions.Caching.Memory;
-using User.Api.Security;
+using Identity.Api.Security;
 using Xunit;
 
-namespace User.UnitTests;
+namespace Identity.UnitTests;
 
 public class CaptchaServiceTests
 {

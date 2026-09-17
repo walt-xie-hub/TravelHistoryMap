@@ -63,6 +63,9 @@ services:
       - Jwt__Key=${JWT_KEY:?JWT_KEY is required}
       - Jwt__Issuer=travel-map
       - Jwt__Audience=travel-map-client
+      # 令牌校验（ADR-0021）：RS256 公钥经该 issuer 的 OIDC 发现获取；
+      # Jwt__Key 只服务共存窗口内的旧 HS256 令牌，窗口不超过 7 天。
+      - Identity__Issuer=http://identity-service:8080/identity
       - DemoUser__Password=${DEMO_USER_PASSWORD:?DEMO_USER_PASSWORD is required}
       # OpenTelemetry OTLP 导出目标：Collector → Jaeger
       # 使用 gRPC 协议 (:4317)，先经过 Collector 做批量/过滤/路由处理
@@ -110,6 +113,8 @@ services:
       - Jwt__Key=${JWT_KEY:?JWT_KEY is required}
       - Jwt__Issuer=travel-map
       - Jwt__Audience=travel-map-client
+      # 令牌校验（ADR-0021）：RS256 公钥经该 issuer 的 OIDC 发现获取
+      - Identity__Issuer=http://identity-service:8080/identity
       # OpenTelemetry OTLP 导出目标：Collector → Jaeger
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
       - OTEL_SERVICE_NAME=travel-service
@@ -135,6 +140,50 @@ services:
         # Dockerfile 变更 → 重建镜像
         - action: rebuild
           path: ./src/backend/services/travel-history/Dockerfile.dev
+    networks:
+      - dev-net
+
+  # identity-service：认证与令牌（ADR-0020/0021）。只读 user-service 的 Users 凭据列，
+  # 不拥有 User；签发 RS256 令牌，并把公钥经 JWKS / OIDC 发现公布。
+  identity-service:
+    build:
+      context: ./src/backend
+      dockerfile: services/identity-service/Dockerfile.dev
+    container_name: identity-api-dev
+    ports:
+      # 宿主 8090：前端 environment.ts 的 identityBaseUrl 指向这里
+      - "127.0.0.1:8090:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8080
+      - DOTNET_USE_POLLING_FILE_WATCHER=true
+      - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=appdb;Username=appuser;Password=${DB_PASSWORD:?DB_PASSWORD is required};Pooling=true;
+      - Db__Password=${DB_PASSWORD:?DB_PASSWORD is required}
+      # issuer 必须与资源服务校验时用的值**逐字一致**；容器间用服务名互访，
+      # 浏览器则走宿主 8090（第一期前端不做发现，只调登录/验证码）。
+      - Identity__Issuer=http://identity-service:8080/identity
+      - Identity__Audience=travel-map-client
+      - Identity__SigningKeyStore__Provider=Development
+      - Identity__SigningKeyStore__Path=/app/keys
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_SERVICE_NAME=identity-service
+    volumes:
+      # 签名密钥落宿主：容器重启不会换钥匙（否则每次重启都让所有人掉线）
+      - ./data/identity-keys:/app/keys
+    # 等 db 健康后再启动：本服务启动时要读 Users 表的凭据列
+    depends_on:
+      db:
+        condition: service_healthy
+    develop:
+      watch:
+        - action: sync
+          path: ./src/backend
+          target: /src
+          ignore:
+            - bin
+            - obj
+        - action: rebuild
+          path: ./src/backend/services/identity-service/Dockerfile.dev
     networks:
       - dev-net
 

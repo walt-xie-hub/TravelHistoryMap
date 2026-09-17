@@ -1,8 +1,7 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { lastValueFrom } from 'rxjs';
 import {
-  AuthResponse,
   CaptchaResponse,
   ChangePasswordRequest,
   LoginRequest,
@@ -11,14 +10,27 @@ import {
   UpdateProfileRequest,
   User,
 } from '@core/models/user.model';
+import { environment } from '@env/environment';
 
 const TOKEN_STORAGE_KEY = 'travel-map.auth.token';
+const REFRESH_TOKEN_STORAGE_KEY = 'travel-map.auth.refresh-token';
 
 /**
- * 认证与“当前用户”服务：
- * - token 存 localStorage（登录后 7 天内有效，由后端签发）
+ * identity-service 的令牌响应（ADR-0021）。刻意**不含**用户资料：
+ * 档案归 user-service，登录成功后再由 users/me 单独获取（ADR-0020）。
+ */
+interface TokenResponse {
+  accessToken: string;
+  refreshToken: string;
+  expiresInSeconds: number;
+  tokenType: string;
+}
+
+/**
+ * 认证与“当前用户”服务（认证在 identity-service，档案在 user-service）：
+ * - access token 只有 20 分钟，401 时由全局拦截器用 refresh token 静默续期
+ * - refresh token 存 localStorage（每次使用即轮换，旧令牌作废）；登出会在服务端撤销整族
  * - 以 signal 维护 currentUser，供布局/页面实时读取
- * - 登出即前端清除 token；401 由全局 auth 拦截器触发 clearSession
  */
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -31,9 +43,15 @@ export class AuthService {
   readonly isAuthenticated = computed(() => this._currentUser() !== null);
 
   private initPromise: Promise<boolean> | null = null;
+  private refreshInFlight: Promise<boolean> | null = null;
 
   get token(): string | null {
     return localStorage.getItem(TOKEN_STORAGE_KEY);
+  }
+
+  /** refresh token；只在续期与登出时用得上。 */
+  get refreshToken(): string | null {
+    return localStorage.getItem(REFRESH_TOKEN_STORAGE_KEY);
   }
 
   /**
@@ -57,13 +75,16 @@ export class AuthService {
     return this.initPromise;
   }
 
-  /** 登录：成功后保存 token 并写入 currentUser。 */
+  /**
+   * 登录：走 identity-service（ADR-0020），成功后保存 access + refresh，
+   * 再单独拉取用户档案（档案不在令牌响应里）。
+   */
   async login(credentials: LoginRequest): Promise<User> {
-    const response = await lastValueFrom(
-      this.http.post<AuthResponse>('auth/login', credentials),
+    const tokens = await lastValueFrom(
+      this.http.post<TokenResponse>(`${environment.identityBaseUrl}/login`, credentials),
     );
-    this.applyAuth(response);
-    return response.user;
+    this.applyTokens(tokens);
+    return this.loadProfile();
   }
 
   /**
@@ -77,12 +98,48 @@ export class AuthService {
     return response.user;
   }
 
-  /** 获取登录页图片验证码（服务端一次性凭证，5 分钟过期）。
+  /** 获取登录页图片验证码（identity-service，一次性凭证、 5 分钟过期）。
    * 附加时间戳避免浏览器缓存旧的失败响应或图片。 */
   async getCaptcha(): Promise<CaptchaResponse> {
     return lastValueFrom(
-      this.http.get<CaptchaResponse>(`auth/captcha?t=${Date.now()}`),
+      this.http.get<CaptchaResponse>(`${environment.identityBaseUrl}/captcha?t=${Date.now()}`),
     );
+  }
+
+  /**
+   * 静默续期：用 refresh token 换新令牌（每次轮换，旧令牌立即作废）。
+   *
+   * **单飞**：并发的 401 共用同一次刷新。否则第二个请求会拿着已被轮换的 refresh token
+   * 再换一次，而服务端把“旧令牌被再次使用”判定为泄露 → 整族撤销，用户直接被登出。
+   */
+  async refreshTokens(): Promise<boolean> {
+    this.refreshInFlight ??= this.performRefresh().finally(() => {
+      this.refreshInFlight = null;
+    });
+    return this.refreshInFlight;
+  }
+
+  private async performRefresh(): Promise<boolean> {
+    const refreshToken = this.refreshToken;
+    if (!refreshToken) {
+      return false;
+    }
+
+    try {
+      const body = new HttpParams()
+        .set('grant_type', 'refresh_token')
+        .set('refresh_token', refreshToken);
+      const tokens = await lastValueFrom(
+        this.http.post<TokenResponse>(`${environment.identityBaseUrl}/token`, body.toString(), {
+          headers: new HttpHeaders({ 'Content-Type': 'application/x-www-form-urlencoded' }),
+        }),
+      );
+      this.applyTokens(tokens);
+      return true;
+    } catch {
+      // 令牌已被轮换过/已撤销/账号已停用——都不能自己恢复
+      return false;
+    }
   }
 
   /** 重新拉取当前用户资料并刷新 currentUser。 */
@@ -107,21 +164,36 @@ export class AuthService {
     await lastValueFrom(this.http.put<void>('users/me/password', body));
   }
 
-  /** 登出：清除本地 token 与内存中的用户资料。 */
-  logout(): void {
+  /** 登出：先在服务端撤销该 refresh 所在的整族，再清本地。
+   *  网络失败也照样清本地——本地令牌本来就会在 20 分钟后过期。 */
+  async logout(): Promise<void> {
+    const refreshToken = this.refreshToken;
     this.clearSession();
+
+    if (!refreshToken) {
+      return;
+    }
+
+    try {
+      await lastValueFrom(
+        this.http.post(`${environment.identityBaseUrl}/logout`, { refreshToken }),
+      );
+    } catch {
+      // 已登出，无需向调用方报错
+    }
   }
 
-  /** 清理本地会话（登出或 token 失效时调用）。 */
+  /** 清理本地会话（登出或续期失败时调用）。 */
   clearSession(): void {
     this._currentUser.set(null);
     localStorage.removeItem(TOKEN_STORAGE_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_STORAGE_KEY);
     this.initPromise = null;
   }
 
-  private applyAuth(response: AuthResponse): void {
-    localStorage.setItem(TOKEN_STORAGE_KEY, response.token);
-    this._currentUser.set(response.user);
+  private applyTokens(response: TokenResponse): void {
+    localStorage.setItem(TOKEN_STORAGE_KEY, response.accessToken);
+    localStorage.setItem(REFRESH_TOKEN_STORAGE_KEY, response.refreshToken);
     this.initPromise = null;
   }
 }

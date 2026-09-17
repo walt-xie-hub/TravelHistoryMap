@@ -10,6 +10,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\..\shared\Shared.Observability\Shared.Observability.csproj" />
+    <!-- 令牌校验（RS256 via OIDC 发现 + HS256 共存窗口），两个资源服务共用一份实现 -->
+    <ProjectReference Include="..\..\..\..\shared\Shared.Security\Shared.Security.csproj" />
     <ProjectReference Include="..\Travel.Application\Travel.Application.csproj" />
     <ProjectReference Include="..\Travel.Infrastructure\Travel.Infrastructure.csproj" />
   </ItemGroup>

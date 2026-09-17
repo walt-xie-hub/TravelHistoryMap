@@ -10,6 +10,9 @@ export const environment = {
   apiBaseUrl: 'http://localhost:8080/api',
   /** travel-history 微服务 API 基础地址（compose 暴露宿主端口 8081） */
   travelApiBaseUrl: 'http://localhost:8081/api',
+  /** identity-service 的公共前缀（ADR-0021：issuer = <网关>/identity）。
+   *  登录/验证码/换令牌走这里，注册与档案仍在 user-service。 */
+  identityBaseUrl: 'http://localhost:8090/identity',
   /** 高德地图 JS API 2.0 密钥。申请步骤见 README「地图密钥」；
    *  未配置时地图页会提示而非崩溃。填入后无需重启即可生效（刷新页面）。 */
   amap: {

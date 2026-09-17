@@ -41,6 +41,11 @@ public static class DatabaseInitializer
                         creator.CreateTables();   // 只建本模型缺失的表
                 }
 
+                // 模型驱动演进：已存在的库不会因 EnsureCreated 改列，缺列时幂等补建。
+                // CredentialVersion 是 identity-service 依赖的契约列（ADR-0020）。
+                db.Database.ExecuteSqlRaw(
+                    $"ALTER TABLE \"{UserTable}\" ADD COLUMN IF NOT EXISTS \"CredentialVersion\" integer NOT NULL DEFAULT 1;");
+
                 return;
             }
             catch (Exception ex)

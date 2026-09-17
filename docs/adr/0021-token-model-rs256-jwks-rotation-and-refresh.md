@@ -15,7 +15,8 @@ ADR-0005 §1 当初刻意选了最轻的方案：user-service 自签 HS256（`Jw
 - 签名改为**非对称 RS256**，公钥经 **JWKS** 发布；资源服务（travel-history、user-service）**验签即可**，不再持有任何签名密钥。
 - issuer 为 `https://<gateway-FQDN>/identity`，**是显式配置项而非从请求推导**；discovery 位于 `/identity/.well-known/openid-configuration`。
 - `sub` = `Users.Id` 的十进制字符串。用户 id 自增且不复用（删用户会级联删其旅行史），因此无需引入不透明 subject 与映射表。
-- claims 最小集：`sub`、`iss`、`aud`、`exp`、`iat`、`nbf`、`jti`、`name`、`email`。**不放任何角色/权限 claim**——当前没有角色模型，提前放会诱导出越权判断。
+- claims 最小集：`sub`、`iss`、`aud`、`exp`、`iat`、`nbf`、`jti`、`email`。**不放任何角色/权限 claim**——当前没有角色模型，提前放会诱导出越权判断。
+  `name` 也**不放**：档案字段归 user-service，令牌里冗余复制只会制造第二个真相源（客户端登录后自行调 `GET /api/users/me`）。
 - `aud` 必须精确匹配：用户 token 为 `travel-map-client`；服务 token 为被调服务标识。
 - 有效期：access token **15–30 分钟**；refresh token **7 天**，**每次刷新即轮换**，旧 token 立即失效，且**旧 token 被再次使用即视为泄露、整族（family）撤销**。
 - 登出 = 撤销该族 refresh；access token 靠短 TTL 兜底。

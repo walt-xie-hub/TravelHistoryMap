@@ -10,6 +10,7 @@ using Travel.Domain.Common;
 using Travel.Infrastructure;
 using Travel.Infrastructure.Persistence;
 using Shared.Observability;
+using Shared.Security;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -21,26 +22,9 @@ builder.Services.AddScoped<ITravelService, TravelService>();
 builder.Services.AddScoped<ITravelImageService, TravelImageService>();
 builder.Services.AddInfrastructure(builder.Configuration);
 
-// JWT 验证（ADR-0005）：与 user-service 共享同一组 Jwt 配置（签名密钥/签发者/受众），
-// 本服务只验证不签发。足迹归属以 token 中的用户身份为准。
-var jwtSection = builder.Configuration.GetSection("Jwt");
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
-    {
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidIssuer = jwtSection["Issuer"] ?? "travel-map",
-            ValidateAudience = true,
-            ValidAudience = jwtSection["Audience"] ?? "travel-map-client",
-            ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(jwtSection["Key"]
-                    ?? throw new InvalidOperationException("Jwt:Key is not configured."))),
-            ValidateLifetime = true,
-            ClockSkew = TimeSpan.FromMinutes(1),
-        };
-    });
+// 令牌校验（ADR-0021）：接受 identity-service 签发的 RS256 令牌（公钥经 OIDC 发现获取），
+// 并在共存窗口内继续接受旧的 HS256 令牌。本服务只验签、不签发。
+builder.Services.AddTravelMapJwt(builder.Configuration, builder.Environment);
 builder.Services.AddAuthorization();
 builder.Services.AddAntiforgery();
 builder.Services.ConfigureHttpJsonOptions(options => options.SerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase);
@@ -48,14 +32,27 @@ builder.Services.ConfigureHttpJsonOptions(options => options.SerializerOptions.P
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
-// 开发态 CORS：允许 Angular dev server（ng serve，默认 :4200）及旧 nginx 开发端口 :8082
-// 跨域调用本服务。演示/开发用途；生产应改为具体前端域名或走网关同源。
+// CORS：生产只允许实际前端域名（或走网关同源）；开发态回落到 localhost 任意端口。
+// 用配置项而不是硬编码，避免把开发期白名单带进生产（docs/security/authorization.md）。
+var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("DevCors", policy =>
-        policy.WithOrigins("http://localhost:4200", "http://localhost:8082")
-              .AllowAnyHeader()
-              .AllowAnyMethod());
+    options.AddPolicy("AppCors", policy =>
+    {
+        if (corsOrigins.Length == 0)
+        {
+            policy.SetIsOriginAllowed(origin =>
+                origin is not null &&
+                (origin.StartsWith("http://localhost:", StringComparison.OrdinalIgnoreCase) ||
+                 origin.StartsWith("http://127.0.0.1:", StringComparison.OrdinalIgnoreCase)));
+        }
+        else
+        {
+            policy.WithOrigins(corsOrigins);
+        }
+
+        policy.AllowAnyHeader().AllowAnyMethod();
+    });
 });
 
 var app = builder.Build();
@@ -118,17 +115,20 @@ using (var scope = app.Services.CreateScope())
 // 否则所有 HTTP 请求（含 /swagger）会被重定向到不可达的 https 端口而打不开。
 // app.UseHttpsRedirection();
 
-// Swagger / OpenAPI 交互界面：开发演示场景始终开启（不受环境限制）。
-// 若生产环境不想暴露，可改回用 if (app.Environment.IsDevelopment()) 包裹下面两行。
-app.MapOpenApi();
-app.UseSwaggerUI(options =>
+// Swagger / OpenAPI 交互界面：**只在 Development 暴露**（生产不公开 API 文档，
+// 见 docs/security/observability-and-audit.md）。
+if (app.Environment.IsDevelopment())
 {
-    options.RoutePrefix = "swagger";
-    options.SwaggerEndpoint("/openapi/v1.json", "Travel API v1");
-});
+    app.MapOpenApi();
+    app.UseSwaggerUI(options =>
+    {
+        options.RoutePrefix = "swagger";
+        options.SwaggerEndpoint("/openapi/v1.json", "Travel API v1");
+    });
+}
 
-// 开发态允许跨域（必须在 MapTravelEndpoints 之前）
-app.UseCors("DevCors");
+// 跨域（必须在 MapTravelEndpoints 之前）
+app.UseCors("AppCors");
 
 // 认证/授权（JWT 校验须在业务端点映射前启用）
 app.UseAuthentication();

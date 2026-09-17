@@ -10,6 +10,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\..\shared\Shared.Observability\Shared.Observability.csproj" />
+    <!-- 令牌校验（RS256 via OIDC 发现 + HS256 共存窗口），两个资源服务共用一份实现 -->
+    <ProjectReference Include="..\..\..\..\shared\Shared.Security\Shared.Security.csproj" />
     <ProjectReference Include="..\User.Application\User.Application.csproj" />
     <ProjectReference Include="..\User.Infrastructure\User.Infrastructure.csproj" />
   </ItemGroup>
@@ -17,12 +19,6 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.9" />
     <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUi" Version="9.0.4" />
-    <!-- JWT Bearer 认证（ADR-0005） -->
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.9" />
-    <!-- 图形验证码渲染：SkiaSharp 纯托管 API + 平台 native（Linux 容器 NoDependencies 无需系统依赖/字体） -->
-    <PackageReference Include="SkiaSharp" Version="2.88.9" />
-    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="2.88.9" />
-    <PackageReference Include="SkiaSharp.NativeAssets.Win32" Version="2.88.9" />
   </ItemGroup>
 
 </Project>

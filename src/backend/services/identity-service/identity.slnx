@@ -1,0 +1,17 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Identity.Application/Identity.Application.csproj" />
+    <Project Path="src/Identity.Domain/Identity.Domain.csproj" />
+    <Project Path="src/Identity.Infrastructure/Identity.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Identity.Api/">
+    <Project Path="src/Identity.Api/identity.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Identity.UnitTests/Identity.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/shared/">
+    <Project Path="..\..\shared\Shared.Contracts\Shared.Contracts.csproj" />
+    <Project Path="..\..\shared\Shared.Observability\Shared.Observability.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,32 @@
+# 开发镜像：用 SDK 跑 dotnet watch，源码由 compose 的 develop.watch 实时同步进容器，
+# 源码变更时自动重新编译并重启进程，实现编译热重载（无需重建镜像）。
+# 构建上下文 = src/backend（含 services/identity-service 与 shared/）。
+FROM mcr.microsoft.com/dotnet/sdk:10.0
+
+WORKDIR /src
+
+# ① 先复制 API 项目及其引用的 .csproj（含跨服务共享库）—— 利用 Docker 层缓存，
+#    依赖不变则无需重跑 restore
+COPY services/identity-service/src/Identity.Domain/Identity.Domain.csproj ./services/identity-service/src/Identity.Domain/
+COPY services/identity-service/src/Identity.Application/Identity.Application.csproj ./services/identity-service/src/Identity.Application/
+COPY services/identity-service/src/Identity.Infrastructure/Identity.Infrastructure.csproj ./services/identity-service/src/Identity.Infrastructure/
+COPY services/identity-service/src/Identity.Api/identity.csproj ./services/identity-service/src/Identity.Api/
+COPY shared/Shared.Contracts/Shared.Contracts.csproj ./shared/Shared.Contracts/
+COPY shared/Shared.Observability/Shared.Observability.csproj ./shared/Shared.Observability/
+
+RUN dotnet restore services/identity-service/src/Identity.Api/identity.csproj
+
+# ② 复制剩余源码（bin/obj 已在 .dockerignore 中排除，由 watch 同步保持更新）
+COPY . .
+
+EXPOSE 8080
+
+# 轮询文件监听：容器挂载文件系统上 inotify 不可靠，用轮询确保 dotnet watch 能感知变更。
+ENV DOTNET_USE_POLLING_FILE_WATCHER=true
+ENV ASPNETCORE_URLS=http://+:8080
+# 开发态签名密钥放在 /app/keys（compose 里挂到宿主 data/identity-keys，重启不换钥匙）
+ENV Identity__SigningKeyStore__Path=/app/keys
+ENV Identity__Issuer=http://localhost:8090/identity
+
+# dotnet watch：监听源码变更 → 重新编译并重启
+ENTRYPOINT ["dotnet", "watch", "--project", "services/identity-service/src/Identity.Api/identity.csproj", "run", "--urls", "http://+:8080"]

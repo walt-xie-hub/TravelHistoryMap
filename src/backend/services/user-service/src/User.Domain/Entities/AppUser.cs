@@ -28,6 +28,13 @@ public class AppUser
     /// <summary>账号是否启用</summary>
     public bool IsActive { get; set; } = true;
 
+    /// <summary>
+    /// 凭据版本（ADR-0020 的跨服务契约）：本服务在改密码/停用账号时自增，
+    /// identity-service 签发 refresh token 时快照该值，刷新时比对 ——
+    /// 不匹配即拒绝，于是"改密码后旧会话全部失效"不需要任何跨服务调用。
+    /// </summary>
+    public int CredentialVersion { get; set; } = 1;
+
     /// <summary>创建时间（UTC）</summary>
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

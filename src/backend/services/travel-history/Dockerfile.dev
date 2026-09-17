@@ -13,6 +13,7 @@ COPY services/travel-history/src/Travel.Infrastructure/Travel.Infrastructure.csp
 COPY services/travel-history/src/Travel.Api/travel.csproj ./services/travel-history/src/Travel.Api/
 COPY shared/Shared.Contracts/Shared.Contracts.csproj ./shared/Shared.Contracts/
 COPY shared/Shared.Observability/Shared.Observability.csproj ./shared/Shared.Observability/
+COPY shared/Shared.Security/Shared.Security.csproj ./shared/Shared.Security/
 
 RUN dotnet restore services/travel-history/src/Travel.Api/travel.csproj
 

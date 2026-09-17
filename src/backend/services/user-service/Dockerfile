@@ -17,6 +17,7 @@ COPY services/user-service/src/User.Api/user.csproj ./services/user-service/src/
 COPY services/user-service/tests/User.UnitTests/User.UnitTests.csproj ./services/user-service/tests/User.UnitTests/
 COPY shared/Shared.Contracts/Shared.Contracts.csproj ./shared/Shared.Contracts/
 COPY shared/Shared.Observability/Shared.Observability.csproj ./shared/Shared.Observability/
+COPY shared/Shared.Security/Shared.Security.csproj ./shared/Shared.Security/
 
 RUN dotnet restore services/user-service/user.slnx
 

@@ -79,12 +79,12 @@
 
 ### P0
 
-- [x] 网关：认证路径补 `limit_req`（登录/验证码/注册）。`limit_conn` 与 `/api/*` 限速见上方说明，延后到 P1。
-- [x] 网关：显式设置 `Host`、剥除 `X-User-*` / `X-Internal-*`、`server_tokens off`。
-- [x] 加 CSP（Report-Only）与 `Permissions-Policy`；client 的 nginx 同步加安全头。
-- [ ] 实测确认 HTTP→HTTPS 重定向确实生效，且 HSTS 只在 HTTPS 响应上出现（代码已改为按 `X-Forwarded-Proto` 条件下发，需在真实入口验证）。
-- [ ] PostgreSQL：收窄公网访问（**未做**：当前拓扑下无法收窄，见 P2）+ 连接串强制 `SslMode`（**已写入 `deploy-azure.sh`，但需同步到已部署的应用**）。
-- [x] dev compose 的 `5432` 与观测栈端口改为绑定 `127.0.0.1`。
+- [ ] 网关：补 `limit_req` / `limit_conn`（至少覆盖登录、验证码、注册）。
+- [ ] 网关：显式设置 `Host`、剥除 `X-User-*` / `X-Internal-*`、`server_tokens off`。
+- [ ] 加 CSP（先 Report-Only 一轮）与 `Permissions-Policy`；client 的 nginx 同步加安全头。
+- [ ] 实测确认 HTTP→HTTPS 重定向确实生效，且 HSTS 只在 HTTPS 响应上出现。
+- [ ] PostgreSQL：收窄公网访问 + 连接串强制 `SslMode`。
+- [ ] dev compose 的 `5432` 与观测栈端口改为绑定 `127.0.0.1`。
 
 ### P1
 

@@ -1,7 +1,8 @@
+using System.Security.Cryptography;
 using Microsoft.Extensions.Caching.Memory;
 using SkiaSharp;
 
-namespace User.Api.Security;
+namespace Identity.Api.Security;
 
 /// <summary>验证码结果：id 供登录时回传，ImageBase64 为 PNG 图片的 Base64。</summary>
 public sealed record CaptchaResult(string Id, string ImageBase64);
@@ -11,6 +12,9 @@ public sealed record CaptchaResult(string Id, string ImageBase64);
 /// 图形采用内置 5x7 像素字模直接绘制，不依赖系统字体/字体文件，
 /// 因此 Linux 容器与本地 Windows 渲染效果一致。
 /// 答案以 id 为键缓存（一次性、5 分钟过期），验证后立即销毁，防重放。
+///
+/// 自 user-service 迁入（ADR-0020：认证归 identity-service）；随机数改用
+/// <see cref="RandomNumberGenerator"/> —— 原来的 <c>Random.Shared</c> 不是密码学安全的。
 /// </summary>
 public sealed class CaptchaService(IMemoryCache cache)
 {
@@ -75,7 +79,7 @@ public sealed class CaptchaService(IMemoryCache cache)
         Span<char> buf = stackalloc char[CodeLength];
         for (var i = 0; i < CodeLength; i++)
         {
-            buf[i] = CodeChars[Random.Shared.Next(CodeChars.Length)];
+            buf[i] = CodeChars[RandomNumberGenerator.GetInt32(CodeChars.Length)];
         }
         return new string(buf);
     }
@@ -100,12 +104,12 @@ public sealed class CaptchaService(IMemoryCache cache)
         using var noisePaint = new SKPaint { Color = SKColors.LightGray, Style = SKPaintStyle.Fill };
         for (var i = 0; i < 130; i++)
         {
-            var x = Random.Shared.Next(ImageW);
-            var y = Random.Shared.Next(ImageH);
+            var x = RandomNumberGenerator.GetInt32(ImageW);
+            var y = RandomNumberGenerator.GetInt32(ImageH);
             noisePaint.Color = new SKColor(
-                (byte)Random.Shared.Next(150, 225),
-                (byte)Random.Shared.Next(150, 225),
-                (byte)Random.Shared.Next(150, 225));
+                (byte)RandomNumberGenerator.GetInt32(150, 225),
+                (byte)RandomNumberGenerator.GetInt32(150, 225),
+                (byte)RandomNumberGenerator.GetInt32(150, 225));
             canvas.DrawPoint(x, y, noisePaint);
         }
 
@@ -119,12 +123,12 @@ public sealed class CaptchaService(IMemoryCache cache)
         for (var i = 0; i < 4; i++)
         {
             linePaint.Color = new SKColor(
-                (byte)Random.Shared.Next(120, 190),
-                (byte)Random.Shared.Next(120, 190),
-                (byte)Random.Shared.Next(120, 190));
+                (byte)RandomNumberGenerator.GetInt32(120, 190),
+                (byte)RandomNumberGenerator.GetInt32(120, 190),
+                (byte)RandomNumberGenerator.GetInt32(120, 190));
             canvas.DrawLine(
-                Random.Shared.Next(ImageW), Random.Shared.Next(ImageH),
-                Random.Shared.Next(ImageW), Random.Shared.Next(ImageH),
+                RandomNumberGenerator.GetInt32(ImageW), RandomNumberGenerator.GetInt32(ImageH),
+                RandomNumberGenerator.GetInt32(ImageW), RandomNumberGenerator.GetInt32(ImageH),
                 linePaint);
         }
 
@@ -143,7 +147,7 @@ public sealed class CaptchaService(IMemoryCache cache)
             glyphPaint.Color = RandomGlyphColor();
             canvas.Save();
             canvas.Translate(cx, cy);
-            canvas.RotateDegrees(Random.Shared.Next(-24, 25));
+            canvas.RotateDegrees(RandomNumberGenerator.GetInt32(-24, 25));
             DrawDigit(canvas, code[i] - '0', -GlyphW / 2, -GlyphH / 2, glyphPaint);
             canvas.Restore();
         }
@@ -154,7 +158,7 @@ public sealed class CaptchaService(IMemoryCache cache)
     }
 
     private static SKColor RandomGlyphColor() =>
-        Random.Shared.Next(3) switch
+        RandomNumberGenerator.GetInt32(3) switch
         {
             0 => new SKColor(0x1a, 0x3c, 0x6e), // 深蓝
             1 => new SKColor(0x1e, 0x5e, 0x2d), // 深绿

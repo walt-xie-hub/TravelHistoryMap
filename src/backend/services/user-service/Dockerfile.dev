@@ -13,6 +13,7 @@ COPY services/user-service/src/User.Infrastructure/User.Infrastructure.csproj ./
 COPY services/user-service/src/User.Api/user.csproj ./services/user-service/src/User.Api/
 COPY shared/Shared.Contracts/Shared.Contracts.csproj ./shared/Shared.Contracts/
 COPY shared/Shared.Observability/Shared.Observability.csproj ./shared/Shared.Observability/
+COPY shared/Shared.Security/Shared.Security.csproj ./shared/Shared.Security/
 
 RUN dotnet restore services/user-service/src/User.Api/user.csproj
 

@@ -17,6 +17,7 @@ COPY services/travel-history/src/Travel.Api/travel.csproj ./services/travel-hist
 COPY services/travel-history/tests/Travel.UnitTests/Travel.UnitTests.csproj ./services/travel-history/tests/Travel.UnitTests/
 COPY shared/Shared.Contracts/Shared.Contracts.csproj ./shared/Shared.Contracts/
 COPY shared/Shared.Observability/Shared.Observability.csproj ./shared/Shared.Observability/
+COPY shared/Shared.Security/Shared.Security.csproj ./shared/Shared.Security/
 
 RUN dotnet restore services/travel-history/travel-history.slnx
 

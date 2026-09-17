@@ -13,5 +13,6 @@
   <Folder Name="/shared/">
     <Project Path="..\..\shared\Shared.Contracts\Shared.Contracts.csproj" />
     <Project Path="..\..\shared\Shared.Observability\Shared.Observability.csproj" />
+    <Project Path="..\..\shared\Shared.Security\Shared.Security.csproj" />
   </Folder>
 </Solution>

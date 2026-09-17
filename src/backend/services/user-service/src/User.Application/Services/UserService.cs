@@ -36,6 +36,13 @@ public class UserService : IUserService
         return ToDto(created);
     }
 
+    /// <summary>
+    /// 邮箱+口令登录。
+    ///
+    /// 注意：**登录已迁到 identity-service**（ADR-0020），本方法目前已无生产调用方，
+    /// 保留是因为它仍是 Users 凭据校验在应用层的参考实现与单测对象；
+    /// 计划在共存窗口结束后删除（避免两处凭据校验逻辑漂移）。
+    /// </summary>
     public async Task<UserDto> LoginAsync(string email, string password, CancellationToken ct = default)
     {
         var user = await _repository.GetByEmailAsync(NormalizeEmail(email), ct);
@@ -86,6 +93,8 @@ public class UserService : IUserService
             throw new InvalidCredentialsException();
 
         user.PasswordHash = _passwordHasher.Hash(newPassword);
+        // 凭据版本自增：identity-service 比对到不一致就会拒绝旧 refresh token（ADR-0020）
+        user.CredentialVersion++;
         user.UpdatedAt = DateTime.UtcNow;
         await _repository.UpdateAsync(user, ct);
     }

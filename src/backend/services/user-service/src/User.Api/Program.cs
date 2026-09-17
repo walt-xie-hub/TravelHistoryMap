@@ -1,17 +1,13 @@
 using System.Diagnostics;
-using System.Text;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.HttpOverrides;
-using Microsoft.IdentityModel.Tokens;
 using User.Api.Endpoints;
 using Swashbuckle.AspNetCore.SwaggerUI;
-using Microsoft.EntityFrameworkCore;
-using User.Api.Security;
 using User.Application.Abstractions;
 using User.Application.Services;
 using User.Infrastructure;
 using User.Infrastructure.Persistence;
 using Shared.Observability;
+using Shared.Security;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -22,47 +18,36 @@ builder.Services.AddObservability("user-service");
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddInfrastructure(builder.Configuration);
 
-// JWT 认证（ADR-0005）：自签发 HS256 access token；Key/Issuer/Audience 与 travel-history 共享同一组配置
-var jwtSection = builder.Configuration.GetSection("Jwt");
-builder.Services.AddSingleton<JwtTokenFactory>();
-// 图片验证码：内存缓存答案 + SkiaSharp 渲染（一次性、5 分钟过期）
-builder.Services.AddMemoryCache();
-builder.Services.AddSingleton<CaptchaService>();
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
-    {
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidIssuer = jwtSection["Issuer"] ?? "travel-map",
-            ValidateAudience = true,
-            ValidAudience = jwtSection["Audience"] ?? "travel-map-client",
-            ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(jwtSection["Key"]
-                    ?? throw new InvalidOperationException("Jwt:Key is not configured."))),
-            ValidateLifetime = true,
-            ClockSkew = TimeSpan.FromMinutes(1),
-        };
-    });
+// 令牌校验（ADR-0021）：接受 identity-service 签发的 RS256 令牌（公钥经 OIDC 发现获取），
+// 并在共存窗口内继续接受旧的 HS256 令牌（窗口上限 7 天）。
+// 本服务**不再签发**令牌：注册与档案归 user-service，认证归 identity-service（ADR-0020）。
+builder.Services.AddTravelMapJwt(builder.Configuration, builder.Environment);
 builder.Services.AddAuthorization();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
-// 开发态 CORS：允许 Angular dev server（ng serve，任意端口）及旧 nginx 开发端口。
-// 使用 localhost / 127.0.0.1 任意端口放行，避免用户通过 127.0.0.1:4200 访问时
-// 因 Origin 不匹配导致验证码/登录等请求被浏览器拦截。
-// 演示/开发用途；生产应改为具体前端域名或走网关同源。
+// CORS：生产只允许实际前端域名（或走网关同源）；开发态回落到 localhost 任意端口。
+// 用配置项而不是硬编码，避免把开发期白名单带进生产（docs/security/authorization.md）。
+var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("DevCors", policy =>
-        policy.SetIsOriginAllowed(origin =>
-            origin is not null &&
-            (origin.StartsWith("http://localhost:", StringComparison.OrdinalIgnoreCase) ||
-             origin.StartsWith("http://127.0.0.1:", StringComparison.OrdinalIgnoreCase)))
-              .AllowAnyHeader()
-              .AllowAnyMethod());
+    options.AddPolicy("AppCors", policy =>
+    {
+        if (corsOrigins.Length == 0)
+        {
+            policy.SetIsOriginAllowed(origin =>
+                origin is not null &&
+                (origin.StartsWith("http://localhost:", StringComparison.OrdinalIgnoreCase) ||
+                 origin.StartsWith("http://127.0.0.1:", StringComparison.OrdinalIgnoreCase)));
+        }
+        else
+        {
+            policy.WithOrigins(corsOrigins);
+        }
+
+        policy.AllowAnyHeader().AllowAnyMethod();
+    });
 });
 
 var app = builder.Build();
@@ -121,17 +106,20 @@ if (app.Environment.IsDevelopment())
 // 否则所有 HTTP 请求（含 /swagger）会被重定向到不可达的 https 端口而打不开。
 // app.UseHttpsRedirection();
 
-// Swagger / OpenAPI 交互界面：开发演示场景始终开启（不受环境限制）。
-// 若生产环境不想暴露，可改回用 if (app.Environment.IsDevelopment()) 包裹下面两行。
-app.MapOpenApi();
-app.UseSwaggerUI(options =>
+// Swagger / OpenAPI 交互界面：**只在 Development 暴露**（生产不公开 API 文档，
+// 见 docs/security/observability-and-audit.md）。
+if (app.Environment.IsDevelopment())
 {
-    options.RoutePrefix = "swagger";
-    options.SwaggerEndpoint("/openapi/v1.json", "User API v1");
-});
+    app.MapOpenApi();
+    app.UseSwaggerUI(options =>
+    {
+        options.RoutePrefix = "swagger";
+        options.SwaggerEndpoint("/openapi/v1.json", "User API v1");
+    });
+}
 
-// 开发态允许跨域（必须在 MapEndpoints 之前）
-app.UseCors("DevCors");
+// 跨域（必须在 MapEndpoints 之前）
+app.UseCors("AppCors");
 
 // 认证/授权（JWT 校验须在业务端点映射前启用）
 app.UseAuthentication();
