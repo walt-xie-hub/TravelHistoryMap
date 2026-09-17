@@ -31,3 +31,22 @@ Accepted
 - 两个服务对同一张表各有一套模型，因此 schema 变更需要契约与两侧同步——这是 ADR-0002 已经接受的「共享 appdb」代价的延续。
 - 「改密码后立即全局失效」不能靠内存状态，必须经 `CredentialVersion`。
 - 若将来要让身份服务脱离这个库独立演进，必须先做一次凭据迁移（会引入注册期的跨服务协调）。**本决策明确选择不这样做。**
+
+## 强制手段（2026-09 补记）
+
+上面写的「只读」最初只是**约定**：identity-service 与 user-service 共用同一个 `appuser` 连接串，
+因此它事实上能 `UPDATE` / `DELETE` `Users`。现已改为权限系统里的事实：
+
+- 独立角色 `identity_service`：`NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS`，
+  只有库的 `CONNECT`、schema 的 `USAGE` + `CREATE`（建自己那四张表）、以及 `Users` 的 `SELECT`。
+- 角色与口令由 `scripts/sql/identity-role.sql` 创建（幂等，口令不在文件里，由调用方经 psql 变量传入）：
+  本地走 `scripts/provision-identity-db-role.ps1`，Azure 由 `deploy-azure.sh` 调用。
+- `Users` 的 `SELECT` 由**表属主** user-service 在启动时补授（`DatabaseInitializer`）。
+  这样就不存在启动时序问题：Azure 上 `min-replicas 0`，`Users` 可能要等第一个请求才被创建。
+- identity-service 不再拿到 `appuser` 的口令（compose 与部署脚本都移除了它的 `Db__Password`）。
+
+已实测的行为：`SELECT` 通过；`INSERT` / `UPDATE` / `DELETE` 报 `permission denied for table Users`；
+`ALTER` / `DROP` 报 `must be owner of table Users`。
+
+残余：`appuser` 是库属主，因此**它**仍能读写 `RefreshTokens` 等身份表。彻底隔离需要拆库或换掉属主角色，
+这属于 ADR-0002（共享 appdb）已经接受的代价。

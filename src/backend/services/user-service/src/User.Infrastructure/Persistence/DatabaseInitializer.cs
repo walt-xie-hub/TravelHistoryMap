@@ -1,8 +1,10 @@
+using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace User.Infrastructure.Persistence;
 
@@ -46,6 +48,10 @@ public static class DatabaseInitializer
                 db.Database.ExecuteSqlRaw(
                     $"ALTER TABLE \"{UserTable}\" ADD COLUMN IF NOT EXISTS \"CredentialVersion\" integer NOT NULL DEFAULT 1;");
 
+                // 属主侧的只读授权（ADR-0020）：identity-service 用独立的最小权限角色连接，
+                // 它读 Users 的权限由**表属主**在这里授予。
+                GrantIdentityReadAccess(scope.ServiceProvider, db, UserTable);
+
                 return;
             }
             catch (Exception ex)
@@ -57,6 +63,67 @@ public static class DatabaseInitializer
 
         throw new InvalidOperationException("Failed to initialize user schema.", lastError);
     }
+
+    /// <summary>
+    /// 把 Users 的 SELECT 授予 identity-service 的独立角色（ADR-0020）。
+    ///
+    /// 为什么在这里做：Users 表是本服务建的，属主授权最自然，而且**天然免疫启动时序**——
+    /// 部署脚本不必赌"表已经建好"（Azure 上 min-replicas 0，Users 可能要等第一个请求才存在）。
+    /// 角色本身的创建、连库与建表权限仍由 database/security/identity-role.sql 负责。
+    ///
+    /// 尽力而为：角色还不存在时只记一条警告。缺权限时 identity-service 查不到凭据会明确
+    /// 报错，属于"响亮地失败"，不会静默降级成不安全的状态。
+    /// </summary>
+    private static void GrantIdentityReadAccess(IServiceProvider services, AppDbContext db, string table)
+    {
+        var role = services.GetService<IConfiguration>()?["Db:IdentityReadRole"] ?? DefaultIdentityReadRole;
+        if (!RoleNamePattern.IsMatch(role))
+            return;   // 角色名不能安全地进标识符就不执行，避免把配置里的脏值拼进 DDL
+
+        try
+        {
+            ExecuteNonQuery(db, $"GRANT SELECT ON TABLE \"{table}\" TO \"{role}\"");
+        }
+        catch (Exception ex)
+        {
+            services.GetService<ILoggerFactory>()
+                ?.CreateLogger("UserDbBootstrap")
+                .LogWarning(ex, "未能把 {Table} 的 SELECT 授予角色 {Role}：跑一次 database/security/identity-role.sql 即可（ADR-0020）。", table, role);
+        }
+    }
+
+    /// <summary>
+    /// 执行一条不带参数的 DDL/DCL 语句。
+    ///
+    /// 刻意不经 EF 的 ExecuteSqlRaw：表名与角色名都是**标识符**，无法用参数占位，
+    /// EF 分析器会因此报 EF1002；这里改用原生命令（与下面的 TableExists 同一套写法），
+    /// 把"值已经校验过"这件事交给调用方 —— 表名是常量，角色名过了正则。
+    /// </summary>
+    private static void ExecuteNonQuery(AppDbContext db, string sql)
+    {
+        var connection = db.Database.GetDbConnection();
+        var shouldClose = connection.State != System.Data.ConnectionState.Open;
+        if (shouldClose)
+            connection.Open();
+
+        try
+        {
+            using var command = connection.CreateCommand();
+            command.CommandText = sql;
+            command.ExecuteNonQuery();
+        }
+        finally
+        {
+            if (shouldClose)
+                connection.Close();
+        }
+    }
+
+    /// <summary>identity-service 的默认数据库角色名。可用配置 <c>Db:IdentityReadRole</c> 改写。</summary>
+    private const string DefaultIdentityReadRole = "identity_service";
+
+    /// <summary>允许的角色名形态（PostgreSQL 未加引号的标识符），防止脏值被拼进 DDL。</summary>
+    private static readonly Regex RoleNamePattern = new("^[a-z_][a-z0-9_]{0,62}$", RegexOptions.Compiled);
 
     private static bool TableExists(AppDbContext db, string table)
     {

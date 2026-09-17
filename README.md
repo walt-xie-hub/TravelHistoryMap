@@ -22,6 +22,7 @@ cp .env.example .env
 | `JWT_KEY` | JWT 签名密钥，user-service 与 travel-history 共用同一组（签发 / 校验） |
 | `DEMO_USER_PASSWORD` | 开发演示账号 `demo@travel.local` 的密码（user-service 以 Development 启动时幂等创建） |
 | `GRAFANA_ADMIN_PASSWORD` | Grafana 管理员口令。原先提交的默认值 `admin/admin` 已移除，缺失会直接报错 |
+| `IDENTITY_DB_PASSWORD` | identity-service 的独立数据库角色口令（ADR-0020），**必须与 `DB_PASSWORD` 不同**，否则最小权限形同虚设。首次准备：`docker compose up -d db server` 后跑 `pwsh -File scripts/provision-identity-db-role.ps1`（幂等，可反复执行） |
 
 `.env`、Kubernetes Secret 和前端运行时配置均不提交到 Git。ASP.NET 配置键保持不变，Compose 通过环境变量覆盖连接串和 JWT 配置。
 

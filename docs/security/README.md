@@ -102,7 +102,7 @@
 | 凭据只读 + `CredentialVersion` | `NpgsqlCredentialReader`（只读 5 列）、user-service 改密码时自增 |
 | 停用账号不得登录 | identity-service 与 user-service 两边都检查 `IsActive` |
 | 服务身份（默认拒绝） | `ServiceClients` 表 + `ClientCredentialsService`；`AllowedServiceAudiences` 默认为空 |
-| 内部端点骨架 | `/internal/*` + `ServiceIdentity` 策略（服务令牌 aud = 本服务）；用户令牌访问 → 403 |
+| 内部端点骨架 | `/internal/*` + `ServiceIdentity` 策略（服务令牌 aud = 本服务）；**无令牌 / 用户令牌 / aud 不匹配一律 401**（challenge 语义：不区分"没带令牌"与"令牌不对"） |
 | 审计事件 | `LoggerAuditLog`（8 个审计方法，签名里就没有口令/令牌字段） |
 | 签名密钥托管 | `ISigningKeyStore` + `DevFileSigningKeyStore`（本地）/ `KeyVaultSigningKeyStore`（`jwt-signing-<kid>`） |
 | 资源服务不再持有密钥 | `shared/Shared.Security`（RS256 via OIDC 发现 + HS256 共存窗口，两个服务共用一份） |
@@ -111,6 +111,16 @@
 | Swagger 仅在 Development | user-service / travel-service / identity-service |
 | 镜像不再自动公开 | `ci.yml` 删除“设为 public”步骤；新增 identity 镜像 |
 | 签名密钥落 Key Vault | `deploy-azure.sh` 创建 KV + 托管身份 + `jwt-signing-<kid>` + 回填 issuer |
+| **identity-service 用最小权限数据库角色** | 独立角色 `identity_service`（非超级用户、不能建库建角色、不能绕过 RLS）：`Users` **只有 `SELECT`**，自己的四张表自建自管。角色由 `scripts/sql/identity-role.sql` 创建（本地 `scripts/provision-identity-db-role.ps1`，Azure 由 `deploy-azure.sh` 调用）；`Users` 的 `SELECT` 另由**表属主** user-service 启动时补授，因此不依赖部署顺序 |
+| identity-service 不再持有 appuser 口令 | 连接串与 secret 均独立（本地 `IDENTITY_DB_PASSWORD`，Azure `identity-db-password`），compose 与部署脚木均已移除它的 `Db__Password` |
+
+> 实测证据（`identity_service` 角色，2026-09-17 在本地库执行）：`SELECT count(*) FROM "Users"` → 成功；
+> `INSERT` / `UPDATE` / `DELETE` → `permission denied for table Users`；`ALTER` / `DROP` → `must be owner of table Users`；
+> `rolsuper|rolcreatedb|rolcreaterole|rolbypassrls` 全为 `f`。
+>
+> **残余风险（未消除）**：`appuser` 仍是库属主，所以**持有它的人**（user-service、部署脚本、运维）依旧能读写
+> `RefreshTokens` 等身份表；若 user-service 的连接串泄露，refresh token 哈希仍会暴露。彻底隔离要么拆库、
+> 要么换一个非属主角色，属于 ADR-0002（共享 appdb）的已知代价。
 
 **仍未完成**（需要真实凭据或环境操作，我无法代做）：
 

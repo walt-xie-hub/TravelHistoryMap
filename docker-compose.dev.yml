@@ -157,8 +157,13 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:8080
       - DOTNET_USE_POLLING_FILE_WATCHER=true
-      - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=appdb;Username=appuser;Password=${DB_PASSWORD:?DB_PASSWORD is required};Pooling=true;
-      - Db__Password=${DB_PASSWORD:?DB_PASSWORD is required}
+      # 数据库：用的是**独立的只读角色**（ADR-0020），不是 appuser。
+      # 因此 identity-service 拿不到库属主的口令，即使被攻陷也写不了 Users ——
+      # 这条约束由 PostgreSQL 权限系统兜住，不再只是"我们的代码里没有写语句"。
+      # 角色由一次性步骤创建（幂等，可反复跑）：
+      #   docker compose up -d db server && pwsh -File scripts/provision-identity-db-role.ps1
+      # 注意：这里**不能**给 Db__Password（那是 appuser 的口令）。
+      - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=appdb;Username=identity_service;Password=${IDENTITY_DB_PASSWORD:?IDENTITY_DB_PASSWORD is required};Pooling=true;
       # issuer 必须与资源服务校验时用的值**逐字一致**；容器间用服务名互访，
       # 浏览器则走宿主 8090（第一期前端不做发现，只调登录/验证码）。
       - Identity__Issuer=http://identity-service:8080/identity

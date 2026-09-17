@@ -21,6 +21,8 @@
 #   - 数据库是公网可达的：本环境未接 VNet，容器应用只能从公网连库，而 ACA 出站 IP
 #     不稳定，也就无法用固定 IP 白名单收窄。代价与后续处置见
 #     docs/security/network-and-edge.md（P2：环境重建为 VNet 集成）。
+#   - identity-service 用**独立的只读角色**（identity_service，ADR-0020），
+#     口令是它自己的 secret，不用 appuser 的连接串。
 #   - 部署完成后请立刻轮换数据库口令（见下方"轮换提醒"）。
 #
 # 顺序说明：issuer 必须等于网关的真实 FQDN，而 FQDN 只有创建网关后才知道，
@@ -41,6 +43,9 @@ PG_USER="appuser"
 PG_DATABASE="appdb"
 KV_NAME="kv-travelmap"
 PG_PASSWORD="${PG_PASSWORD:?请设置 PG_PASSWORD 环境变量}"
+# identity-service 的专用数据库口令（ADR-0020）。与 PG_PASSWORD 分开是有意的：
+# 它对应最小权限角色，泄露这个口令拿不到 Users 的写权限。允许外部注入以复用既有环境。
+IDENTITY_DB_PASSWORD="${IDENTITY_DB_PASSWORD:-$(head -c 18 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 24)}"
 
 # 签名密钥（HS256，ADR-0005）——只用于迁移共存窗口内的旧令牌校验：
 # 允许外部注入以复用既有环境的值；未注入即随机生成，避免"漏配导致服务启动即抛"。
@@ -60,7 +65,10 @@ fi
 #   az postgres flexible-server update -g travelMap -n pg-travelmap --admin-password "$NEW_PW"
 #   az containerapp secret set -n user-service     -g travelMap --secrets db-password="$NEW_PW"
 #   az containerapp secret set -n travel-service   -g travelMap --secrets db-password="$NEW_PW"
-#   az containerapp secret set -n identity-service -g travelMap --secrets db-password="$NEW_PW"
+#   # identity-service 不跟着换 admin 口令：它用的是只读角色，单独轮换：
+#   az postgres flexible-server execute -g travelMap -n pg-travelmap -d appdb \
+#     -u appuser -p "$NEW_PW" -q "ALTER ROLE identity_service WITH PASSWORD '<新只读口令>';"
+#   az containerapp secret set -n identity-service -g travelMap --secrets identity-db-password="<新只读口令>"
 #   # 再各触发一次新 revision 让新 secret 生效
 # ────────────────────────────────────────────────────────────────
 
@@ -92,6 +100,35 @@ az postgres flexible-server create -g "$RESOURCE_GROUP" \
 
 PG_HOST="$PG_SERVER.postgres.database.azure.com"
 CONNECTION_STRING="Host=$PG_HOST;Port=5432;Database=$PG_DATABASE;Username=$PG_USER;Password=secretref:db-password;Pooling=true;SslMode=Require"
+# identity-service 自己的连接串：最小权限角色 + 自己的 secret（ADR-0020）。
+IDENTITY_CONNECTION_STRING="Host=$PG_HOST;Port=5432;Database=$PG_DATABASE;Username=identity_service;Password=secretref:identity-db-password;Pooling=true;SslMode=Require"
+
+# ── 3b. identity-service 的数据库角色（ADR-0020）────────────
+# 建角色 + 连库 + 建自己四张表的权限，并尝试授予 Users 的 SELECT。
+# 此处库通常是空的：min-replicas 0，Users 要等 user-service 收到第一个请求才建，
+# 所以传 allow_missing_users=1 降级为提示 —— user-service 启动时会以属主身份自行补授
+# SELECT（见 User.Infrastructure 的 DatabaseInitializer），因此不存在启动时序问题。
+echo "==> 创建 identity-service 的只读数据库角色 identity_service"
+PROVISION=()
+if command -v psql >/dev/null 2>&1; then
+  PROVISION=(psql "host=$PG_HOST port=5432 dbname=$PG_DATABASE user=$PG_USER sslmode=require" \
+    -f scripts/sql/identity-role.sql)
+elif command -v docker >/dev/null 2>&1; then
+  PROVISION=(docker run --rm -i -e PGPASSWORD="$PG_PASSWORD" \
+    -v "$PWD/scripts/sql:/sql:ro" postgres:16-alpine \
+    psql "host=$PG_HOST port=5432 dbname=$PG_DATABASE user=$PG_USER sslmode=require" \
+    -f /sql/identity-role.sql)
+else
+  echo "!! 既没有 psql 也没有 docker，无法创建 identity_service 角色。" >&2
+  echo "   请手动执行 scripts/sql/identity-role.sql，否则 identity-service 读不到 Users。" >&2
+fi
+
+if [ ${#PROVISION[@]} -gt 0 ]; then
+  PGPASSWORD="$PG_PASSWORD" "${PROVISION[@]}" \
+    -v role_name=identity_service \
+    -v role_password="$IDENTITY_DB_PASSWORD" \
+    -v allow_missing_users=1
+fi
 
 # ── 4. 四个 internal 应用 ───────────────────────────────────
 # ① user-service：拥有 Users 表（含凭据列）。issuer 在网关创建后回填。
@@ -142,10 +179,9 @@ az containerapp create \
   --image "ghcr.io/$ORG/travelmap-identity-service:latest" \
   --target-port 8080 --ingress internal --min-replicas 0 --max-replicas 3 \
   --system-assigned \
-  --secrets db-password="$PG_PASSWORD" \
+  --secrets identity-db-password="$IDENTITY_DB_PASSWORD" \
   --env-vars \
-    "ConnectionStrings__DefaultConnection=$CONNECTION_STRING" \
-    "Db__Password=secretref:db-password" \
+    "ConnectionStrings__DefaultConnection=$IDENTITY_CONNECTION_STRING" \
     "Identity__Issuer=https://pending.invalid/identity" \
     "Identity__ServiceId=identity-service" \
     "Identity__Audience=travel-map-client" \

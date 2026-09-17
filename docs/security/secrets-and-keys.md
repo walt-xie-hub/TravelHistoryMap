@@ -27,6 +27,8 @@
    - 是 → 公网可达（`--public-access Enabled`）的生产库口令已公开，按最高优先级处理；
    - 否 → 影响面限于本地开发库，但**仍然必须轮换**（同一口令跨环境复用是横向移动的燃料）。
 2. **轮换 Azure**：`az postgres flexible-server update -g travelMap -n pg-travelmap --admin-password '<新口令>'`，随后更新 ACA 的 `db-password` secret 并触发新 revision。
+   identity-service **不跟着换**：它用的是只读角色，单独执行 `ALTER ROLE identity_service WITH PASSWORD '<新只读口令>'`，
+   并更新它的 `identity-db-password` secret（ADR-0020）。两个口令相同就等于把最小权限策略作废。
 3. **轮换本地（有坑）**：`POSTGRES_PASSWORD` **只在 initdb 时生效**。`database/postgres` 已是初始化过的数据目录，改 `.env` 不会改角色口令，必须显式执行：
    `docker exec -it postgres-db psql -U appuser -d appdb -c "ALTER USER appuser WITH PASSWORD '<新口令>';"`，再同步 `.env`。
    **不要**为了改口令删除 `database/postgres`——那是你的开发数据，且与 k8s PV 共用同一份物理目录。
@@ -46,7 +48,8 @@
 
 | 用途 | 承载 | 取用方式 | 归属服务 |
 |---|---|---|---|
-| DB 连接串 / 口令 | KV | 平台引用 → `ConnectionStrings__DefaultConnection` | user / travel / identity |
+| DB 连接串 / 口令 | KV | 平台引用 → `ConnectionStrings__DefaultConnection` | user / travel |
+| identity 只读 DB 角色口令 | KV | 平台引用 → `ConnectionStrings__DefaultConnection`，但角色是 `identity_service`（对 `Users` 只有 `SELECT`，ADR-0020） | identity |
 | 签名私钥（多 `kid`） | KV，`jwt-signing-<kid>` | 应用内 SDK 读取（**唯一需要代码的机密**） | identity |
 | Client secret（服务身份） | identity 自有表，**只存哈希** | 哈希比对，无明文存放 | identity |
 | 演示账号口令 | KV / ACA secret | 平台引用 → `DemoUser__Password`（仅 dev） | user |
@@ -82,7 +85,7 @@
 
 ### P0
 
-- [ ] 确认并轮换数据库口令（Azure 与本地各自执行；注意本地必须 `ALTER USER`，改 `.env` 无效）；收窄 PostgreSQL 公网访问；连接串强制 `SslMode`。
+- [ ] 确认并轮换数据库口令（Azure 与本地各自执行；注意本地必须 `ALTER USER`，改 `.env` 无效）；identity-service 的只读角色口令单独轮换；收窄 PostgreSQL 公网访问；连接串强制 `SslMode`。
 - [ ] GHCR 镜像转私有，ACA 配置 registry 凭据（脚本已支持 `--registry-*`）。
 - [ ] 从 `README.md` / `ci.yml` 移除明文默认凭据与内嵌 GUID 的 secret 命名（改为通用名 + 在 GitHub Secrets 中重命名）。
 
