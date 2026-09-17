@@ -36,29 +36,6 @@ public class UserService : IUserService
         return ToDto(created);
     }
 
-    /// <summary>
-    /// 邮箱+口令登录。
-    ///
-    /// 注意：**登录已迁到 identity-service**（ADR-0020），本方法目前已无生产调用方，
-    /// 保留是因为它仍是 Users 凭据校验在应用层的参考实现与单测对象；
-    /// 计划在共存窗口结束后删除（避免两处凭据校验逻辑漂移）。
-    /// </summary>
-    public async Task<UserDto> LoginAsync(string email, string password, CancellationToken ct = default)
-    {
-        var user = await _repository.GetByEmailAsync(NormalizeEmail(email), ct);
-        // 先验凭据：这一步的失败与"账号被停用"必须返回同一个异常，
-        // 否则接口会变成账号存在性/状态的探测器（见 docs/security/authentication.md）。
-        if (user?.PasswordHash is null || !_passwordHasher.Verify(password, user.PasswordHash))
-            throw new InvalidCredentialsException();
-
-        // 凭据正确后再判停用：停用账号不得换到令牌（安全指引 P0）。
-        // 未来身份服务化（ADR-0020）后此处挪到 identity-service，语义不变。
-        if (!user.IsActive)
-            throw new InvalidCredentialsException();
-
-        return ToDto(user);
-    }
-
     public async Task<UserDto?> GetByIdAsync(int id, CancellationToken ct = default)
     {
         var user = await _repository.GetByIdAsync(id, ct);

@@ -21,11 +21,6 @@ export interface LoginRequest {
   captchaAnswer?: string | null;
 }
 
-export interface AuthResponse {
-  token: string;
-  user: User;
-}
-
 /** 注册成功响应：后端只落库并返回用户信息，不签发 token（用户需跳转登录页重新登录）。 */
 export interface RegisterResponse {
   user: User;

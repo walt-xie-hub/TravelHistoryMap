@@ -82,7 +82,7 @@
 
 | 项 | 落地位置 |
 |---|---|
-| 停用账号不得换取令牌（P0 ⑥） | `UserService.LoginAsync` + 2 个单元测试 |
+| 停用账号不得换取令牌（P0 ⑥） | identity-service：`AuthenticationServiceTests.LoginAsync_WithDeactivatedAccount_Throws` + `RefreshTokenServiceTests.RotateAsync_WhenUserDeactivated_RevokesFamilyAndRejects`（user-service 的旧 `LoginAsync` 已删除，见下） |
 | dev 端口全部只绑回环（P0 ③） | `docker-compose.dev.yml` |
 | Grafana 默认口令移除（P0 ③） | `docker-compose.dev.yml` + `.env.example` + `README.md`（新增**必需**变量 `GRAFANA_ADMIN_PASSWORD`） |
 | 遥测属性脱敏、debug 降级（P0 ③） | `infra/observability/otel-collector-config.yaml` |
@@ -132,6 +132,13 @@
 | 窗口关闭后旧 issuer 一并拒绝 | `BuildValidIssuers` |
 | 回归测试 9 条：默认关闭、缺日期、格式错、过期、超限、缺密钥、合法窗口、上限常量 | `src/backend/shared/Shared.Security.Tests` |
 | 部署侧说明如何临时开启 | `docker-compose.dev.yml` 与 `deploy-azure.sh` 注释 |
+
+**本次已实现（认证路径唯一化 + 死代码清理）**：
+
+| 项 | 落地位置 |
+|---|---|
+| 认证只有一条实现：删除 user-service 的 `LoginAsync`（它已无调用方，却是一套与 identity-service 分歧的凭据校验——没有锁定、没有失败计数） | `IUserService` / `UserService` 与 4 条对应单测；等价覆盖在 identity-service（停用账号拒登、刷新时停用即撤族） |
+| 删除零引用的 `LoginRequestDto` / `AuthResponseDto` / 前端 `AuthResponse` | `UserDto.cs`、`user.model.ts`（`LoginRequest` / `RegisterResponse` 仍在用，保留） |
 
 **仍未完成**（需要真实凭据或环境操作，我无法代做）：
 
