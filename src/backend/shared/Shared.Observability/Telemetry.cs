@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -23,7 +24,7 @@ public static class Telemetry
     /// <summary>
     /// 注册 OpenTelemetry Tracing + Metrics + Logging 管线。
     ///
-    /// OTLP 端点优先从代码配置读取，其次从环境变量 OTEL_EXPORTER_OTLP_ENDPOINT 读取。
+    /// OTLP 端点取环境变量 OTEL_EXPORTER_OTLP_ENDPOINT；**未配置时不启用 OTLP 导出**。
     ///
     /// 自动埋点：
     ///   - ASP.NET Core  HTTP 请求/响应 (tracing + metrics)
@@ -43,6 +44,9 @@ public static class Telemetry
         // ---- 构建 Resource ----
         var resourceBuilder = ResourceBuilder.CreateDefault().AddService(serviceName);
 
+        // OTLP 只在显式配置了端点时才启用（理由见 ResolveOtlpEndpoint 的注释）
+        var otlpEndpoint = ResolveOtlpEndpoint();
+
         // ---- Logging：通过 OTLP 导出结构化日志 ----
         services.AddLogging(logging =>
         {
@@ -54,7 +58,10 @@ public static class Telemetry
 #if DEBUG
                 otelLogging.AddConsoleExporter();           // DEBUG 时控制台可见日志
 #endif
-                otelLogging.AddOtlpExporter(ConfigureOtlp);
+                if (otlpEndpoint is not null)
+                {
+                    otelLogging.AddOtlpExporter(o => o.Endpoint = otlpEndpoint);
+                }
             });
         });
 
@@ -65,25 +72,35 @@ public static class Telemetry
                 .AddTelemetrySdk())
 
             // Tracing 管线
-            .WithTracing(tracing => tracing
-                .AddAspNetCoreInstrumentation(asp =>
+            .WithTracing(tracing =>
+            {
+                tracing.AddAspNetCoreInstrumentation(asp =>
                 {
                     asp.Filter = ctx => !ctx.Request.Path.StartsWithSegments("/health");
                     asp.RecordException = true;
                 })
-                .AddNpgsql()                              // Npgsql 数据库命令级追踪：每条 SQL 自动创建 span
-                .SetSampler(new AlwaysOnSampler())
+                .AddNpgsql();                             // Npgsql 数据库命令级追踪：每条 SQL 自动创建 span
+                tracing.SetSampler(ResolveSampler());
 #if DEBUG
-                .AddConsoleExporter()                  // DEBUG 构建输出到控制台，便于诊断
+                tracing.AddConsoleExporter();             // DEBUG 构建输出到控制台，便于诊断
 #endif
-                .AddOtlpExporter(ConfigureOtlp))
+                if (otlpEndpoint is not null)
+                {
+                    tracing.AddOtlpExporter(o => o.Endpoint = otlpEndpoint);
+                }
+            })
 
             // Metrics 管线：双导出 —— OTLP + Prometheus scrape
-            .WithMetrics(metrics => metrics
-                .AddAspNetCoreInstrumentation()
-                .AddRuntimeInstrumentation()
-                .AddPrometheusExporter()                  // 暴露 /metrics 供 Prometheus 抓取
-                .AddOtlpExporter(ConfigureOtlp));
+            .WithMetrics(metrics =>
+            {
+                metrics.AddAspNetCoreInstrumentation()
+                       .AddRuntimeInstrumentation()
+                       .AddPrometheusExporter();          // 暴露 /metrics 供 Prometheus 抓取
+                if (otlpEndpoint is not null)
+                {
+                    metrics.AddOtlpExporter(o => o.Endpoint = otlpEndpoint);
+                }
+            });
 
         return services;
     }
@@ -99,17 +116,37 @@ public static class Telemetry
     }
 
     /// <summary>
-    /// 统一 OTLP 导出器配置：开发环境使用 Jaeger gRPC :4317。
-    /// 端点可通过 <c>OTEL_EXPORTER_OTLP_ENDPOINT</c> 环境变量覆盖。
+    /// 解析 OTLP 端点。**未显式配置时不导出**。
+    ///
+    /// 旧实现会回落到 http://localhost:4317：在没有 collector 的环境里（例如 ACA 上
+    /// 未启用托管 agent 时）表现为持续导出失败与日志噪音——看起来像"配了遥测"，
+    /// 实际什么都到不了。现在的语义是：要么明确给了端点，要么不启用 OTLP
+    /// （本地仍保留 /metrics 与 DEBUG 控制台导出）。
     /// </summary>
-    private static void ConfigureOtlp(OtlpExporterOptions options)
+    private static Uri? ResolveOtlpEndpoint()
     {
         var endpoint = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT");
-        if (string.IsNullOrWhiteSpace(endpoint))
+        return Uri.TryCreate(endpoint, UriKind.Absolute, out var uri) ? uri : null;
+    }
+
+    /// <summary>
+    /// 采样策略：默认全采（保持本地开发的既有行为），可用
+    /// <c>OTEL_TRACE_SAMPLING_RATIO</c>（0..1）改为按比例采样。
+    ///
+    /// 生产必须设成小比例：原来的 AlwaysOnSampler 是 100% 采样，会把免费额度很快烧完
+    /// （见 docs/security/observability-and-audit.md）。用 ParentBased 是为了尊重上游
+    /// 的采样决定，避免同一条 trace 在服务之间断开。
+    /// 注意：这里做不到"错误 100% 采集"——那需要 tail sampling，不在应用侧解决。
+    /// </summary>
+    private static Sampler ResolveSampler()
+    {
+        var raw = Environment.GetEnvironmentVariable("OTEL_TRACE_SAMPLING_RATIO");
+        if (double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var ratio)
+            && ratio >= 0d && ratio <= 1d)
         {
-            endpoint = "http://localhost:4317";
+            return new ParentBasedSampler(new TraceIdRatioBasedSampler(ratio));
         }
 
-        options.Endpoint = new Uri(endpoint);
+        return new ParentBasedSampler(new AlwaysOnSampler());
     }
 }

@@ -104,6 +104,53 @@ public class UserServiceTests
     }
 
     [Fact]
+    public async Task LoginAsync_WhenUserIsDeactivated_ThrowsInvalidCredentials()
+    {
+        // 停用账号不得换到令牌（安全指引 authentication.md 的 P0 项）。
+        // 凭据本身正确，唯一区别是 IsActive=false。
+        _repositoryMock.Setup(r => r.GetByEmailAsync("disabled@example.com", It.IsAny<CancellationToken>()))
+                       .ReturnsAsync(new AppUser
+                       {
+                           Id = 3,
+                           Name = "Disabled",
+                           Email = "disabled@example.com",
+                           PasswordHash = "h:p@ssw0rd",
+                           IsActive = false,
+                       });
+
+        await Assert.ThrowsAsync<InvalidCredentialsException>(
+            () => _sut.LoginAsync("disabled@example.com", "p@ssw0rd"));
+    }
+
+    [Fact]
+    public async Task LoginAsync_WhenUserIsDeactivated_SignalsSameFailureAsWrongPassword()
+    {
+        // 停用与口令错误必须不可区分，否则接口会变成账号存在性/状态的探测器。
+        _repositoryMock.Setup(r => r.GetByEmailAsync("disabled@example.com", It.IsAny<CancellationToken>()))
+                       .ReturnsAsync(new AppUser
+                       {
+                           Id = 3,
+                           Email = "disabled@example.com",
+                           PasswordHash = "h:p@ssw0rd",
+                           IsActive = false,
+                       });
+        _repositoryMock.Setup(r => r.GetByEmailAsync("alice@example.com", It.IsAny<CancellationToken>()))
+                       .ReturnsAsync(new AppUser
+                       {
+                           Id = 1,
+                           Email = "alice@example.com",
+                           PasswordHash = "h:p@ssw0rd",
+                       });
+
+        var deactivated = await Assert.ThrowsAsync<InvalidCredentialsException>(
+            () => _sut.LoginAsync("disabled@example.com", "p@ssw0rd"));
+        var wrongPassword = await Assert.ThrowsAsync<InvalidCredentialsException>(
+            () => _sut.LoginAsync("alice@example.com", "wrong-password"));
+
+        Assert.Equal(wrongPassword.Message, deactivated.Message);
+    }
+
+    [Fact]
     public async Task GetByIdAsync_WhenUserExists_ReturnsUserDto()
     {
         _repositoryMock.Setup(r => r.GetByIdAsync(1, It.IsAny<CancellationToken>()))

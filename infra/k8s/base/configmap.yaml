@@ -6,6 +6,13 @@ metadata:
   namespace: myapp
 data:
   ASPNETCORE_ENVIRONMENT: "Production"
-  # OpenTelemetry OTLP 导出目标（生产环境部署 OpenTelemetry Collector 后填写）
-  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+  # 刻意不设置 OTEL_EXPORTER_OTLP_ENDPOINT：
+  # 原先指向集群里并不存在的 otel-collector，应用会持续导出失败——看起来"配了遥测"，
+  # 实际什么都到不了。Telemetry.cs 现在的语义是"没配端点就不启用 OTLP"。
+  #
+  # 生产要采遥测时的两条正确路径（见 docs/security/observability-and-audit.md）：
+  #   1) ACA：启用环境级托管 OTel agent，它会自动注入该变量（推荐，零额外 compute 成本）；
+  #   2) k8s：先真正部署 collector（本目录没有 collector 的清单），再把地址写在这里。
   OTEL_SERVICE_NAME: "user-service"
+  # 采样率：不要 100% 采样，否则很快烧完额度（Telemetry.cs 的默认值是全采）
+  OTEL_TRACE_SAMPLING_RATIO: "0.1"

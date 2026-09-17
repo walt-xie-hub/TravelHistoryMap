@@ -1,16 +1,40 @@
 # Travel Map
 
-记录用户到过哪里、何时到达与离开的应用：user-service 管理用户档案，travel-history 记录用户的旅行历史，前端将历史渲染到地图上。
+记录用户到过哪里、何时到达与离开的应用：user-service 管理用户档案与注册，identity-service 负责认证与签发令牌，travel-history 记录用户的旅行历史，前端将历史渲染到地图上。
 
 ## Language
 
 **User**:
-由 user-service 拥有并管理的用户档案（`users` 表）。用户持有**凭据**（email + password）用于登录；注册是创建用户的唯一途径（公开的 users CRUD 已下线）。其他服务只通过整数 `user_id` 引用它，不复制用户数据。
-_Avoid_: member, account, owner
+由 user-service 拥有并管理的用户档案（`users` 表），档案内含**凭据**。注册是创建 User 的唯一途径（公开的 users CRUD 已下线）；user-service 是 `users` 表的**唯一写者**，含凭据列。identity-service **不拥有** User，只在认证通过后于令牌中引用其 `Id`；travel-history 也只通过整数 `user_id` 引用它，不复制用户数据。
+_Avoid_: member, account, owner, 把 User 当成 identity-service 的实体
+
+**Credential**（凭据）:
+证明「我就是这个 User」的材料（当前为 email + password）。它属于 User，但与档案**分开表述**：档案是可改的展示信息，凭据是认证材料，且只有 user-service 能写。
+_Avoid_: 把凭据当普通档案字段、在两个服务里各存一份凭据
+
+**Identity provider**（身份提供方）:
+签发并证明身份的权威方（本项目为 identity-service）。它认证 User 并签发令牌，但**不拥有** User；其他服务只验证它签发的令牌，不自行签发身份。
+_Avoid_: 把签发身份的能力散落到各服务、把 User 当成身份提供方的实体
+
+**Caller**（调用者）:
+一次请求的发起方，只有三种：匿名、登录用户、服务。服务对每个请求都必须先判定它属于哪一种，再决定是否放行。
+_Avoid_: 把「已认证」等同于「是登录用户」、把请求来自哪张网络当身份
 
 **Signed-in user**（登录用户）:
-已通过 user-service 登录流程认证、获准进入主界面的用户。主界面数据（如 Travel records、地图足迹）只呈现给其归属的登录用户自己。
+已通过身份提供方认证、获准进入主界面的 User。主界面数据（如 Travel records、地图足迹）只呈现给其归属的登录用户自己。
 _Avoid_: guest, anonymous, current account
+
+**Refresh token**（刷新令牌）:
+access 令牌过期后用来换取新令牌的长期凭据，只存在于客户端与身份提供方之间。每次使用即轮换、旧的立即失效；**旧令牌被再次使用视为泄露，该族整体撤销**。
+_Avoid_: 把它当长期 access 令牌、把它交给资源服务、把它当会话 cookie
+
+**Client**（服务客户端）:
+一个后端服务在身份提供方注册后的身份，用于证明「这次调用是我发的」。与 User 是**两套凭据体系**，不复用用户令牌的密钥或语义。
+_Avoid_: 把 Client 当 User、用用户令牌充当服务身份、用服务身份去校验用户是否存在（见 ADR-0002）
+
+**Scope & Audience**（范围与受众）:
+令牌上的两条约束：Audience 指「这个令牌签给谁用」，Scope 指「它被允许做什么」。二者共同构成「服务能调什么」的规则，默认拒绝、按需开。
+_Avoid_: 把 Audience 当提示信息、把 Scope 当角色、把「不指定 audience」当通配
 
 **Travel record**（旅行记录）:
 一名用户在某地点的一段有明确到达与离开边界的一次停留。一条记录对应地图上的一个点；同一地点多次到访是独立的多条记录。由 travel-history 服务拥有（`TravelRecords` 表）。

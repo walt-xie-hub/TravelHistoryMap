@@ -5,57 +5,118 @@
 # - TLS 与 http→https 跳转统一由边缘层完成（Azure Container Apps 外部入口
 #   transport=Auto，或 K8s nginx Ingress），网关容器自身只监听 80（HTTP）。
 # - 到内部服务的调用统一走 https://<内部FQDN>（ACA 内部入口以 https 提供），
-#   因此 ${*_URL} 配置为 https://…；不显式覆盖 Host，nginx 会以 proxy_pass 的
-#   目标 FQDN 作为 Host/SNI（proxy_ssl_server_name on），让 ACA 正确路由并完成 TLS。
+#   因此 ${*_URL} 配置为 https://…；显式把 Host 设为上游目标 FQDN
+#   （$proxy_host，与不覆盖 Host 时的默认值一致，但意图明确），
+#   proxy_ssl_server_name on 让 ACA 正确路由并完成 TLS。
 #   proxy_ssl_verify off：内网环境内信任边缘 CA，避免证书链依赖。
+# - 网关不做鉴权，也不注入任何身份头；服务只认自己验签的令牌（见 docs/adr/0019）。
 # - $host / $request_uri 是 nginx 内置变量，envsubst 不会替换它们。
+#
+# ── http 上下文：真实客户端 IP 与限流 ──────────────────────────
+# 本文件渲染后落在 conf.d/ 下，即处于 http 上下文，因此可以声明 map / limit_req_zone。
+#
+# 关键前提：TLS 由 ACA 边缘终止，网关看到的 $remote_addr 是边缘代理而不是终端用户，
+# 直接按 $remote_addr 限流等于把所有用户算成一个桶。ACA 会把真实客户端地址追加到
+# X-Forwarded-For 末尾，因此取"最右一个"才是可信来源；左侧的值来自客户端自身，不可信。
+map $http_x_forwarded_for $travel_map_client_ip {
+    default                           $remote_addr;
+    "~^(?:[^,]+,\s*)*([^,\s]+)\s*$"   $1;
+}
+
+# 边缘给的值优先；缺失时回落 $scheme（本地直连网关的场景）
+map $http_x_forwarded_proto $travel_map_forwarded_proto {
+    default $http_x_forwarded_proto;
+    ""      $scheme;
+}
+
+# 只在真的走了 HTTPS 时下发 HSTS：网关自身只监听 http，
+# 在明文响应上发 HSTS 是无意义的（旧配置用 always，明文响应也会带上）。
+map $http_x_forwarded_proto $travel_map_hsts {
+    https   "max-age=31536000; includeSubDomains";
+    default "";
+}
+
+# 认证类端点单独限速：登录 / 验证码 / 注册是最值得爆破的目标。
+# 只对这几条路径启用，是为了把"限流配置写错"的影响面限制在认证路径上。
+limit_req_zone $travel_map_client_ip zone=auth:10m rate=10r/m;
+
 server {
     listen 80;
+
+    # 不回显 nginx 版本号
+    server_tokens off;
 
     # 图片上传 body 上限：travel 服务单张最大 10 MB，网关放开到 12 MB 以免 413
     # （nginx 默认 1 MB 会让 >1MB 的图片上传被拒）。
     client_max_body_size 12m;
 
-    # 安全响应头：HSTS 要求浏览器后续只用 HTTPS；其余为常见 XSS/嗅探防护
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    # 安全响应头
+    add_header Strict-Transport-Security $travel_map_hsts always;
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Permissions-Policy "camera=(), microphone=(), payment=(), usb=()" always;
+
+    # CSP 先以 Report-Only 运行：只上报、不拦截，用来发现高德 SDK 实际还需要哪些源；
+    # 观察一轮后再把 Content-Security-Policy-Report-Only 改成强制的 Content-Security-Policy。
+    # 它是本期替代性缓解：PKCE 之前的 access token 仍存在 localStorage，CSP 是这段窗口里
+    # 唯一能实质降低 XSS 影响的措施（见 docs/security/network-and-edge.md）。
+    add_header Content-Security-Policy-Report-Only "default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://webapi.amap.com https://*.amap.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.amap.com https://*.autonavi.com; connect-src 'self' https://*.amap.com https://*.autonavi.com; font-src 'self' data:; frame-src 'self' https://*.amap.com" always;
+
+    # ── 转发到内部服务的统一约定（server 级设置，由各 location 继承）──
+    # 1) 只把边缘追加的真实客户端 IP 往下传（不追加客户端自带的 XFF）；
+    # 2) X-Forwarded-Proto 以边缘给的值为准，缺失时回落 $scheme；
+    # 3) 显式设置 Host 为上游目标 FQDN；
+    # 4) 清空一切"身份类"请求头——网关不注入身份，服务只认自己验签的令牌（ADR-0019）。
+    #    设成空串即等于不转发该头。nginx 不支持通配符，所以这里是显式枚举；
+    #    真正的保证不在这一行清单上，而在"服务绝不读取未经自己验证的身份头"。
+    proxy_set_header X-Forwarded-For $travel_map_client_ip;
+    proxy_set_header X-Forwarded-Proto $travel_map_forwarded_proto;
+    proxy_set_header Host $proxy_host;
+    proxy_set_header X-Real-IP "";
+    proxy_set_header X-User-Id "";
+    proxy_set_header X-User "";
+    proxy_set_header X-User-Name "";
+    proxy_set_header X-User-Role "";
+    proxy_set_header X-User-Email "";
+    proxy_set_header X-Forwarded-User "";
+    proxy_set_header X-Authenticated-User "";
+    proxy_set_header X-Internal-Token "";
+    proxy_set_header X-Internal-Caller "";
+
+    proxy_ssl_server_name on;
+    proxy_ssl_verify off;
 
     # 旅行 API：/api/travels、/api/travels/、/api/travels/{id}/... 全部转 travel-service。
     # 前缀刻意不带尾斜杠，避免 nginx 对 /api/travels 补斜杠 301，也防止列表端点漏落到 user-service。
+    # 代理头与 TLS 参数已在 server 级统一设置，这里只声明去向。
     location /api/travels {
         proxy_pass ${TRAVEL_SERVICE_URL};
-        proxy_ssl_server_name on;
-        proxy_ssl_verify off;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
     }
 
     # 只读分享快照 → travel-service（公开端点，见 ADR-0012）
     location /api/share-snapshots {
         proxy_pass ${TRAVEL_SERVICE_URL};
-        proxy_ssl_server_name on;
-        proxy_ssl_verify off;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # ── 认证类端点：限流 ────────────────────────────────────────
+    # 这三个端点是仅有的公开可写入口，也是爆破目标。用一条正则 location 覆盖，
+    # 正则优先级高于前缀 location，因此不会被下面的 /api/ 吞掉。
+    # 限流只是纵深防御，不能替代应用侧的登录失败计数与锁定
+    # （见 docs/security/authentication.md 的 P1 项）。
+    location ~ ^/api/auth/(login|captcha|register)/?$ {
+        limit_req zone=auth burst=5 nodelay;
+        limit_req_status 429;
+        proxy_pass ${USER_SERVICE_URL};
     }
 
     # /api/* -> user-service (the /api prefix is preserved)
     location /api/ {
         proxy_pass ${USER_SERVICE_URL};
-        proxy_ssl_server_name on;
-        proxy_ssl_verify off;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
     }
 
     # 其余 → 前端 client（SPA，client 内部 nginx 处理 history fallback）
     location / {
         proxy_pass ${CLIENT_URL};
-        proxy_ssl_server_name on;
-        proxy_ssl_verify off;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
     }
 }

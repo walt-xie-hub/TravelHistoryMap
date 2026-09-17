@@ -39,8 +39,16 @@ public class UserService : IUserService
     public async Task<UserDto> LoginAsync(string email, string password, CancellationToken ct = default)
     {
         var user = await _repository.GetByEmailAsync(NormalizeEmail(email), ct);
+        // 先验凭据：这一步的失败与"账号被停用"必须返回同一个异常，
+        // 否则接口会变成账号存在性/状态的探测器（见 docs/security/authentication.md）。
         if (user?.PasswordHash is null || !_passwordHasher.Verify(password, user.PasswordHash))
             throw new InvalidCredentialsException();
+
+        // 凭据正确后再判停用：停用账号不得换到令牌（安全指引 P0）。
+        // 未来身份服务化（ADR-0020）后此处挪到 identity-service，语义不变。
+        if (!user.IsActive)
+            throw new InvalidCredentialsException();
+
         return ToDto(user);
     }
 

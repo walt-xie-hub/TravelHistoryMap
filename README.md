@@ -21,6 +21,7 @@ cp .env.example .env
 | `DB_PASSWORD` | PostgreSQL 密码。注意 `./database/postgres` 数据目录被 Compose 与 k8s PV 共用，改动会影响两边 |
 | `JWT_KEY` | JWT 签名密钥，user-service 与 travel-history 共用同一组（签发 / 校验） |
 | `DEMO_USER_PASSWORD` | 开发演示账号 `demo@travel.local` 的密码（user-service 以 Development 启动时幂等创建） |
+| `GRAFANA_ADMIN_PASSWORD` | Grafana 管理员口令。原先提交的默认值 `admin/admin` 已移除，缺失会直接报错 |
 
 `.env`、Kubernetes Secret 和前端运行时配置均不提交到 Git。ASP.NET 配置键保持不变，Compose 通过环境变量覆盖连接串和 JWT 配置。
 
@@ -38,6 +39,8 @@ docker compose -f docker-compose.dev.yml up -d
 | user-service | http://localhost:8080/swagger |
 | travel-history | http://localhost:8081/swagger |
 | Grafana（可观测性） | http://localhost:3000 |
+
+> 宿主端口一律只绑定 `127.0.0.1`（仅本机可访问）：观测栈没有任何鉴权，不应暴露给同网段的其它机器。
 
 > `up -d` 只是把服务跑起来，**不会**把工作区改动实时同步进容器。client / server / travel-server 没有挂 volume，容器里跑的是**构建镜像那一刻的代码快照**；想改完源码即时生效请用下面的 watch 模式。
 
@@ -152,11 +155,11 @@ user-service (.NET OTel SDK)
 | **Swagger UI** | http://localhost:8080/swagger | API 文档 + 交互测试 |
 | **Jaeger UI** | http://localhost:16686 | 分布式追踪查询 (Traces) |
 | **Prometheus** | http://localhost:9090 | 时序指标查询 (Metrics) |
-| **Grafana** | http://localhost:3000 | 统一可视化（Traces + Metrics + Logs），admin/admin |
+| **Grafana** | http://localhost:3000 | 统一可视化（Traces + Metrics + Logs），口令取 `.env` 的 `GRAFANA_ADMIN_PASSWORD` |
 | **`/metrics`** | http://localhost:8080/metrics | Prometheus 抓取端点（应用直接暴露） |
 | **`/health`** | http://localhost:8080/health | 健康检查 |
 | **Loki API** | http://localhost:3100 | 日志查询 API（Grafana 中以 Loki 为数据源查询） |
-| **Collector debug** | `docker logs otel-collector` | Collector 控制台输出 traces + logs 内容 |
+| **Collector debug** | `docker logs otel-collector` | span / log 概要（`verbosity: basic`；不含属性值，避免凭据随属性外泄） |
 | **App logs** | `docker logs dotnet-api-dev` | .NET 控制台日志（DEBUG 构建含 ConsoleExporter） |
 
 ### 配置分布

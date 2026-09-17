@@ -30,11 +30,17 @@ processors:
     limit_mib: 512
     spike_limit_mib: 128
 
-  # 属性过滤：生产环境可按需打开，去除敏感字段
-  # attributes:
-  #   actions:
-  #     - key: http.request.header.authorization
-  #       action: delete
+  # 属性脱敏：删除凭据类请求头，避免 token 通过 trace / log 外泄。
+  # 这一段必须保持开启：它曾以"生产环境可按需打开"为由被注释掉，
+  # 结果是本地 collector 的 debug 输出与 Jaeger 里都带着 Authorization 头。
+  attributes:
+    actions:
+      - key: http.request.header.authorization
+        action: delete
+      - key: http.request.header.cookie
+        action: delete
+      - key: http.response.header.set-cookie
+        action: delete
 
 exporters:
   # Traces → Jaeger（OTLP/gRPC）
@@ -53,23 +59,26 @@ exporters:
     tls:
       insecure: true
 
-  # 开发调试：输出到控制台，便于诊断
+  # 开发调试：输出到控制台，便于诊断。
+  # 刻意用 basic 而非 detailed：detailed 会把完整 span/log 内容（含属性）刷到容器
+  # stdout，是最直接的泄露面。需要看完整内容时用 Jaeger（traces）或 Grafana/Loki（logs）。
+  # 任何共享/生产环境配置都不得包含本 exporter。
   debug:
-    verbosity: detailed
+    verbosity: basic
 
 service:
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [memory_limiter, batch]
+      processors: [memory_limiter, attributes, batch]
       exporters: [otlp/jaeger, debug]
 
     metrics:
       receivers: [otlp]
-      processors: [memory_limiter, batch]
+      processors: [memory_limiter, attributes, batch]
       exporters: [prometheus, debug]
 
     logs:
       receivers: [otlp]
-      processors: [memory_limiter, batch]
+      processors: [memory_limiter, attributes, batch]
       exporters: [otlphttp/loki, debug]

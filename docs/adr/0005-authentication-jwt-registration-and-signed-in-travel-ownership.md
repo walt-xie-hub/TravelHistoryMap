@@ -1,5 +1,7 @@
 # Authentication via self-issued JWT; registration is the only way to create users, travel data is bound to the signed-in user
 
+> **Status**：本 ADR 的**第 1 节（认证机制）已被 [ADR-0021](./0021-token-model-rs256-jwks-rotation-and-refresh.md) 取代**——签发方改为 identity-service、签名改为 RS256 + 公开 JWKS、引入 refresh 轮换与服务端吊销。第 2–6 节（注册是创建用户的唯一途径、me 资源模式、归属取自 token、前端守卫、dev 种子）**继续有效**。原文保持不改写，以便对照当时的取舍。
+
 应用此前**完全没有认证**：users CRUD 端点公开、任何人可无密码创建/编辑用户；地图页通过「用户下拉 + `localStorage` 记忆」选择任意用户，并把客户端传入的 `userId` 作为 travel 查询/写入的归属者——服务端不校验、可被任意伪造（越权读取他人足迹）。`AppUser.PasswordHash` 与 `AvatarUrl` 字段预留但从未使用。
 
 需求：注册与登录；**只有登录用户才能进入主界面**；右上角显示用户名与头像，点击菜单含「修改用户信息」与「登出」。设计收敛如下。
