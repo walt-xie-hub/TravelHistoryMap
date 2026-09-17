@@ -49,6 +49,9 @@ IDENTITY_DB_PASSWORD="${IDENTITY_DB_PASSWORD:-$(head -c 18 /dev/urandom | base64
 
 # 签名密钥（HS256，ADR-0005）——只用于迁移共存窗口内的旧令牌校验：
 # 允许外部注入以复用既有环境的值；未注入即随机生成，避免"漏配导致服务启动即抛"。
+# 注意：资源服务**默认不接受** HS256（ADR-0021 的共存窗口默认关闭）。迁移期要临时接受旧令牌，
+# 需额外给 user-service / travel-service 设置 Jwt__AllowLegacyHs256=true 与
+# Jwt__LegacyUntil=<ISO-8601 UTC>（≤ 7 天）；到期后服务会拒绝启动，不靠人记得清理。
 JWT_KEY="${JWT_KEY:-$(head -c 48 /dev/urandom | base64 | tr -d '\n')}"
 
 # 镜像拉取凭据片段（私有镜像必需；为空则不加这一段）

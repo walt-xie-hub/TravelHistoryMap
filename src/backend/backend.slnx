@@ -37,4 +37,7 @@
     <Project Path="shared/Shared.Observability/Shared.Observability.csproj" />
     <Project Path="shared/Shared.Security/Shared.Security.csproj" />
   </Folder>
+  <Folder Name="/shared/tests/">
+    <Project Path="shared/Shared.Security.Tests/Shared.Security.Tests.csproj" />
+  </Folder>
 </Solution>

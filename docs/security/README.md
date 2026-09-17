@@ -122,11 +122,23 @@
 > `RefreshTokens` 等身份表；若 user-service 的连接串泄露，refresh token 哈希仍会暴露。彻底隔离要么拆库、
 > 要么换一个非属主角色，属于 ADR-0002（共享 appdb）的已知代价。
 
+**本次已实现（HS256 共存窗口可执行化）**：
+
+| 项 | 落地位置 |
+|---|---|
+| 窗口默认关闭：配了 `Jwt:Key` 也不再自动接受 HS256 | `shared/Shared.Security/TravelMapJwt.cs`（`ResolveLegacyWindow`） |
+| 开启必须给到期时间，且距今 ≤ 7 天；缺失/格式错/过期/超限一律**拒绝启动** | 同上（fail closed，错误信息点名要改的键） |
+| 到期无需发版即失效（pod 长期不重启也一样） | 请求路径上按旧 issuer 再判一次（`OnTokenValidated`） |
+| 窗口关闭后旧 issuer 一并拒绝 | `BuildValidIssuers` |
+| 回归测试 9 条：默认关闭、缺日期、格式错、过期、超限、缺密钥、合法窗口、上限常量 | `src/backend/shared/Shared.Security.Tests` |
+| 部署侧说明如何临时开启 | `docker-compose.dev.yml` 与 `deploy-azure.sh` 注释 |
+
 **仍未完成**（需要真实凭据或环境操作，我无法代做）：
 
 | 项 | 原因 |
 |---|---|
 | **数据库口令轮换** | 需要真实凭据；步骤见 [secrets-and-keys.md](./secrets-and-keys.md) 的「立即处置」 |
+| HS256 退役的最后一步 | 代码已保证窗口到期即失效，但**配置清理**要动线上：`az containerapp update` 删掉 user-service / travel-service 的 `Jwt__Key`（以及任何 `Jwt__AllowLegacyHs256` / `Jwt__LegacyUntil`），并同步 `.env` / `docker-compose.dev.yml` |
 | **启用生产遥测采集** | P0 ④ 只做到"不再指向不存在的 collector"：OTLP 现在是**明确关闭**（不再静默失败），并没有接通采集。要真正采到数据需创建 Application Insights 资源并执行 `az containerapp env telemetry app-insights set …`（需要 Azure 权限，以及新资源的费用决定） |
 | 收窄 PostgreSQL 公网访问 | 当前环境未接 VNet、ACA 出站 IP 不稳定，只能随环境重建处理（P2） |
 | 把 `SslMode` / 采样率同步到**已部署**的应用 | 需要 `az containerapp update` 权限（脚本改动只影响下次初始化） |

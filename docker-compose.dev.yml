@@ -63,8 +63,11 @@ services:
       - Jwt__Key=${JWT_KEY:?JWT_KEY is required}
       - Jwt__Issuer=travel-map
       - Jwt__Audience=travel-map-client
-      # 令牌校验（ADR-0021）：RS256 公钥经该 issuer 的 OIDC 发现获取；
-      # Jwt__Key 只服务共存窗口内的旧 HS256 令牌，窗口不超过 7 天。
+      # 令牌校验（ADR-0021）：RS256 公钥经该 issuer 的 OIDC 发现获取。
+      # 旧 HS256 **默认不接受**；只有在需要接受旧令牌时才把下面两行打开，且日期必须未过期、
+      # 距今不超过 7 天，否则服务会拒绝启动（fail closed）。本地调试旧令牌才需要：
+      #   - Jwt__AllowLegacyHs256=true
+      #   - Jwt__LegacyUntil=2026-09-25T00:00:00Z
       - Identity__Issuer=http://identity-service:8080/identity
       - DemoUser__Password=${DEMO_USER_PASSWORD:?DEMO_USER_PASSWORD is required}
       # OpenTelemetry OTLP 导出目标：Collector → Jaeger
@@ -113,7 +116,8 @@ services:
       - Jwt__Key=${JWT_KEY:?JWT_KEY is required}
       - Jwt__Issuer=travel-map
       - Jwt__Audience=travel-map-client
-      # 令牌校验（ADR-0021）：RS256 公钥经该 issuer 的 OIDC 发现获取
+      # 令牌校验（ADR-0021）：RS256 公钥经该 issuer 的 OIDC 发现获取；旧 HS256 默认不接受
+      # （要接受需打开 Jwt__AllowLegacyHs256 + Jwt__LegacyUntil，上限 7 天）。
       - Identity__Issuer=http://identity-service:8080/identity
       # OpenTelemetry OTLP 导出目标：Collector → Jaeger
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317

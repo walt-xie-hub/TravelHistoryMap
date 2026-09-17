@@ -72,7 +72,24 @@ identity-service 承担认证与令牌；注册与档案留在 user-service（AD
 1. travel-history 先上线「JWKS 验签（RS256）**+ 暂时保留** HS256 校验」。
 2. identity-service 上线并开始签发 RS256，**立即停止签发 HS256**。
 3. **共存窗口上限 7 天**（= 最长 token 生命周期），到期**必须删除 HS256 校验分支**与全部 `Jwt__Key` 配置。
-   验收条件：`grep -r "HmacSha256" src/backend` 应无命中，且部署侧不再存在 `Jwt__Key`。
+
+#### 窗口是「可执行」的，不是口号
+
+HS256 是否被接受**不取决于 `Jwt:Key` 是否存在**（那等于永久接受），而由 `Shared.Security` 在启动时判定：
+
+| 配置 | 行为 |
+|---|---|
+| 不配 `Jwt:AllowLegacyHs256`（**默认**） | 只接受 RS256；`Jwt:Key` 即使存在也被忽略 |
+| `=true` + `Jwt:LegacyUntil`（ISO-8601 UTC，距今 ≤ 7 天） | 接受 HS256，旧 issuer 一并进入白名单 |
+| `=true` 但缺少 / 格式错 / 已过期 / 超过 7 天 | **拒绝启动**（fail closed），错误信息直接点名要改或要删的键 |
+| `=true` 但没配 `Jwt:Key` | 拒绝启动 |
+
+- 到期**不需要发版**：请求路径上再按 issuer 判一次，窗口一过旧令牌立刻失效（pod 长期不重启也一样）。
+- 因此上面的验收条件更正为：**到期后服务启动即失败**，逼你把 `Jwt:AllowLegacyHs256` /
+  `Jwt:LegacyUntil` / `Jwt:Key` 清干净。`grep -r "HmacSha256" src/backend` 仍会命中
+  `Shared.Security`——那是白名单本身，不再是「还有旧代码」的证据；可怕的是「还有旧配置」。
+- 回归测试：`src/backend/shared/Shared.Security.Tests`（9 条）逐行覆盖上表。
+- 何时开启：只有迁移期需要接受**已发出去的旧令牌**时才开。新部署不要开。
 
 ## 检查项
 
