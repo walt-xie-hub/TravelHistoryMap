@@ -14,5 +14,8 @@
     <Project Path="..\..\shared\Shared.Contracts\Shared.Contracts.csproj" />
     <Project Path="..\..\shared\Shared.Observability\Shared.Observability.csproj" />
     <Project Path="..\..\shared\Shared.Security\Shared.Security.csproj" />
+    <!-- 共享安全库的单测跟在本镜像里跑：CI 的“跑测试”就是 docker build，
+         而 docker build 只 test 各服务的 slnx —— 不挂在这里的话它永远不会被跑。 -->
+    <Project Path="..\..\shared\Shared.Security.Tests\Shared.Security.Tests.csproj" />
   </Folder>
 </Solution>

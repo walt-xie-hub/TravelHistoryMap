@@ -4,15 +4,17 @@
 # 设计原则：Dockerfile 是构建的"唯一事实来源"。
 #   依赖安装、编译、单元测试都已经写进 Dockerfile 的 build 阶段
 #   （后端 dotnet test、前端 ng test），测试失败会中断镜像构建。
-#   因此 CI 只需要 docker build 三个镜像，即可完成全部验证，
+#   因此 CI 只需要 docker build 五个镜像，即可完成全部验证，
 #   且与本地 docker build 的结果完全一致。
 #
 # 部署：镜像 push 到 ghcr.io（GitHub Container Registry），再用
 #   azure/containerapps-deploy 更新 Azure Container Apps：
-#   - user-service  → 后端 API（.NET，internal 入口）
-#   - client        → 前端静态站（nginx，internal 入口）
-#   - gateway       → nginx 统一入口（复刻 K8s ingress 的路径分流：
-#                      /api/* → user-service，/* → client，唯一 external 入口）
+#   - user-service    → 后端 API（.NET，internal 入口，跑 User.UnitTests + Shared.Security.Tests）
+#   - travel-service  → 后端 API（.NET，internal 入口）
+#   - identity-service→ 后端 API（.NET，internal 入口，跑 Identity.UnitTests）
+#   - client          → 前端静态站（nginx，internal 入口）
+#   - gateway         → nginx 统一入口（复刻 K8s ingress 的路径分流：
+#                      /api/* 与 /identity/* → 后端，/* → client，唯一 external 入口）
 #   免费方案：镜像设 public 免认证拉取；Container Apps min-replicas 0 缩容到零。
 #
 # 触发时机：
@@ -29,7 +31,7 @@
 #   GHCR_PASSWORD          # GitHub Personal Access Token（至少 read:packages）
 #
 # 部署前置条件（一次性，az CLI 完成）：
-#   rg-travelmap 资源组 / cae-travelmap 环境 / 三个 Container App 已创建；
+#   rg-travelmap 资源组 / cae-travelmap 环境 / 五个 Container App 已创建；
 #   gateway 配置 USER_SERVICE_URL、TRAVEL_SERVICE_URL、CLIENT_URL（internal 服务地址）；
 #   user-service 配置 db-password secret 与 PostgreSQL 连接串；
 #   PostgreSQL Flexible Server（B1ms 免费层）。
