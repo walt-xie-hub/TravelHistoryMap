@@ -17,6 +17,11 @@ public interface IUserService
     /// <summary>更新本人资料（邮箱冲突抛 EmailAlreadyExistsException；用户不存在抛 UserNotFoundException）。</summary>
     Task<DTOs.UserDto> UpdateProfileAsync(int id, DTOs.UpdateProfileDto dto, CancellationToken ct = default);
 
-    /// <summary>修改本人密码（当前密码错误抛 InvalidCredentialsException）。</summary>
-    Task ChangePasswordAsync(int id, string currentPassword, string newPassword, CancellationToken ct = default);
+    /// <summary>
+    /// 修改本人密码（当前密码错误抛 <see cref="Domain.Common.InvalidCredentialsException"/>）。
+    ///
+    /// ip / userAgent 只为审计（事件 <c>password_changed</c>）；改密后 CredentialVersion 自增，
+    /// identity-service 会因此拒掉旧 refresh（ADR-0020）。
+    /// </summary>
+    Task ChangePasswordAsync(int id, string currentPassword, string newPassword, string? ip, string? userAgent, CancellationToken ct = default);
 }

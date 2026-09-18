@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Shared.Observability;
 using User.Application.Abstractions;
 using User.Application.DTOs;
 using User.Domain.Common;
@@ -47,14 +48,20 @@ public static class UserEndpoints
         }
     }
 
-    private static async Task<IResult> ChangePasswordAsync(ClaimsPrincipal principal, ChangePasswordDto dto, IUserService users, CancellationToken ct)
+    private static async Task<IResult> ChangePasswordAsync(ClaimsPrincipal principal, ChangePasswordDto dto, IUserService users, HttpContext http, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(dto.NewPassword) || dto.NewPassword.Length < 8)
             return Results.BadRequest(new { message = "新密码长度至少 8 位。" });
 
         try
         {
-            await users.ChangePasswordAsync(CurrentUserId(principal), dto.CurrentPassword, dto.NewPassword, ct);
+            await users.ChangePasswordAsync(
+                CurrentUserId(principal),
+                dto.CurrentPassword,
+                dto.NewPassword,
+                RequestContext.ClientIp(http),
+                RequestContext.UserAgent(http),
+                ct);
             return Results.NoContent();
         }
         catch (InvalidCredentialsException)

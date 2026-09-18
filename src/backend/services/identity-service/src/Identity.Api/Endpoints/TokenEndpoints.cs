@@ -1,4 +1,5 @@
 using Identity.Application.Services;
+using Shared.Observability;
 
 namespace Identity.Api.Endpoints;
 

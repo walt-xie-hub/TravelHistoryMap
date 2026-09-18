@@ -39,6 +39,22 @@
 
 留存要求：审计事件必须落到**可查询、可留存**的后端（见下），不能只存在于容器 stdout——否则"审计"在事故后无法回溯。
 
+### 落地方式（2026-09-18）
+
+- **一个端口，两个服务共用**：`Shared.Observability` 的 `IAuditLog.Write(AuditEvent)`。事件名与字段固定在
+  `AuditEventNames` / `AuditLogExtensions`（`login_succeeded`、`login_failed`、`login_locked`、
+  `token_refreshed`、`refresh_reuse_detected`、`logout`、`password_changed`、`service_token_issued`、
+  `service_token_denied`）—— 改名等于改契约，因此只允许改那一处。
+- **类型里没有敏感字段**：`AuditEvent` 只有事件名 / 结果 / 严重度 / 主体（用户 id 或不可解析的账号标识）/
+  来源 IP / User-Agent / 事件特有标量。没有字段可以放口令、令牌原文或验证码答案。
+- **来源 IP 与 User-Agent 只有一个取法**：`Shared.Observability` 的 `RequestContext`
+  （XFF **最右一段**，无则回落 `RemoteIpAddress`）。审计里的 IP 必须与限流用的口径一致，
+  否则事故时两边对不上。
+- 落点仍是结构化日志（→ OTel → 可查询后端）：事件特有的标量走 scope 属性，不拼进消息文本，
+  便于按 `familyId` 之类字段查询。
+- 已接入：identity-service 的全部认证事件 + user-service 的改密。后者的测试
+  （`ChangePasswordAuditTests`）明确断言"成功必有事件、失败不留事件"。
+
 ### 遥测落点（生产）
 
 已核实的事实：ACA 提供**环境级托管 OpenTelemetry agent**，`az containerapp env telemetry app-insights set ...` 即可启用，**零额外 compute 成本**（平台预配资源且不计费），支持 App Insights / Datadog / 任意 OTLP 端点；agent 会**自动注入 `OTEL_EXPORTER_OTLP_ENDPOINT`**，因此 `Shared.Observability/Telemetry.cs` 的 OTLP 导出几乎无需改动。

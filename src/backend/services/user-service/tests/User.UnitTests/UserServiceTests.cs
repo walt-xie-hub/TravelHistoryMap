@@ -1,4 +1,5 @@
 using Moq;
+using Shared.Observability;
 using Xunit;
 using User.Application.Abstractions;
 using User.Application.DTOs;
@@ -17,6 +18,7 @@ public class UserServiceTests
 {
     private readonly Mock<IUserRepository> _repositoryMock = new();
     private readonly Mock<IPasswordHasher> _hasherMock = new();
+    private readonly RecordingAuditLog _audit = new();
     private readonly IUserService _sut;
 
     public UserServiceTests()
@@ -27,7 +29,7 @@ public class UserServiceTests
         _hasherMock.Setup(h => h.Verify(It.IsAny<string>(), It.IsAny<string>()))
                    .Returns((string p, string hash) => hash == "h:" + p);
 
-        _sut = new UserService(_repositoryMock.Object, _hasherMock.Object);
+        _sut = new UserService(_repositoryMock.Object, _hasherMock.Object, _audit);
     }
 
     [Fact]
@@ -146,7 +148,7 @@ public class UserServiceTests
                        .ReturnsAsync((AppUser u, CancellationToken _) => u);
 
         // Act
-        await _sut.ChangePasswordAsync(1, "old-pass", "new-pass");
+        await _sut.ChangePasswordAsync(1, "old-pass", "new-pass", null, null);
 
         // Assert：新密码已哈希且旧密码哈希被替换
         _repositoryMock.Verify(r => r.UpdateAsync(
@@ -161,7 +163,7 @@ public class UserServiceTests
                        .ReturnsAsync(new AppUser { Id = 1, Email = "a@x.com", PasswordHash = "h:old-pass" });
 
         await Assert.ThrowsAsync<InvalidCredentialsException>(
-            () => _sut.ChangePasswordAsync(1, "wrong", "new-pass"));
+            () => _sut.ChangePasswordAsync(1, "wrong", "new-pass", null, null));
         _repositoryMock.Verify(r => r.UpdateAsync(It.IsAny<AppUser>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
@@ -172,6 +174,6 @@ public class UserServiceTests
                        .ReturnsAsync(new AppUser { Id = 1, Email = "a@x.com", PasswordHash = null });
 
         await Assert.ThrowsAsync<InvalidCredentialsException>(
-            () => _sut.ChangePasswordAsync(1, "anything", "new-pass"));
+            () => _sut.ChangePasswordAsync(1, "anything", "new-pass", null, null));
     }
 }

@@ -10,6 +10,7 @@
     <ProjectReference Include="..\User.Domain\User.Domain.csproj" />
     <!-- 跨服务契约：集成事件等共享类型 -->
     <ProjectReference Include="..\..\..\..\shared\Shared.Contracts\Shared.Contracts.csproj" />
+    <ProjectReference Include="..\..\..\..\shared\Shared.Observability\Shared.Observability.csproj" />
   </ItemGroup>
 
 </Project>

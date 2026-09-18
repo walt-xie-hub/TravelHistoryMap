@@ -2,6 +2,7 @@ using Identity.Application.Abstractions;
 using Identity.Application.Models;
 using Identity.Domain.Common;
 using Identity.Domain.Entities;
+using Shared.Observability;
 
 namespace Identity.Application.Services;
 

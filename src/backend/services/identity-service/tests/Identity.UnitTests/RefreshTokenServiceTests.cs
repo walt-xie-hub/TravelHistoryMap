@@ -194,6 +194,6 @@ public class RefreshTokenServiceTests
         Assert.True(await CreateSut().RevokeByRawTokenAsync("some-token"));
 
         Assert.Equal(familyId, _revokedFamily);
-        Assert.True(_audit.Contains("logged_out"));
+        Assert.True(_audit.Contains("logout"));
     }
 }

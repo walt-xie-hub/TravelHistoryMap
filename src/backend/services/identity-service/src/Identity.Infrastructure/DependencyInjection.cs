@@ -1,7 +1,6 @@
 using Identity.Application;
 using Identity.Application.Abstractions;
 using Identity.Application.Services;
-using Identity.Infrastructure.Observability;
 using Identity.Infrastructure.Persistence;
 using Identity.Infrastructure.Repositories;
 using Identity.Infrastructure.Security;
@@ -10,6 +9,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Npgsql;
+using Shared.Observability;
 
 namespace Identity.Infrastructure;
 

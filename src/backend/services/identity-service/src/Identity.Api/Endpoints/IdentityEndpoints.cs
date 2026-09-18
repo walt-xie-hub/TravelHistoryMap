@@ -2,6 +2,7 @@ using Identity.Api.Security;
 using Identity.Application.Abstractions;
 using Identity.Application.Services;
 using Identity.Domain.Common;
+using Shared.Observability;
 
 namespace Identity.Api.Endpoints;
 
@@ -80,23 +81,5 @@ public static class IdentityEndpoints
         await refreshTokens.RevokeByRawTokenAsync(dto.RefreshToken ?? string.Empty, ct);
         // 幂等：令牌不存在也返回 204，避免这个端点变成"令牌是否有效"的探测器
         return Results.NoContent();
-    }
-}
-
-/// <summary>取请求上下文信息用于审计。IP 取自边缘追加的 X-Forwarded-For 最右一段。</summary>
-internal static class RequestContext
-{
-    public static string? ClientIp(HttpContext context)
-    {
-        var forwarded = context.Request.Headers["X-Forwarded-For"].ToString();
-        if (!string.IsNullOrWhiteSpace(forwarded))
-        {
-            var last = forwarded.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
-                .LastOrDefault();
-            if (!string.IsNullOrWhiteSpace(last))
-                return last;
-        }
-
-        return context.Connection.RemoteIpAddress?.ToString();
     }
 }

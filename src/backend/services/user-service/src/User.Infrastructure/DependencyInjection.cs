@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Shared.Observability;
 using User.Application.Abstractions;
 using User.Domain.Abstractions;
 using User.Infrastructure.Persistence;
@@ -31,6 +32,10 @@ public static class DependencyInjection
 
         // 密码哈希（PBKDF2，基于 ASP.NET Core Identity PasswordHasher）
         services.AddSingleton<IPasswordHasher, PasswordHasher>();
+
+        // 安全事件审计（改密等）：与 identity-service 共用同一个端口与实现
+        // （docs/security/observability-and-audit.md）
+        services.AddSingleton<IAuditLog, LoggerAuditLog>();
 
         return services;
     }

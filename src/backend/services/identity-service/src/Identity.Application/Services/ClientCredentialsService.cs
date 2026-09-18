@@ -1,4 +1,5 @@
 using Identity.Application.Abstractions;
+using Shared.Observability;
 
 namespace Identity.Application.Services;
 

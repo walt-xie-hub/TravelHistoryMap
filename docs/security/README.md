@@ -103,7 +103,7 @@
 | 停用账号不得登录 | identity-service 与 user-service 两边都检查 `IsActive` |
 | 服务身份（默认拒绝） | `ServiceClients` 表 + `ClientCredentialsService`；`AllowedServiceAudiences` 默认为空 |
 | 内部端点骨架 | `/internal/*` + `ServiceIdentity` 策略（服务令牌 aud = 本服务）；**无令牌 / 用户令牌 / aud 不匹配一律 401**（challenge 语义：不区分"没带令牌"与"令牌不对"） |
-| 审计事件 | `LoggerAuditLog`（8 个审计方法，签名里就没有口令/令牌字段） |
+| 审计事件 | `Shared.Observability` 的 `IAuditLog.Write(AuditEvent)`（事件名在 `AuditEventNames`，类型里没有口令/令牌字段），identity 与 user 共用 |
 | 签名密钥托管 | `ISigningKeyStore` + `DevFileSigningKeyStore`（本地）/ `KeyVaultSigningKeyStore`（`jwt-signing-<kid>`） |
 | 资源服务不再持有密钥 | `shared/Shared.Security`（RS256 via OIDC 发现 + HS256 共存窗口，两个服务共用一份） |
 | 归属规则覆盖软删除 | `TravelImageService.OwnsRecordAsync` 现在过滤 `DeletedAt` |
@@ -139,6 +139,16 @@
 |---|---|
 | 认证只有一条实现：删除 user-service 的 `LoginAsync`（它已无调用方，却是一套与 identity-service 分歧的凭据校验——没有锁定、没有失败计数） | `IUserService` / `UserService` 与 4 条对应单测；等价覆盖在 identity-service（停用账号拒登、刷新时停用即撤族） |
 | 删除零引用的 `LoginRequestDto` / `AuthResponseDto` / 前端 `AuthResponse` | `UserDto.cs`、`user.model.ts`（`LoginRequest` / `RegisterResponse` 仍在用，保留） |
+
+**本次已实现（审计端口统一 + `password_changed`）**：
+
+| 项 | 落地位置 |
+|---|---|
+| 审计端口提到共享库，两个服务共用一条通道 | `shared/Shared.Observability`：`IAuditLog` / `AuditEvent` / `AuditEventNames` / `AuditLogExtensions` / `LoggerAuditLog`；identity 的 8 个调用点签名不变 |
+| **`password_changed` 事件**（P1） | user-service `UserService.ChangePasswordAsync` —— 成功才发（失败不发，否则审计会退化成口令猜测记录），IP/UA 由 `RequestContext` 取 |
+| 请求元数据只有一种取法 | `Shared.Observability.RequestContext`（原 identity 的私有实现已删），XFF 最右一段与限流口径一致 |
+| 事件名与审计口径对齐事件表 | `logout`（原 `logged_out`）、`password_changed`；严重度：锁定/复用/被拒 走 Warning |
+| 回归测试 | `ChangePasswordAuditTests`（成功带来源信息、失败零事件）；`RecordingAuditLog` 改为记录 `AuditEvent` |
 
 **仍未完成**（需要真实凭据或环境操作，我无法代做）：
 

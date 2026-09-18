@@ -1,3 +1,4 @@
+using Shared.Observability;
 using User.Application.Abstractions;
 using User.Application.DTOs;
 using User.Domain.Abstractions;
@@ -7,18 +8,22 @@ using User.Domain.Entities;
 namespace User.Application.Services;
 
 /// <summary>
-/// 用户应用服务：编排领域对象、密码哈希与仓储，完成注册/登录与本人档案管理用例，并负责领域&lt;-&gt;DTO 映射。
+/// 用户应用服务：编排领域对象、密码哈希与仓储，完成注册与本人档案管理用例，并负责领域&lt;-&gt;DTO 映射。
 /// 只依赖领域/应用抽象，不感知数据库实现。邮箱统一小写规范化存储（依赖数据库 Email 唯一索引兜底）。
+///
+/// 登录**不在这里**：认证与令牌归 identity-service（ADR-0020），本服务只写凭据。
 /// </summary>
 public class UserService : IUserService
 {
     private readonly IUserRepository _repository;
     private readonly IPasswordHasher _passwordHasher;
+    private readonly IAuditLog _audit;
 
-    public UserService(IUserRepository repository, IPasswordHasher passwordHasher)
+    public UserService(IUserRepository repository, IPasswordHasher passwordHasher, IAuditLog audit)
     {
         _repository = repository;
         _passwordHasher = passwordHasher;
+        _audit = audit;
     }
 
     public async Task<UserDto> RegisterAsync(string name, string email, string password, CancellationToken ct = default)
@@ -63,17 +68,21 @@ public class UserService : IUserService
         return ToDto(updated);
     }
 
-    public async Task ChangePasswordAsync(int id, string currentPassword, string newPassword, CancellationToken ct = default)
+    public async Task ChangePasswordAsync(int id, string currentPassword, string newPassword, string? ip, string? userAgent, CancellationToken ct = default)
     {
         var user = await _repository.GetByIdAsync(id, ct);
         if (user?.PasswordHash is null || !_passwordHasher.Verify(currentPassword, user.PasswordHash))
             throw new InvalidCredentialsException();
 
         user.PasswordHash = _passwordHasher.Hash(newPassword);
-        // 凭据版本自增：identity-service 比对到不一致就会拒绝旧 refresh token（ADR-0020）
+        // 凭据版本自增：identity-service 比对到不一致就会拒绍旧 refresh token（ADR-0020）
         user.CredentialVersion++;
         user.UpdatedAt = DateTime.UtcNow;
         await _repository.UpdateAsync(user, ct);
+
+        // 审计（P1 事件表）：改密是"凭据被改写"唯一直接的证据。
+        // 失败路径刻意不发事件——那只会把审计日志变成一份口令猜测记录。
+        _audit.PasswordChanged(user.Id, ip, userAgent);
     }
 
     private static string NormalizeEmail(string email) => email.Trim().ToLowerInvariant();
