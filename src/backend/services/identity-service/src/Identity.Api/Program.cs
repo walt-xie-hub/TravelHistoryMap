@@ -3,10 +3,12 @@ using Identity.Api.Endpoints;
 using Identity.Api.Security;
 using Identity.Application;
 using Identity.Application.Abstractions;
+using Identity.Application.Services;
 using Identity.Infrastructure;
 using Identity.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Shared.Observability;
 using Swashbuckle.AspNetCore.SwaggerUI;
@@ -98,6 +100,22 @@ app.Use(async (context, next) =>
 
 // 共享 appdb 的 schema 引导：只建本服务自己的 4 张表，绝不建/改 Users（ADR-0020）
 app.Services.EnsureIdentitySchema();
+
+for (var registrationAttempt = 0; registrationAttempt < 5; registrationAttempt++)
+{
+    try
+    {
+        await using var registrationScope = app.Services.CreateAsyncScope();
+        await registrationScope.ServiceProvider
+            .GetRequiredService<ServiceClientRegistrationService>()
+            .EnsureRegisteredAsync();
+        break;
+    }
+    catch (DbUpdateException) when (registrationAttempt < 4)
+    {
+        await Task.Delay(TimeSpan.FromMilliseconds(100 * (registrationAttempt + 1)));
+    }
+}
 
 // 等 Users 表与 CredentialVersion 列就绪（由 user-service 建/加）。
 // 超时仍不就绪则拒绝启动——不在一个凭据契约不完整的库上提供认证。

@@ -32,6 +32,9 @@ public sealed class IdentityOptions
     /// </summary>
     public List<string> AllowedServiceAudiences { get; set; } = [];
 
+    /// <summary>部署期注入的服务客户端；secret 只在启动时读取并转换为哈希。</summary>
+    public List<ServiceClientRegistration> ServiceClients { get; set; } = [];
+
     public LockoutOptions Lockout { get; set; } = new();
 
     public SigningKeyStoreOptions SigningKeyStore { get; set; } = new();
@@ -61,5 +64,16 @@ public sealed class IdentityOptions
 
         /// <summary>指定用哪把密钥签发；留空则用最新创建的那把</summary>
         public string ActiveKid { get; set; } = string.Empty;
+    }
+
+    public sealed class ServiceClientRegistration
+    {
+        public string ClientId { get; set; } = string.Empty;
+
+        public string ClientSecret { get; set; } = string.Empty;
+
+        public string DisplayName { get; set; } = string.Empty;
+
+        public List<string> Scopes { get; set; } = [];
     }
 }

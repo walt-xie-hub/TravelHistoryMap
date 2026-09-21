@@ -23,8 +23,13 @@ cp .env.example .env
 | `DEMO_USER_PASSWORD` | 开发演示账号 `demo@travel.local` 的密码（user-service 以 Development 启动时幂等创建） |
 | `GRAFANA_ADMIN_PASSWORD` | Grafana 管理员口令。原先提交的默认值 `admin/admin` 已移除，缺失会直接报错 |
 | `IDENTITY_DB_PASSWORD` | identity-service 的独立数据库角色口令（ADR-0020），**必须与 `DB_PASSWORD` 不同**，否则最小权限形同虚设。首次准备：`docker compose up -d db server` 后跑 `pwsh -File scripts/provision-identity-db-role.ps1`（幂等，可反复执行） |
+| `USER_SERVICE_CLIENT_SECRET` | user-service 注册到 identity-service 的服务 secret；只通过环境变量注入，identity-service 只保存哈希 |
+| `TRAVEL_SERVICE_CLIENT_SECRET` | travel-service 注册到 identity-service 的服务 secret；只通过环境变量注入，identity-service 只保存哈希 |
+| `IDENTITY_SERVICE_CLIENT_SECRET` | identity-service 自身的服务 Client secret；只通过环境变量注入，identity-service 只保存哈希 |
 
 `.env`、Kubernetes Secret 和前端运行时配置均不提交到 Git。ASP.NET 配置键保持不变，Compose 通过环境变量覆盖连接串和 JWT 配置。
+
+服务身份由 identity-service 在启动时按 `Identity:ServiceClients` 幂等注册；资源服务通过 `ServiceIdentity` 配置使用 `client_credentials` 换取短期服务令牌。当前不提供运行时注册管理端点，新增或轮换 secret 应通过部署 secret 完成。
 
 ### 2) 首次启动（一次性）
 

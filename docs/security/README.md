@@ -101,7 +101,7 @@
 | 失败计数与锁定 | `AuthenticationService` + `LoginAttempts` 表（跨副本共享，5 次 / 15 分钟窗口 / 锁定 15 分钟） |
 | 凭据只读 + `CredentialVersion` | `NpgsqlCredentialReader`（只读 5 列）、user-service 改密码时自增 |
 | 停用账号不得登录 | identity-service 与 user-service 两边都检查 `IsActive` |
-| 服务身份（默认拒绝） | `ServiceClients` 表 + `ClientCredentialsService`；`AllowedServiceAudiences` 默认为空 |
+| 服务身份（默认拒绝） | `ServiceClients` 表 + 启动期部署注册 + `ClientCredentialsService` + 共享 `IServiceTokenClient`；`AllowedServiceAudiences` 默认为空 |
 | 内部端点骨架 | `/internal/*` + `ServiceIdentity` 策略（服务令牌 aud = 本服务）；**无令牌 / 用户令牌 / aud 不匹配一律 401**（challenge 语义：不区分"没带令牌"与"令牌不对"） |
 | 审计事件 | `Shared.Observability` 的 `IAuditLog.Write(AuditEvent)`（事件名在 `AuditEventNames`，类型里没有口令/令牌字段），identity 与 user 共用 |
 | 签名密钥托管 | `ISigningKeyStore` + `DevFileSigningKeyStore`（本地）/ `KeyVaultSigningKeyStore`（`jwt-signing-<kid>`） |

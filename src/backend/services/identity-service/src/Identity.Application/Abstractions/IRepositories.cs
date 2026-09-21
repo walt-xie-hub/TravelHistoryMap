@@ -20,7 +20,16 @@ public interface IServiceClientRepository
 
     Task AddAsync(ServiceClient client, CancellationToken cancellationToken = default);
 
+    void Update(ServiceClient client);
+
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
+}
+
+public interface IServiceSecretHasher
+{
+    string Hash(string secret);
+
+    bool Verify(string secret, string hash);
 }
 
 public interface ILoginAttemptRepository

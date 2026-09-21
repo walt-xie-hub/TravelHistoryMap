@@ -22,6 +22,7 @@ builder.Services.AddInfrastructure(builder.Configuration);
 // 并在共存窗口内继续接受旧的 HS256 令牌（窗口上限 7 天）。
 // 本服务**不再签发**令牌：注册与档案归 user-service，认证归 identity-service（ADR-0020）。
 builder.Services.AddTravelMapJwt(builder.Configuration, builder.Environment);
+builder.Services.AddTravelMapServiceTokenClient(builder.Configuration);
 builder.Services.AddAuthorization();
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi

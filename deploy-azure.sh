@@ -46,6 +46,9 @@ PG_PASSWORD="${PG_PASSWORD:?请设置 PG_PASSWORD 环境变量}"
 # identity-service 的专用数据库口令（ADR-0020）。与 PG_PASSWORD 分开是有意的：
 # 它对应最小权限角色，泄露这个口令拿不到 Users 的写权限。允许外部注入以复用既有环境。
 IDENTITY_DB_PASSWORD="${IDENTITY_DB_PASSWORD:-$(head -c 18 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 24)}"
+USER_SERVICE_CLIENT_SECRET="${USER_SERVICE_CLIENT_SECRET:-$(head -c 32 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 43)}"
+TRAVEL_SERVICE_CLIENT_SECRET="${TRAVEL_SERVICE_CLIENT_SECRET:-$(head -c 32 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 43)}"
+IDENTITY_SERVICE_CLIENT_SECRET="${IDENTITY_SERVICE_CLIENT_SECRET:-$(head -c 32 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 43)}"
 
 # 签名密钥（HS256，ADR-0005）——只用于迁移共存窗口内的旧令牌校验：
 # 允许外部注入以复用既有环境的值；未注入即随机生成，避免"漏配导致服务启动即抛"。
@@ -140,13 +143,16 @@ az containerapp create \
   --name user-service -g "$RESOURCE_GROUP" --environment "$ENV_NAME" \
   --image "ghcr.io/$ORG/travelmap-user-service:latest" \
   --target-port 8080 --ingress internal --min-replicas 0 --max-replicas 3 \
-  --secrets db-password="$PG_PASSWORD" jwt-key="$JWT_KEY" \
+  --secrets db-password="$PG_PASSWORD" jwt-key="$JWT_KEY" service-client-secret="$USER_SERVICE_CLIENT_SECRET" \
   --env-vars \
     "ConnectionStrings__DefaultConnection=$CONNECTION_STRING" \
     "Db__Password=secretref:db-password" \
     "Jwt__Key=secretref:jwt-key" \
     "Jwt__Issuer=travel-map" \
     "Jwt__Audience=travel-map-client" \
+    "ServiceIdentity__Issuer=https://pending.invalid/identity" \
+    "ServiceIdentity__ClientId=user-service" \
+    "ServiceIdentity__ClientSecret=secretref:service-client-secret" \
     "OTEL_TRACE_SAMPLING_RATIO=0.1" \
   "${REGISTRY_ARGS[@]}"
 
@@ -156,13 +162,16 @@ az containerapp create \
   --name travel-service -g "$RESOURCE_GROUP" --environment "$ENV_NAME" \
   --image "ghcr.io/$ORG/travelmap-travel-service:latest" \
   --target-port 8080 --ingress internal --min-replicas 0 --max-replicas 3 \
-  --secrets db-password="$PG_PASSWORD" jwt-key="$JWT_KEY" \
+  --secrets db-password="$PG_PASSWORD" jwt-key="$JWT_KEY" service-client-secret="$TRAVEL_SERVICE_CLIENT_SECRET" \
   --env-vars \
     "ConnectionStrings__DefaultConnection=$CONNECTION_STRING" \
     "Db__Password=secretref:db-password" \
     "Jwt__Key=secretref:jwt-key" \
     "Jwt__Issuer=travel-map" \
     "Jwt__Audience=travel-map-client" \
+    "ServiceIdentity__Issuer=https://pending.invalid/identity" \
+    "ServiceIdentity__ClientId=travel-service" \
+    "ServiceIdentity__ClientSecret=secretref:service-client-secret" \
     "OTEL_TRACE_SAMPLING_RATIO=0.1" \
   "${REGISTRY_ARGS[@]}"
 
@@ -182,12 +191,24 @@ az containerapp create \
   --image "ghcr.io/$ORG/travelmap-identity-service:latest" \
   --target-port 8080 --ingress internal --min-replicas 0 --max-replicas 3 \
   --system-assigned \
-  --secrets identity-db-password="$IDENTITY_DB_PASSWORD" \
+  --secrets identity-db-password="$IDENTITY_DB_PASSWORD" user-service-client-secret="$USER_SERVICE_CLIENT_SECRET" travel-service-client-secret="$TRAVEL_SERVICE_CLIENT_SECRET" identity-service-client-secret="$IDENTITY_SERVICE_CLIENT_SECRET" \
   --env-vars \
     "ConnectionStrings__DefaultConnection=$IDENTITY_CONNECTION_STRING" \
     "Identity__Issuer=https://pending.invalid/identity" \
     "Identity__ServiceId=identity-service" \
     "Identity__Audience=travel-map-client" \
+    "Identity__AllowedServiceAudiences__0=user-service" \
+    "Identity__AllowedServiceAudiences__1=travel-service" \
+    "Identity__AllowedServiceAudiences__2=identity-service" \
+    "Identity__ServiceClients__0__ClientId=user-service" \
+    "Identity__ServiceClients__0__ClientSecret=secretref:user-service-client-secret" \
+    "Identity__ServiceClients__0__DisplayName=user-service" \
+    "Identity__ServiceClients__1__ClientId=travel-service" \
+    "Identity__ServiceClients__1__ClientSecret=secretref:travel-service-client-secret" \
+    "Identity__ServiceClients__1__DisplayName=travel-service" \
+    "Identity__ServiceClients__2__ClientId=identity-service" \
+    "Identity__ServiceClients__2__ClientSecret=secretref:identity-service-client-secret" \
+    "Identity__ServiceClients__2__DisplayName=identity-service" \
     "Identity__SigningKeyStore__Provider=KeyVault" \
     "Identity__SigningKeyStore__KeyVaultUri=https://$KV_NAME.vault.azure.net/" \
     "OTEL_TRACE_SAMPLING_RATIO=0.1" \
@@ -217,7 +238,7 @@ az containerapp update -n identity-service -g "$RESOURCE_GROUP" \
   --set-env-vars "Identity__Issuer=$ISSUER"
 for app in user-service travel-service; do
   az containerapp update -n "$app" -g "$RESOURCE_GROUP" \
-    --set-env-vars "Identity__Issuer=$ISSUER"
+    --set-env-vars "Identity__Issuer=$ISSUER" "ServiceIdentity__Issuer=$ISSUER"
 done
 
 # ── 7. Key Vault：生成第一把签名密钥并授权给 identity-service ─

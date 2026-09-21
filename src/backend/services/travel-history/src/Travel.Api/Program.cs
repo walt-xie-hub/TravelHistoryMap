@@ -25,6 +25,7 @@ builder.Services.AddInfrastructure(builder.Configuration);
 // 令牌校验（ADR-0021）：接受 identity-service 签发的 RS256 令牌（公钥经 OIDC 发现获取），
 // 并在共存窗口内继续接受旧的 HS256 令牌。本服务只验签、不签发。
 builder.Services.AddTravelMapJwt(builder.Configuration, builder.Environment);
+builder.Services.AddTravelMapServiceTokenClient(builder.Configuration);
 builder.Services.AddAuthorization();
 builder.Services.AddAntiforgery();
 builder.Services.ConfigureHttpJsonOptions(options => options.SerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase);

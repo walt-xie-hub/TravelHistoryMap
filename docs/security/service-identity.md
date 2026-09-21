@@ -6,13 +6,13 @@
 
 ## 现状
 
-- **后端零服务间调用**：在 `src/backend/**` 搜 `HttpClient`、`AddHttpClient`、`Yarp`、`MassTransit`、`RabbitMQ` **零命中**（命中的 `HttpClient` 全在前端）。
+- **当前后端仍零真实服务间业务调用**：服务身份基础设施已经实现，但尚未有业务端点使用它发起跨服务请求。
 - 两服务之间唯一的"协作"是共享 `appdb` 与数据库级外键（ADR-0002），以及 `shared/Shared.Contracts` 里两个**尚未被使用**的集成事件契约（`IIntegrationEvent`、`UserCreatedEvent`）。
 - 网关转发时**不注入任何身份头**，也不剥离客户端伪造的头；服务识别调用方的唯一手段是客户端自带的 `Authorization`（ADR-0019 的现状描述）。
 - ACA 上后端都是 `internal`，但 `internal` = 同环境内任意容器应用可达，**没有对等认证**，也没有 NetworkPolicy。
 - 环境**未接 VNet**，且网络类型创建后不可改 → 本期不可能用网络策略来隔离。
 
-结论：现在没有任何服务身份机制，也没有一个真实的调用点需要它。因此这件事的形态是**契约先行**。
+结论：服务身份基础设施已就绪，真实跨服务业务调用仍需按硬规则单独落地。
 
 ## 目标形态
 
@@ -27,6 +27,8 @@
 | `scope` | 允许的动作；**起步阶段不预置任何 scope（默认拒绝）** |
 | 存储 | identity-service 自有表；secret 与用户口令一样只存哈希 |
 | 注册方式 | **不提供管理端点**，先以部署期种子/运维脚本写入（少一个管理面就少一类攻击面） |
+
+当前实现：identity-service 启动时读取 `Identity:ServiceClients`，将部署注入的明文 secret 转为 PBKDF2 哈希后幂等写入 `ServiceClients`；资源服务通过 `Shared.Security` 的 `IServiceTokenClient` 使用 `ServiceIdentity:ClientId/ClientSecret` 获取并缓存短期令牌。生产 secret 由 ACA secret 引用，本地由 `.env` 注入。
 
 ### 内部端点的形态约定
 
@@ -61,10 +63,15 @@
 
 ## 检查项
 
+### 已实现
+
+- identity-service 的部署期 Client 注册与哈希存储。
+- 资源服务侧的 client credentials 客户端，包含按 audience/scope 缓存、提前刷新和并发请求去重。
+
 ### P1
 
-- [ ] identity-service 实现 Client 注册表与 client credentials 端点（契约见上）。
-- [ ] 资源服务侧实现「服务身份校验中间件」骨架：校验 `iss`/`aud`/`sub` 前缀/`scope`/`exp`，默认拒绝。
+- identity-service Client 注册表与 client credentials 端点已实现；新增 Client 通过部署 secret 注入，不提供运行时管理端点。
+- 资源服务侧的服务身份校验骨架已实现于 identity-service 的 `/internal/*` 策略；新增资源服务端点仍需按 scope 明确授权。
 - [ ] 明确 `/internal/*` 的前缀约定并写进评审习惯。
 - [ ] 把上面三条"硬规则"写进 `AGENTS.md` 或本目录索引，让新增调用必须过这一关。
 

@@ -39,6 +39,8 @@ public sealed class ServiceClientRepository(IdentityDbContext db) : IServiceClie
     public async Task AddAsync(ServiceClient client, CancellationToken cancellationToken = default)
         => await db.ServiceClients.AddAsync(client, cancellationToken);
 
+    public void Update(ServiceClient client) => db.ServiceClients.Update(client);
+
     public Task SaveChangesAsync(CancellationToken cancellationToken = default)
         => db.SaveChangesAsync(cancellationToken);
 }

@@ -29,7 +29,9 @@ public static class DependencyInjection
         // Users 表走参数化 SQL 直读（ADR-0020），共用同一个连接池
         services.AddSingleton(_ => NpgsqlDataSource.Create(connectionString));
         services.AddSingleton<ICredentialReader, NpgsqlCredentialReader>();
-        services.AddSingleton<IPasswordVerifier, PasswordVerifier>();
+        services.AddSingleton<PasswordVerifier>();
+        services.AddSingleton<IPasswordVerifier>(sp => sp.GetRequiredService<PasswordVerifier>());
+        services.AddSingleton<IServiceSecretHasher>(sp => sp.GetRequiredService<PasswordVerifier>());
 
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
         services.AddScoped<IServiceClientRepository, ServiceClientRepository>();
@@ -50,6 +52,7 @@ public static class DependencyInjection
         services.AddScoped<RefreshTokenService>();
         services.AddScoped<AuthenticationService>();
         services.AddScoped<ClientCredentialsService>();
+        services.AddScoped<ServiceClientRegistrationService>();
 
         return services;
     }
