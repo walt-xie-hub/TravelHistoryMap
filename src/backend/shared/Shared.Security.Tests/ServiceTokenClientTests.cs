@@ -8,6 +8,30 @@ namespace Shared.Security.Tests;
 public class ServiceTokenClientTests
 {
     [Fact]
+    public void Validate_WithPlaceholderSecret_RejectsStartup()
+    {
+        var options = new ServiceIdentityOptions
+        {
+            Issuer = "http://identity/identity",
+            ClientId = "user-service",
+            ClientSecret = ServiceIdentityOptions.EnvironmentPlaceholder,
+        };
+
+        var exception = Assert.Throws<InvalidOperationException>(options.Validate);
+
+        Assert.Contains("占位符", exception.Message);
+    }
+
+    [Fact]
+    public void Validate_WithRealSecret_Passes()
+        => new ServiceIdentityOptions
+        {
+            Issuer = "http://identity/identity",
+            ClientId = "user-service",
+            ClientSecret = "a-real-injected-secret",
+        }.Validate();
+
+    [Fact]
     public async Task GetAccessTokenAsync_CachesTokenForSameAudienceAndScope()
     {
         var handler = new TokenHandler();

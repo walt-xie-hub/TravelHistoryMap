@@ -19,13 +19,7 @@ public static class ServiceTokenClientExtensions
     {
         var options = new ServiceIdentityOptions();
         configuration.GetSection(ServiceIdentityOptions.SectionName).Bind(options);
-
-        if (string.IsNullOrWhiteSpace(options.Issuer))
-            throw new InvalidOperationException("ServiceIdentity:Issuer is required.");
-        if (string.IsNullOrWhiteSpace(options.ClientId))
-            throw new InvalidOperationException("ServiceIdentity:ClientId is required.");
-        if (string.IsNullOrWhiteSpace(options.ClientSecret))
-            throw new InvalidOperationException("ServiceIdentity:ClientSecret is required.");
+        options.Validate();
 
         services.AddSingleton(Options.Create(options));
         services.AddHttpClient<IServiceTokenClient, ServiceTokenClient>();

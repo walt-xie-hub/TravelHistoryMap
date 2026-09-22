@@ -9,6 +9,12 @@ public sealed class ServiceClientRegistrationService(
     IServiceSecretHasher secrets,
     IdentityOptions options)
 {
+    /// <summary>
+    /// 仓库跟踪的 appsettings 里用的占位符。它出现在这里说明**真实 secret 没有注入**：
+    /// 与其把 <c>__SET_VIA_ENV__</c> 当成一个真能用的凭据存进库里，不如拒绝启动（fail closed）。
+    /// </summary>
+    public const string EnvironmentPlaceholder = "__SET_VIA_ENV__";
+
     public async Task EnsureRegisteredAsync(CancellationToken ct = default)
     {
         foreach (var registration in options.ServiceClients)
@@ -48,6 +54,10 @@ public sealed class ServiceClientRegistrationService(
 
         if (string.IsNullOrWhiteSpace(registration.ClientSecret))
             throw new InvalidOperationException($"Service client '{registration.ClientId}' has no secret.");
+
+        if (string.Equals(registration.ClientSecret, EnvironmentPlaceholder, StringComparison.Ordinal))
+            throw new InvalidOperationException(
+                $"Service client '{registration.ClientId}' 仍是占位符 secret：请通过环境变量注入真实值。");
 
         if (string.IsNullOrWhiteSpace(registration.DisplayName))
             registration.DisplayName = registration.ClientId;

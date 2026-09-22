@@ -32,6 +32,7 @@ public static class DependencyInjection
         services.AddSingleton<PasswordVerifier>();
         services.AddSingleton<IPasswordVerifier>(sp => sp.GetRequiredService<PasswordVerifier>());
         services.AddSingleton<IServiceSecretHasher>(sp => sp.GetRequiredService<PasswordVerifier>());
+        services.AddSingleton<IClock, SystemClock>();
 
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
         services.AddScoped<IServiceClientRepository, ServiceClientRepository>();
@@ -41,6 +42,7 @@ public static class DependencyInjection
         // 配置绑定：整个服务只在这里读一次 Identity:* 配置
         var options = new IdentityOptions();
         configuration.GetSection(IdentityOptions.SectionName).Bind(options);
+        services.AddSingleton(options);
         services.AddSingleton(Options.Create(options));
 
         // 签名密钥来源：生产 Key Vault、本地文件（ADR-0023）

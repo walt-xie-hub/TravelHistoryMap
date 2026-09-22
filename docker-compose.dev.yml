@@ -69,8 +69,7 @@ services:
       #   - Jwt__AllowLegacyHs256=true
       #   - Jwt__LegacyUntil=2026-09-25T00:00:00Z
       - Identity__Issuer=http://identity-service:8080/identity
-      - ServiceIdentity__Issuer=http://identity-service:8080/identity
-      - ServiceIdentity__ClientId=user-service
+      # 服务身份（ADR-0022）：ClientId/Issuer 在 appsettings.json，这里只注入 secret。
       - ServiceIdentity__ClientSecret=${USER_SERVICE_CLIENT_SECRET:?USER_SERVICE_CLIENT_SECRET is required}
       - DemoUser__Password=${DEMO_USER_PASSWORD:?DEMO_USER_PASSWORD is required}
       # OpenTelemetry OTLP 导出目标：Collector → Jaeger
@@ -122,8 +121,7 @@ services:
       # 令牌校验（ADR-0021）：RS256 公钥经该 issuer 的 OIDC 发现获取；旧 HS256 默认不接受
       # （要接受需打开 Jwt__AllowLegacyHs256 + Jwt__LegacyUntil，上限 7 天）。
       - Identity__Issuer=http://identity-service:8080/identity
-      - ServiceIdentity__Issuer=http://identity-service:8080/identity
-      - ServiceIdentity__ClientId=travel-service
+      # 服务身份（ADR-0022）：ClientId/Issuer 在 appsettings.json，这里只注入 secret。
       - ServiceIdentity__ClientSecret=${TRAVEL_SERVICE_CLIENT_SECRET:?TRAVEL_SERVICE_CLIENT_SECRET is required}
       # OpenTelemetry OTLP 导出目标：Collector → Jaeger
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
@@ -178,18 +176,11 @@ services:
       # 浏览器则走宿主 8090（第一期前端不做发现，只调登录/验证码）。
       - Identity__Issuer=http://identity-service:8080/identity
       - Identity__Audience=travel-map-client
-      - Identity__AllowedServiceAudiences__0=user-service
-      - Identity__AllowedServiceAudiences__1=travel-service
-      - Identity__AllowedServiceAudiences__2=identity-service
-      - Identity__ServiceClients__0__ClientId=user-service
+      # 服务客户端清单（ClientId/audience）在 appsettings.json；这里只按同一顺序注入 secret，
+      # 顺序必须与 Identity:ServiceClients 数组一致（下标即绑定）。
       - Identity__ServiceClients__0__ClientSecret=${USER_SERVICE_CLIENT_SECRET:?USER_SERVICE_CLIENT_SECRET is required}
-      - Identity__ServiceClients__0__DisplayName=user-service
-      - Identity__ServiceClients__1__ClientId=travel-service
       - Identity__ServiceClients__1__ClientSecret=${TRAVEL_SERVICE_CLIENT_SECRET:?TRAVEL_SERVICE_CLIENT_SECRET is required}
-      - Identity__ServiceClients__1__DisplayName=travel-service
-      - Identity__ServiceClients__2__ClientId=identity-service
       - Identity__ServiceClients__2__ClientSecret=${IDENTITY_SERVICE_CLIENT_SECRET:?IDENTITY_SERVICE_CLIENT_SECRET is required}
-      - Identity__ServiceClients__2__DisplayName=identity-service
       - Identity__SigningKeyStore__Provider=Development
       - Identity__SigningKeyStore__Path=/app/keys
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317

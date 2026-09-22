@@ -151,7 +151,6 @@ az containerapp create \
     "Jwt__Issuer=travel-map" \
     "Jwt__Audience=travel-map-client" \
     "ServiceIdentity__Issuer=https://pending.invalid/identity" \
-    "ServiceIdentity__ClientId=user-service" \
     "ServiceIdentity__ClientSecret=secretref:service-client-secret" \
     "OTEL_TRACE_SAMPLING_RATIO=0.1" \
   "${REGISTRY_ARGS[@]}"
@@ -170,7 +169,6 @@ az containerapp create \
     "Jwt__Issuer=travel-map" \
     "Jwt__Audience=travel-map-client" \
     "ServiceIdentity__Issuer=https://pending.invalid/identity" \
-    "ServiceIdentity__ClientId=travel-service" \
     "ServiceIdentity__ClientSecret=secretref:service-client-secret" \
     "OTEL_TRACE_SAMPLING_RATIO=0.1" \
   "${REGISTRY_ARGS[@]}"
@@ -197,18 +195,9 @@ az containerapp create \
     "Identity__Issuer=https://pending.invalid/identity" \
     "Identity__ServiceId=identity-service" \
     "Identity__Audience=travel-map-client" \
-    "Identity__AllowedServiceAudiences__0=user-service" \
-    "Identity__AllowedServiceAudiences__1=travel-service" \
-    "Identity__AllowedServiceAudiences__2=identity-service" \
-    "Identity__ServiceClients__0__ClientId=user-service" \
     "Identity__ServiceClients__0__ClientSecret=secretref:user-service-client-secret" \
-    "Identity__ServiceClients__0__DisplayName=user-service" \
-    "Identity__ServiceClients__1__ClientId=travel-service" \
     "Identity__ServiceClients__1__ClientSecret=secretref:travel-service-client-secret" \
-    "Identity__ServiceClients__1__DisplayName=travel-service" \
-    "Identity__ServiceClients__2__ClientId=identity-service" \
     "Identity__ServiceClients__2__ClientSecret=secretref:identity-service-client-secret" \
-    "Identity__ServiceClients__2__DisplayName=identity-service" \
     "Identity__SigningKeyStore__Provider=KeyVault" \
     "Identity__SigningKeyStore__KeyVaultUri=https://$KV_NAME.vault.azure.net/" \
     "OTEL_TRACE_SAMPLING_RATIO=0.1" \

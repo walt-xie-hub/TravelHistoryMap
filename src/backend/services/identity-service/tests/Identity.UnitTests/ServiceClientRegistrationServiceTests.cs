@@ -66,6 +66,24 @@ public class ServiceClientRegistrationServiceTests
     }
 
     [Fact]
+    public async Task EnsureRegisteredAsync_RejectsPlaceholderSecret()
+    {
+        var options = new IdentityOptions
+        {
+            ServiceClients =
+            [new() { ClientId = "travel-service", ClientSecret = ServiceClientRegistrationService.EnvironmentPlaceholder }],
+        };
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            new ServiceClientRegistrationService(
+                new RecordingServiceClientRepository(),
+                new RecordingSecretHasher(),
+                options).EnsureRegisteredAsync());
+
+        Assert.Contains("占位符", exception.Message);
+    }
+
+    [Fact]
     public async Task EnsureRegisteredAsync_RejectsMissingSecret()
     {
         var options = new IdentityOptions
