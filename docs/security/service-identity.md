@@ -25,6 +25,7 @@
 | `sub` | `service:<name>`（例如 `service:travel-service`） |
 | `aud` | 被调服务的标识，**精确匹配**，一个 token 只对一个目标有效 |
 | `scope` | 允许的动作；**起步阶段不预置任何 scope（默认拒绝）** |
+| 粒度 | **一个服务一个 Client，一个 Client 一个 secret**。禁止多服务复用同一 secret：共用意味着任意一个服务被攻陷即可冒充其余服务，且轮换/撤销只能一起做（审计里 `sub=service:<name>` 也会失去区分力） |
 | 存储 | identity-service 自有表；secret 与用户口令一样只存哈希 |
 | 注册方式 | **不提供管理端点**，先以部署期种子/运维脚本写入（少一个管理面就少一类攻击面） |
 
