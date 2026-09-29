@@ -12,6 +12,14 @@ const PUBLIC_AUTH_ENDPOINT_PATTERN =
   /\b(auth\/(login|register|captcha)|identity\/(login|register|captcha|token|logout))$/;
 
 /**
+ * 是否为公开认证请求。匹配前先剥掉 `?query` 与 `#hash`：
+ * 验证码请求带 `?t=<时间戳>` 防缓存参数，若连查询串一起匹配就会落到「需鉴权」分支，
+ * 于是被附上过期 token（多一次 CORS 预检），登录页也会被 401 逻辑牵连。
+ */
+const isPublicAuthRequest = (url: string): boolean =>
+  PUBLIC_AUTH_ENDPOINT_PATTERN.test(url.split(/[?#]/, 1)[0]);
+
+/**
  * 认证 HTTP 拦截器：
  * - 请求阶段：为相对/绝对 API 请求自动附加 Authorization: Bearer <token>
  * - 响应阶段：401 → 先用 refresh token 静默续期并重放一次；失败才清理会话并回登录页
@@ -21,8 +29,9 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const router = inject(Router);
 
   const token = auth.token;
+  const isPublicAuth = isPublicAuthRequest(req.url);
   let request = req;
-  if (token && !PUBLIC_AUTH_ENDPOINT_PATTERN.test(req.url)) {
+  if (token && !isPublicAuth) {
     request = req.clone({
       headers: req.headers.set('Authorization', `Bearer ${token}`),
     });
@@ -30,7 +39,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
 
   return next(request).pipe(
     catchError((error: HttpErrorResponse) => {
-      if (error.status !== 401 || PUBLIC_AUTH_ENDPOINT_PATTERN.test(req.url)) {
+      if (error.status !== 401 || isPublicAuth) {
         return throwError(() => error);
       }
 
