@@ -18,39 +18,41 @@
                 }
             }
         },
+        // 仓库里没有 .sln，构建/调试一律按项目走；
+        // 需要长时间热重载时，在终端里跑：dotnet watch run --project <csproj>
         {
-            "label": "build",
+            "label": "build: user-service",
             "command": "dotnet",
             "type": "process",
             "args": [
                 "build",
-                "./${workspaceFolder}/c:/Users/46041/AppData/Roaming/Code/User/workspaceStorage/babc4687c811519e94ed9e4658ebcd08/ms-dotnettools.csdevkit/travel-map.sln",
+                "${workspaceFolder}/src/backend/services/user-service/src/User.Api/user.csproj",
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary;ForceNoAlign"
             ],
             "problemMatcher": "$msCompile"
         },
         {
-            "label": "publish",
+            "label": "build: travel-service",
             "command": "dotnet",
             "type": "process",
             "args": [
-                "publish",
-                "./${workspaceFolder}/c:/Users/46041/AppData/Roaming/Code/User/workspaceStorage/babc4687c811519e94ed9e4658ebcd08/ms-dotnettools.csdevkit/travel-map.sln",
+                "build",
+                "${workspaceFolder}/src/backend/services/travel-history/src/Travel.Api/travel.csproj",
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary;ForceNoAlign"
             ],
             "problemMatcher": "$msCompile"
         },
         {
-            "label": "watch",
+            "label": "build: identity-service",
             "command": "dotnet",
             "type": "process",
             "args": [
-                "watch",
-                "run",
-                "--project",
-                "./${workspaceFolder}/c:/Users/46041/AppData/Roaming/Code/User/workspaceStorage/babc4687c811519e94ed9e4658ebcd08/ms-dotnettools.csdevkit/travel-map.sln"
+                "build",
+                "${workspaceFolder}/src/backend/services/identity-service/src/Identity.Api/identity.csproj",
+                "/property:GenerateFullPaths=true",
+                "/consoleloggerparameters:NoSummary;ForceNoAlign"
             ],
             "problemMatcher": "$msCompile"
         }

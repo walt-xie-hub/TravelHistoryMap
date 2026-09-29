@@ -1,32 +1,154 @@
 {
     "version": "0.2.0",
     "configurations": [
-    {
-        "name": ".NET Core Attach",
-        "type": "coreclr",
-        "request": "attach",
-        "pipeTransport": {
-            "pipeCwd": "${workspaceFolder}",
-            "pipeProgram": "enter the fully qualified path for the pipe program name, for example '/usr/bin/ssh'",
-            "pipeArgs": [],
-            "debuggerPath": "enter the path for the debugger on the target machine, for example ~/vsdbg/vsdbg"
-        }
-    },
+        // ─────────────────────────────────────────────────────────────────
+        // 后端本地调试（本仓库推荐方式）
+        //   ① 只起依赖，别起同名服务容器（会抢端口）：
+        //        docker compose -f docker-compose.dev.yml up -d db
+        //   ② 密钥一次性交给 user-secrets（不写进本文件）：
+        //        dotnet user-secrets init --project <csproj>
+        //        dotnet user-secrets set "ConnectionStrings:DefaultConnection" "..." --project <csproj>
+        //   ③ 想调哪个服务就 F5 哪一个；调带鉴权的接口时先把 identity-service 起起来。
+        //   端口与 docker-compose.dev.yml 暴露给宿主的一致，前端 environment.ts 无需改动。
+        // ─────────────────────────────────────────────────────────────────
         {
-            // 使用 IntelliSense 找出 C# 调试存在哪些属性
-            // 将悬停用于现有属性的说明
-            // 有关详细信息，请访问 https://github.com/dotnet/vscode-csharp/blob/main/debugger-launchjson.md
-            "name": ".NET Core Launch (console)",
+            "name": "backend: identity-service (8090)",
             "type": "coreclr",
             "request": "launch",
-            "preLaunchTask": "build",
-            // 如果已更改目标框架，请确保更新程序路径。
-            "program": "${workspaceFolder}/server/user/tests/User.UnitTests/bin/Debug/net10.0/User.UnitTests.dll",
-            "args": [],
-            "cwd": "${workspaceFolder}/server/user/tests/User.UnitTests",
-            // 有关“控制台”字段的详细信息，请参阅 https://aka.ms/VSCode-CS-LaunchJson-Console
+            "preLaunchTask": "build: identity-service",
+            "program": "${workspaceFolder}/src/backend/services/identity-service/src/Identity.Api/bin/Debug/net10.0/identity.dll",
+            "cwd": "${workspaceFolder}/src/backend/services/identity-service/src/Identity.Api",
+            "env": {
+                "ASPNETCORE_ENVIRONMENT": "Development",
+                "ASPNETCORE_URLS": "http://localhost:8090",
+                // 复用 compose 挂载的同一份签名密钥：本地与容器互换时已签发令牌不失效
+                "Identity__SigningKeyStore__Path": "${workspaceFolder}/data/identity-keys"
+            },
             "console": "internalConsole",
             "stopAtEntry": false
+        },
+        {
+            "name": "backend: user-service (8080)",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build: user-service",
+            "program": "${workspaceFolder}/src/backend/services/user-service/src/User.Api/bin/Debug/net10.0/user.dll",
+            "cwd": "${workspaceFolder}/src/backend/services/user-service/src/User.Api",
+            "env": {
+                "ASPNETCORE_ENVIRONMENT": "Development",
+                "ASPNETCORE_URLS": "http://localhost:8080",
+                // 这一项必须显式给：appsettings 里没有默认值，缺失会直接拒绝启动
+                // 它同时是 iss 校验值和 OIDC 发现地址，所以必须是本机能解析、且与签发方逐字一致的值
+                "Identity__Issuer": "http://localhost:8090/identity",
+                // 本服务去这里换服务令牌（client_credentials）
+                "ServiceIdentity__Issuer": "http://localhost:8090/identity"
+            },
+            "console": "internalConsole",
+            "stopAtEntry": false
+        },
+        {
+            "name": "backend: travel-service (8081)",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build: travel-service",
+            "program": "${workspaceFolder}/src/backend/services/travel-history/src/Travel.Api/bin/Debug/net10.0/travel.dll",
+            "cwd": "${workspaceFolder}/src/backend/services/travel-history/src/Travel.Api",
+            "env": {
+                "ASPNETCORE_ENVIRONMENT": "Development",
+                "ASPNETCORE_URLS": "http://localhost:8081",
+                "Identity__Issuer": "http://localhost:8090/identity",
+                "ServiceIdentity__Issuer": "http://localhost:8090/identity",
+                // 与 compose 里的 /app/media 挂载同一份目录，图片本地/容器都能看到
+                "TravelMedia__RootPath": "${workspaceFolder}/data/travel-media"
+            },
+            "console": "internalConsole",
+            "stopAtEntry": false
+        },
+        // ── 附加到宿主本地进程（自己在终端跑 dotnet watch run 起的）──
+        // 同样不写 processId：没有 pipeTransport 时，C# 扩展会弹本机进程列表。
+        {
+            "name": "attach 本地: pick process",
+            "type": "coreclr",
+            "request": "attach"
+        },
+        // ── 附加到 docker compose 容器内的进程 ───────────────────────────
+        // 前提 1：容器里装了 vsdbg（重建容器后需重装，/vsdbg 不在卷里）：
+        //   docker exec <container> bash -c "curl -sSL https://aka.ms/getvsdbgsh | bash /dev/stdin -v latest -l /vsdbg"
+        // 前提 2：sourceFileMap 把容器内 /src 映射回宿主 src/backend。
+        //   容器里的 PDB 记录的是构建时的路径（/src/services/...），不映射则断点会显示
+        //   "未绑定断点"，看起来像断点没生效。
+        // 注意：这里**故意不写 processId**。
+        //   C# 扩展的配置提供者逻辑是：request=attach 且没有 processId/processName 时，
+        //   若配置带 pipeTransport，就用 pipeTransport 在容器内列进程；否则列本机进程。
+        //   写成 "${command:pickRemoteProcess}" 反而会退化成本机列表（该命令在当前版本
+        //   已置空，且 ${command:...} 无法把 launch 配置当参数传给命令）。
+        //   若仍然弹不出容器进程，把 processId 改成具体数字：
+        //       docker exec <container> ps -eo pid,args   → 取 bin/Debug/net10.0/<app> 那行的 PID
+        //   容器 entrypoint 是 dotnet watch，真正的应用是它的子进程，别附到 dotnet watch 本身。
+        {
+            "name": "docker: attach user-service",
+            "type": "coreclr",
+            "request": "attach",
+            "pipeTransport": {
+                "pipeCwd": "${workspaceFolder}",
+                "pipeProgram": "docker",
+                "pipeArgs": ["exec", "-i", "dotnet-api-dev"],
+                "debuggerPath": "/vsdbg/vsdbg",
+                "quoteArgs": false
+            },
+            "sourceFileMap": {
+                "/src": "${workspaceFolder}/src/backend"
+            }
+        },
+        {
+            "name": "docker: attach travel-service",
+            "type": "coreclr",
+            "request": "attach",
+            "pipeTransport": {
+                "pipeCwd": "${workspaceFolder}",
+                "pipeProgram": "docker",
+                "pipeArgs": ["exec", "-i", "travel-api-dev"],
+                "debuggerPath": "/vsdbg/vsdbg",
+                "quoteArgs": false
+            },
+            "sourceFileMap": {
+                "/src": "${workspaceFolder}/src/backend"
+            }
+        },
+        {
+            "name": "docker: attach identity-service",
+            "type": "coreclr",
+            "request": "attach",
+            "pipeTransport": {
+                "pipeCwd": "${workspaceFolder}",
+                "pipeProgram": "docker",
+                "pipeArgs": ["exec", "-i", "identity-api-dev"],
+                "debuggerPath": "/vsdbg/vsdbg",
+                "quoteArgs": false
+            },
+            "sourceFileMap": {
+                "/src": "${workspaceFolder}/src/backend"
+            }
+        },
+        // ── 兜底：上面的自动选择器列不出容器进程时，用这条手填容器名 + PID ──
+        // F5 后会依次弹两个输入框。查 PID：
+        //   docker exec <容器> ps -eo pid,args   → 取 bin/Debug/net10.0/<app> 那一行的 PID
+        // 注意：dotnet watch 每次重新编译都会换 PID，届时重新输入即可。
+        {
+            "name": "docker: attach (手动指定容器+PID)",
+            "type": "coreclr",
+            "request": "attach",
+            "processId": "${input:dockerPid}",
+            "pipeTransport": {
+                "pipeCwd": "${workspaceFolder}",
+                "pipeProgram": "docker",
+                "pipeArgs": ["exec", "-i", "${input:containerName}"],
+                "debuggerPath": "/vsdbg/vsdbg",
+                "quoteArgs": false
+            },
+            "sourceFileMap": {
+                "/src": "${workspaceFolder}/src/backend"
+            }
         },
         {
             "name": "Angular: Chrome",
@@ -36,11 +158,20 @@
             "url": "http://localhost:4200/",
             "webRoot": "${workspaceFolder}/src/frontend/client",
             "sourceMaps": true
+        }
+    ],
+    // 供上面的「手动指定容器+PID」配置使用
+    "inputs": [
+        {
+            "id": "containerName",
+            "type": "promptString",
+            "description": "容器名",
+            "default": "travel-api-dev"
         },
         {
-            "name": ".NET Core Attach",
-            "type": "coreclr",
-            "request": "attach"
+            "id": "dockerPid",
+            "type": "promptString",
+            "description": "容器内应用进程 PID（docker exec <容器> ps -eo pid,args）"
         }
     ]
 }
