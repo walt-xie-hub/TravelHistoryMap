@@ -62,7 +62,7 @@
 | Docker CLI | 能被 VS Code 扩展宿主进程调用（在 `PATH` 上） | 终端执行 `docker ps` 有输出 |
 | 容器已启动 | 用 `docker compose -f docker-compose.dev.yml up -d` 起过 | `docker ps` 能看到三个后端容器 |
 | 源码同步 | 建议同时跑 `docker compose -f docker-compose.dev.yml watch` | 改文件后容器内 `dotnet watch` 有重建日志 |
-| C# 扩展 | `ms-dotnettools.csharp`（本文依据 **v2.140.9** 的行为编写） | 扩展面板查看版本 |
+| C# 扩展 | `ms-dotnettools.csharp`（本文依据 **v2.160.4** 编写；v2.140.9 行为一致） | 终端跑 `code --list-extensions --show-versions` 确认实际启用版本 |
 | .NET SDK | 容器镜像 `mcr.microsoft.com/dotnet/sdk:10.0` | 由 `Dockerfile.dev` 决定 |
 
 容器与配置的对应关系（**改端口/容器名时要同步改 `launch.json`**）：
@@ -232,9 +232,11 @@ RUN curl -sSL --retry 3 https://aka.ms/getvsdbgsh | bash /dev/stdin -v latest -l
 
 这是本项目踩过的坑，务必不要改回去：
 
-1. 在本仓库使用的 C# 扩展 v2.140.9 中，`csharp.listProcess` 与 `csharp.listRemoteProcess`
-   **已被注册为空实现**（`registerCommand("csharp.listRemoteProcess", () => "")`），
-   所以 `${command:pickRemoteProcess}` 会解析成空串。
+1. 各版本的 `csharp.listRemoteProcess` 都不可用：v2.140.9 把 `csharp.listProcess` 与
+   `csharp.listRemoteProcess` **注册成了空实现**（`registerCommand("csharp.listRemoteProcess", () => "")`）；
+   v2.160.4 则已把 `csharp.listRemoteProcess` 命令从代码里移除（`package.json` 里仍留着
+   `pickRemoteProcess` 的映射，属于历史遗留）。因此 `${command:pickRemoteProcess}`
+   要么解析成空串、要么直接指向一个不存在的命令。
 2. VS Code 的 `${command:...}` 变量在解析时**不会把 launch 配置当参数**传给命令
    （扩展源码里对此留了注释，指向 microsoft/vscode#110889），
    于是受限于命令签名的 `ShowAttachEntries(args, ...)` 拿不到 `pipeTransport`。
