@@ -5,6 +5,13 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0
 
 WORKDIR /src
 
+# 开发调试器：把 vsdbg 固化进开发镜像，容器重建后无需再手动安装。
+#   放在最前面（先于 restore 与 COPY . .）是为了让这一层被缓存：
+#   源码/依赖变更都不会重新下载。仅服务 VS Code「附加到容器进程」的调试场景
+#   （见 doc/docker-attach-debugging.md）；**生产镜像（Dockerfile）不含此项**。
+#   想锁定版本就把 latest 换成具体版本号（如 18.10.10709.3）。
+RUN curl -sSL --retry 3 https://aka.ms/getvsdbgsh | bash /dev/stdin -v latest -l /vsdbg
+
 # ① 先复制 API 项目及其引用的 .csproj（含跨服务共享库）—— 利用 Docker 层缓存，
 #    依赖不变则无需重跑 restore
 COPY services/travel-history/src/Travel.Domain/Travel.Domain.csproj ./services/travel-history/src/Travel.Domain/
