@@ -4,7 +4,7 @@
 
 - 建立时的定位基准：**小范围真实用户**（有公开注册入口、分享链接公网可达、数据库公网可达）。
 - **生产环境的唯一真相是 Azure Container Apps**（`deploy-azure.sh`）。`infra/k8s/**` 已冻结为本地实验，只在恢复维护时按 `network-and-edge.md` 的附录逐项补齐。
-- 本目录只描述**目标态与差距**；已落盘的架构决策在 `docs/adr/0019`–`0023`。
+- 本目录只描述**目标态与差距**；已落盘的架构决策在 `docs/adr/0019`–`0024`。
 
 > 🔴 **当前最高优先级（2026-09-17 确认）**：本仓库是 **public**，且初始提交 `8faf6c5` 里 `infra/k8s/base/secret.yaml` 的 `Db__Password` **就是当前有效的数据库口令**（2026-07-26 起对全网可见，2026-09-07 才从工作树移除，历史仍可取出）。处置步骤见 [secrets-and-keys.md](./secrets-and-keys.md) 的「立即处置」。
 
@@ -37,6 +37,7 @@
 | [0021](../adr/0021-token-model-rs256-jwks-rotation-and-refresh.md) | 令牌模型：RS256 + JWKS + 轮换 refresh（**取代 ADR-0005 §1**） |
 | [0022](../adr/0022-service-identity-client-credentials-and-internal-channel.md) | 服务身份：client credentials + 默认拒绝 + 内部通道分期 |
 | [0023](../adr/0023-secret-and-key-management-key-vault-and-managed-identity.md) | 机密与密钥托管：Key Vault + 托管身份 |
+| [0024](../adr/0024-token-exchange-for-user-delegation.md) | 用户委托：token exchange（`sub`=用户 + `act`=服务 + `aud`=被调服务） |
 
 ## 四条硬规则
 
@@ -149,6 +150,19 @@
 | 请求元数据只有一种取法 | `Shared.Observability.RequestContext`（原 identity 的私有实现已删），XFF 最右一段与限流口径一致 |
 | 事件名与审计口径对齐事件表 | `logout`（原 `logged_out`）、`password_changed`；严重度：锁定/复用/被拒 走 Warning |
 | 回归测试 | `ChangePasswordAuditTests`（成功带来源信息、失败零事件）；`RecordingAuditLog` 改为记录 `AuditEvent` |
+
+**本次已实现（用户委托 / token exchange，ADR-0024）**：
+
+| 项 | 落地位置 |
+|---|---|
+| token exchange grant | `Identity.Api/Endpoints/TokenEndpoints.cs`（`urn:ietf:params:oauth:grant-type:token-exchange`） |
+| 裁决（默认拒绝；**scope 缺失也拒**） | `Identity.Application/Services/TokenExchangeService.cs`——先验调用方，再验 audience/主体/scope |
+| 令牌形状 | `JwtAccessTokenIssuer.CreateDelegatedToken`（`sub`=用户 id、`act`=service:&lt;clientId&gt;、`aud`=被调服务；TTL 同服务令牌） |
+| 主体令牌校验 | `Identity.Api/Security/DelegatedTokenValidator.cs`（只接受用户令牌：aud 必须是客户端标识，sub 必须是十进制 id） |
+| 接收侧方案与策略 | `Shared.Security/DelegatedIdentity.cs`——**要求 `act` 存在**（区分服务令牌的判别位）；aud 取 `ServiceIdentity:ClientId`，缺失或占位符即**拒绝启动** |
+| 验收端点 | `Travel.Api/Endpoints/InternalEndpoints.cs` → `GET /internal/whoami` |
+| 单测 | `TokenExchangeServiceTests`（8 条：四道闸门 + “凭证无效时不碰主体令牌”）、`JwtAccessTokenIssuerTests`（act 的嵌套 JSON 形状与 TTL）、`DelegatedIdentityTests`（10 条：act 解析 + 标识缺失拒绝启动） |
+| 验收方式 | [service-identity.md](./service-identity.md) 的「用户委托（token exchange）的验收」表——含“服务令牌调同一端点 → 403”这条关键断言 |
 
 **仍未完成**（需要真实凭据或环境操作，我无法代做）：
 

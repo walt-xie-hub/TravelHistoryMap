@@ -7,6 +7,9 @@
 ## 现状
 
 - **当前后端仍零真实服务间业务调用**：服务身份基础设施已经实现，但尚未有业务端点使用它发起跨服务请求。
+- **用户委托（token exchange）已实现**（ADR-0024）：调用方可用「自己的服务凭证 + 用户的令牌」换一枚
+  `sub=用户`、`act=服务`、`aud=被调服务` 的短 TTL 令牌；接收侧是 `Shared.Security` 的 `Delegated` 方案。
+  但目前除 travel-service 的 `/internal/whoami` 验收端点外，**没有真实业务调用点**在使用它。
 - 两服务之间唯一的"协作"是共享 `appdb` 与数据库级外键（ADR-0002），以及 `shared/Shared.Contracts` 里两个**尚未被使用**的集成事件契约（`IIntegrationEvent`、`UserCreatedEvent`）。
 - 网关转发时**不注入任何身份头**，也不剥离客户端伪造的头；服务识别调用方的唯一手段是客户端自带的 `Authorization`（ADR-0019 的现状描述）。
 - ACA 上后端都是 `internal`，但 `internal` = 同环境内任意容器应用可达，**没有对等认证**，也没有 NetworkPolicy。
@@ -58,6 +61,28 @@
 
 > "加密"与"对等认证"是两个正交的轴：平台内网 TLS 只保证链路机密性；**识别调用方必须靠 token**。不要把前者当作后者。
 
+### 用户委托（token exchange，ADR-0024）
+
+当调用链需要“**代表用户**”时（`浏览器 → user-service → travel-service`），转发用户令牌与自定义头两种做法都不成立，
+改用 token exchange —— 一次性解决“谁在调”与“代表谁”。
+
+| 项 | 约定 |
+|---|---|
+| 换令牌 | `POST /identity/token`，`grant_type=urn:ietf:params:oauth:grant-type:token-exchange` |
+| 调用方身份 | `client_id` + `client_secret`（= actor，与 client credentials 同一套注册） |
+| 主体 | `subject_token` + `subject_token_type=urn:ietf:params:oauth:token-type:access_token`（必须是**用户**令牌） |
+| 目标 | `audience` 必须在 `Identity:AllowedServiceAudiences` 内 |
+| scope | **必填**且必须已授予；缺失即拒 —— 否则委托令牌就退化成“用户令牌的副本” |
+| 令牌内容 | `sub`=用户 id、`act`=`{"sub":"service:<clientId>"}`（RFC 8693 代理链）、`aud`=被调服务 |
+| TTL | 与服务令牌相同（5 分钟），不沿用用户令牌的 20 分钟 |
+| 接收侧 | `Shared.Security` 的 `Delegated` 方案 + `DelegatedIdentity` 策略 |
+
+接收侧有两道校验不能省：
+
+1. **`aud` 必须等于本服务标识**（取 `ServiceIdentity:ClientId`，缺失或仍是占位符则**拒绝启动**）；
+2. **必须要求 `act` 声明存在**——委托令牌与 client_credentials 服务令牌的 `aud` 都是本服务标识，
+   光看 `aud` 区分不了；`act` 是服务令牌**不会带**的声明。少了这条，一枚普通服务令牌就能冒充“代表某用户”。
+
 ### 与 ADR-0002 的边界
 
 服务身份**不得**被用来做"跨服务同步调用校验用户存在性"。用户存在性仍由数据库外键保证（写入不存在的 `user_id` → 23503 → 400）。服务身份只用于**新增的**、真正需要的跨服务能力。
@@ -68,13 +93,17 @@
 
 - identity-service 的部署期 Client 注册与哈希存储。
 - 资源服务侧的 client credentials 客户端，包含按 audience/scope 缓存、提前刷新和并发请求去重。
+- **用户委托（token exchange）**：签发侧 `TokenExchangeService` + `JwtAccessTokenIssuer.CreateDelegatedToken`；
+  接收侧 `Shared.Security/DelegatedIdentity.cs`；验收端点 `Travel.Api/Endpoints/InternalEndpoints.cs`。
+  单测：`TokenExchangeServiceTests`、`JwtAccessTokenIssuerTests`（含 act 的嵌套 JSON 形状与 TTL）、
+  `DelegatedIdentityTests`（act 解析 + 本服务标识缺失时拒绝启动）。
 
 ### P1
 
 - identity-service Client 注册表与 client credentials 端点已实现；新增 Client 通过部署 secret 注入，不提供运行时管理端点。
 - 资源服务侧的服务身份校验骨架已实现于 identity-service 的 `/internal/*` 策略；新增资源服务端点仍需按 scope 明确授权。
-- [ ] 明确 `/internal/*` 的前缀约定并写进评审习惯。
-- [ ] 把上面三条"硬规则"写进 `AGENTS.md` 或本目录索引，让新增调用必须过这一关。
+- [x] 明确 `/internal/*` 的前缀约定并写进评审习惯（已在 `AGENTS.md` 的 Security 节与 `README.md` 的硬规则第 2 条）。
+- [x] 把上面三条"硬规则"写进 `AGENTS.md` 或本目录索引（见 `AGENTS.md` 的 Security 节与 `README.md` 的「四条硬规则」）。
 
 ### P2
 
@@ -83,7 +112,27 @@
 
 ## 验收方式
 
-- 不带 token 调 `/internal/*` → 401；带**用户** token → 403；带 `aud` 指向别的服务的服务 token → 401；`aud` 对但 scope 不匹配 → 403。
+- 不带 token 调 `/internal/*` → 401；带**用户** token → 401/403；带 `aud` 指向别的服务的服务 token → 401；`aud` 对但 scope 不匹配 → 403。
 - 服务 token 的 TTL 实测 ≤ 5 分钟，且过期后必须重新换取（无静默续期）。
 - `grep -rn "api/" src/backend/**/Endpoints/*.cs` 中不出现 `/internal` 路径（内部端点不得挂在 `/api/` 下）。
 - 启用 Dapr 后：用一个未启用 Dapr 的直接 HTTP 调用目标服务 → 期望失败（证明确实走了加强通道）。
+
+### 用户委托（token exchange）的验收
+
+| 请求 | 期望 | 原因 |
+|---|---|---|
+| `subject_token_type` 不对 / 缺 `subject_token` | 400 `invalid_request` | RFC 8693 要求显式声明主体类型 |
+| `client_secret` 错 / client 未注册 | 400 `invalid_client` | 先验调用方，且不触碰主体令牌 |
+| `audience` 不在白名单 | 400 `invalid_target` | 默认拒绝 |
+| `subject_token` 过期/伪造/是服务令牌 | 400 `invalid_grant` | 只接受本服务签发的用户令牌 |
+| 缺 `scope` 或请求了未授予的 scope | 400 `invalid_scope` | 防止退化成“用户令牌的副本” |
+| 带委托令牌调 `/internal/whoami` | **200** | 回显 `subject`（用户 id）、`actingService`（`service:user-service`）、`scopes` |
+| 带 **client_credentials 服务令牌**调同一端点 | **403** | 它 `aud` 对得上但不能通过 `RequireClaim("act")` —— **这条证明服务令牌不能冒充用户委托** |
+| 带**用户令牌**调 `/internal/whoami` | **401** | 用户令牌 `aud` 是客户端标识，与 `Delegated` 方案的 `ValidAudience` 不匹配 |
+| 带委托令牌调**别的**服务 | 401 | `aud` 精确匹配，一个令牌只对一个目标有效 |
+
+一条 curl 就能验通最后三行（`$TOKEN` 为换到的委托令牌）：
+
+```bash
+curl -i -H "Authorization: Bearer $TOKEN" http://localhost:8081/internal/whoami
+```

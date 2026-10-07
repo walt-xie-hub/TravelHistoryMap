@@ -14,4 +14,4 @@ Single-context layout: one `CONTEXT.md` plus `docs/adr/` at the repo root. See `
 
 ### Security
 
-Security guidance, check items, and the four hard rules live in `docs/security/README.md` (decisions in ADR-0019–0023). Before merging: new endpoints must state who may call them (writing no `RequireAuthorization()` means public), internal endpoints must live under `/internal/*`, and new cross-service calls must carry a service-identity token over an encrypted channel.
+Security guidance, check items, and the four hard rules live in `docs/security/README.md` (decisions in ADR-0019–0024). Before merging: new endpoints must state who may call them (writing no `RequireAuthorization()` means public), internal endpoints must live under `/internal/*`, and new cross-service calls must carry a service-identity token over an encrypted channel.
