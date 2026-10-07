@@ -14,6 +14,15 @@ public interface IAccessTokenIssuer
     /// <summary>服务令牌：sub = service:&lt;clientId&gt;，aud = 被调服务，scope 表达允许的动作。</summary>
     string CreateServiceToken(string clientId, string audience, IReadOnlyCollection<string> scopes);
 
+    /// <summary>
+    /// 委托令牌（token exchange）：sub = 用户的 Users.Id（**不是** service:*），
+    /// aud = 被调服务，act = 代理发起方（service:&lt;clientId&gt;）。
+    ///
+    /// 与 <see cref="CreateServiceToken"/> 的关键差别就在 sub：那一枚回答“谁在调”，这一枚同时回答
+    /// “代表谁”。接收方靠 act 的存在把两者区分开，因此 act 是安全的判别位，不能省。
+    /// </summary>
+    string CreateDelegatedToken(int userId, string actorClientId, string audience, IReadOnlyCollection<string> scopes);
+
     /// <summary>access token 有效期（秒），由实现与签发配置保持一致。</summary>
     int AccessTokenLifetimeSeconds { get; }
 

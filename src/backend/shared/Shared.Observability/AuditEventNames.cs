@@ -26,4 +26,9 @@ public static class AuditEventNames
     public const string ServiceTokenIssued = "service_token_issued";
 
     public const string ServiceTokenRequestDenied = "service_token_denied";
+
+    /// <summary>用户委托令牌签发（token exchange）：sub=用户，act=代理服务。</summary>
+    public const string DelegatedTokenIssued = "delegated_token_issued";
+
+    public const string DelegatedTokenDenied = "delegated_token_denied";
 }

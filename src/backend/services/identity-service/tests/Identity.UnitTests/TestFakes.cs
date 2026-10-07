@@ -40,4 +40,7 @@ public sealed class StubAccessTokenIssuer : IAccessTokenIssuer
 
     public string CreateServiceToken(string clientId, string audience, IReadOnlyCollection<string> scopes)
         => $"service-token:{clientId}:{audience}:{string.Join(',', scopes)}";
+
+    public string CreateDelegatedToken(int userId, string actorClientId, string audience, IReadOnlyCollection<string> scopes)
+        => $"delegated-token:user:{userId}:actor:{actorClientId}:{audience}:{string.Join(',', scopes)}";
 }

@@ -26,6 +26,8 @@ builder.Services.AddSingleton<CaptchaService>();
 // 组合根：基础设施（库、只读凭据、签名密钥、仓储）+ 应用服务
 builder.Services.AddIdentityInfrastructure(builder.Configuration);
 builder.Services.AddSingleton<IAccessTokenIssuer, JwtAccessTokenIssuer>();
+// token exchange 的主体令牌校验（ADR-0024）：验签用户令牌并取其 sub 作为委托主体
+builder.Services.AddSingleton<IUserTokenValidator, DelegatedTokenValidator>();
 
 var identityOptions = new IdentityOptions();
 builder.Configuration.GetSection(IdentityOptions.SectionName).Bind(identityOptions);

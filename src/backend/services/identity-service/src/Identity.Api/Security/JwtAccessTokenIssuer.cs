@@ -49,7 +49,35 @@ public sealed class JwtAccessTokenIssuer(
         return Create(claims, audience);
     }
 
-    private string Create(IEnumerable<Claim> claims, string audience)
+    /// <summary>
+    /// 委托令牌（token exchange）：sub = 用户的 Users.Id、aud = 被调服务、
+    /// act = 代理发起方，scope = 本次调用允许的动作。
+    ///
+    /// 注意 aud 不是客户端标识，所以 <see cref="Create"/> 会按**服务令牌的短 TTL**
+    /// 签发：它同时携带用户身份，泄露后果比纯服务令牌更重，不应该活得更久。
+    /// </summary>
+    public string CreateDelegatedToken(int userId, string actorClientId, string audience, IReadOnlyCollection<string> scopes)
+    {
+        var claims = new List<Claim>
+        {
+            new(JwtRegisteredClaimNames.Sub, userId.ToString(CultureInfo.InvariantCulture)),
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N")),
+        };
+
+        if (scopes.Count > 0)
+            claims.Add(new Claim("scope", string.Join(' ', scopes)));
+
+        // act 按 RFC 8693 的形状是个**嵌套 JSON 对象**（代理链），不用扁平字符串：
+        // 接收方一看类型就知道它是“代理者”，而不是又一个普通声明。
+        var act = new Dictionary<string, object>
+        {
+            ["act"] = new Dictionary<string, object> { ["sub"] = $"service:{actorClientId}" },
+        };
+
+        return Create(claims, audience, act);
+    }
+
+    private string Create(IEnumerable<Claim> claims, string audience, IDictionary<string, object>? extraClaims = null)
     {
         var active = signingKeys.GetActiveKey();
         var now = clock.UtcNow;
@@ -60,6 +88,7 @@ public sealed class JwtAccessTokenIssuer(
             Issuer = _options.Issuer,
             Audience = audience,
             Subject = new ClaimsIdentity(claims),
+            Claims = extraClaims,
             IssuedAt = now,
             NotBefore = now,
             Expires = now.AddMinutes(minutes),

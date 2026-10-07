@@ -54,6 +54,7 @@ public static class DependencyInjection
         services.AddScoped<RefreshTokenService>();
         services.AddScoped<AuthenticationService>();
         services.AddScoped<ClientCredentialsService>();
+        services.AddScoped<TokenExchangeService>();
         services.AddScoped<ServiceClientRegistrationService>();
 
         return services;

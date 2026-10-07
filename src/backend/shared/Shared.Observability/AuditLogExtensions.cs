@@ -70,6 +70,29 @@ public static class AuditLogExtensions
             Subject: $"client:{clientId}",
             Data: new Dictionary<string, object?> { ["reason"] = reason }));
 
+    /// <summary>
+    /// 用户委托令牌签发（token exchange）。Subject 记**用户**，actor 记**代理发起方** ——
+    /// 审计要能同时回答“代表谁”与“谁在调”，这两者缺一就无法归因。
+    /// </summary>
+    public static void DelegatedTokenIssued(this IAuditLog audit, int userId, string actorClientId, string audience, string scopes)
+        => audit.Write(new AuditEvent(
+            AuditEventNames.DelegatedTokenIssued,
+            Subject: $"user:{userId}",
+            Data: new Dictionary<string, object?>
+            {
+                ["actor"] = $"service:{actorClientId}",
+                ["audience"] = audience,
+                ["scopes"] = scopes,
+            }));
+
+    public static void DelegatedTokenDenied(this IAuditLog audit, string actorClientId, string reason)
+        => audit.Write(new AuditEvent(
+            AuditEventNames.DelegatedTokenDenied,
+            Result: "denied",
+            Severity: AuditSeverity.Warning,
+            Subject: $"client:{actorClientId}",
+            Data: new Dictionary<string, object?> { ["reason"] = reason }));
+
     public static void PasswordChanged(this IAuditLog audit, int userId, string? ip, string? userAgent)
         => audit.Write(new AuditEvent(
             AuditEventNames.PasswordChanged,

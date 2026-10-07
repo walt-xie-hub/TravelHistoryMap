@@ -26,6 +26,8 @@ builder.Services.AddInfrastructure(builder.Configuration);
 // 并在共存窗口内继续接受旧的 HS256 令牌。本服务只验签、不签发。
 builder.Services.AddTravelMapJwt(builder.Configuration, builder.Environment);
 builder.Services.AddTravelMapServiceTokenClient(builder.Configuration);
+// 用户委托令牌（token exchange，ADR-0024）：接受 sub=用户、act=代理服务、aud=本服务的令牌
+builder.Services.AddTravelMapDelegatedIdentity(builder.Configuration, builder.Environment);
 builder.Services.AddAuthorization();
 builder.Services.AddAntiforgery();
 builder.Services.ConfigureHttpJsonOptions(options => options.SerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase);
@@ -141,6 +143,9 @@ app.UseObservability();
 
 // 旅行记录微服务端点
 app.MapTravelEndpoints();
+
+// 内部端点（/internal/*，要求用户委托令牌；不在网关转发的 /api/* 下）
+app.MapInternalEndpoints();
 
 // 健康检查（供容器探针 / 网关使用）
 app.MapGet("/health", () => Results.Ok("Healthy"));

@@ -3,7 +3,10 @@ using Shared.Observability;
 
 namespace Identity.Application.Services;
 
-/// <summary>client credentials 的结果。失败时 <see cref="Error"/> 取 OAuth 的 error 语义。</summary>
+/// <summary>
+/// 令牌端点的结果（client credentials 与 token exchange 两个 grant 共用同一形状）。
+/// 失败时 <see cref="Error"/> 取 OAuth 的 error 语义。
+/// </summary>
 public sealed record ServiceTokenResult(
     bool Succeeded,
     string? AccessToken,
