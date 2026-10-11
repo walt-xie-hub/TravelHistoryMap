@@ -15,6 +15,13 @@ public sealed record CaptchaResult(string Id, string ImageBase64);
 ///
 /// 自 user-service 迁入（ADR-0020：认证归 identity-service）；随机数改用
 /// <see cref="RandomNumberGenerator"/> —— 原来的 <c>Random.Shared</c> 不是密码学安全的。
+///
+/// **可读性调整（2026-10-07）**：验证码的职责是拦住脚本，不是拦住人。
+/// 旧参数（5px 点、字距 10px、旋转 ±24°、130 噪点、4 条干扰线）下，
+/// 2 与 7 、8 与 9 这类字形在旋转后会互相混淆 —— 实测把图放大 6 倍、不限时间读，
+/// 仍会读错，用户只能反复重来。现在：点放大到 8px、旋转收到 ±10°、字距拉到 18px
+/// （确保旋转后的外接框不重叠）、干扰线减到 2 条。
+/// 抗脚本能力仍靠“随机 4 位 + 噪点 + 干扰线 + 一次性 5 分钟”，而不是靠让人看不清。
 /// </summary>
 public sealed class CaptchaService(IMemoryCache cache)
 {
@@ -85,13 +92,19 @@ public sealed class CaptchaService(IMemoryCache cache)
     }
 
     // ---- 图形渲染 ----
-    private const int Cell = 5;          // 每个像素点放大为 5x5 矩形
-    private const int GlyphW = 5 * Cell; // 字模宽
-    private const int GlyphH = 7 * Cell; // 字模高
-    private const int Gap = 10;          // 字间距
-    private const int PadX = 12;         // 左右留白（容纳旋转溢出）
+    // 注：下面几个常量共同决定“能不能读出来”，改动前先看 Create/Validate 的实测证据（类注释）。
+    private const int Cell = 8;          // 每个像素点放大为 8x8 矩形（原 5：笔画太细，旋转后难辨）
+    private const int GlyphW = 5 * Cell; // 字模宽 = 40
+    private const int GlyphH = 7 * Cell; // 字模高 = 56
+    private const int Gap = 18;          // 字间距（必须容得下旋转后的外接框：步进 58 > 外接宽 ~49）
+    private const int PadX = 16;         // 左右留白（容纳旋转溢出）
+    private const int PadY = 18;         // 上下留白（同上）
+
+    /// <summary>最大旋转角（度）。±24° 会让 2/7、8/9 这类字形互相混淆；±10° 足以对抗模板匹配。</summary>
+    private const int MaxRotationDegrees = 10;
+
     private const int ImageW = CodeLength * GlyphW + (CodeLength - 1) * Gap + PadX * 2;
-    private const int ImageH = GlyphH + 22;
+    private const int ImageH = GlyphH + PadY * 2;
 
     private static string RenderPng(string code)
     {
@@ -102,7 +115,7 @@ public sealed class CaptchaService(IMemoryCache cache)
 
         // 背景噪点
         using var noisePaint = new SKPaint { Color = SKColors.LightGray, Style = SKPaintStyle.Fill };
-        for (var i = 0; i < 130; i++)
+        for (var i = 0; i < 180; i++)
         {
             var x = RandomNumberGenerator.GetInt32(ImageW);
             var y = RandomNumberGenerator.GetInt32(ImageH);
@@ -120,12 +133,12 @@ public sealed class CaptchaService(IMemoryCache cache)
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
         };
-        for (var i = 0; i < 4; i++)
+        for (var i = 0; i < 2; i++)
         {
             linePaint.Color = new SKColor(
-                (byte)RandomNumberGenerator.GetInt32(120, 190),
-                (byte)RandomNumberGenerator.GetInt32(120, 190),
-                (byte)RandomNumberGenerator.GetInt32(120, 190));
+                (byte)RandomNumberGenerator.GetInt32(150, 210),
+                (byte)RandomNumberGenerator.GetInt32(150, 210),
+                (byte)RandomNumberGenerator.GetInt32(150, 210));
             canvas.DrawLine(
                 RandomNumberGenerator.GetInt32(ImageW), RandomNumberGenerator.GetInt32(ImageH),
                 RandomNumberGenerator.GetInt32(ImageW), RandomNumberGenerator.GetInt32(ImageH),
@@ -147,7 +160,7 @@ public sealed class CaptchaService(IMemoryCache cache)
             glyphPaint.Color = RandomGlyphColor();
             canvas.Save();
             canvas.Translate(cx, cy);
-            canvas.RotateDegrees(RandomNumberGenerator.GetInt32(-24, 25));
+            canvas.RotateDegrees(RandomNumberGenerator.GetInt32(-MaxRotationDegrees, MaxRotationDegrees + 1));
             DrawDigit(canvas, code[i] - '0', -GlyphW / 2, -GlyphH / 2, glyphPaint);
             canvas.Restore();
         }
