@@ -1,4 +1,4 @@
-import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { lastValueFrom } from 'rxjs';
 import {
@@ -14,6 +14,16 @@ import { environment } from '@env/environment';
 
 const TOKEN_STORAGE_KEY = 'travel-map.auth.token';
 const REFRESH_TOKEN_STORAGE_KEY = 'travel-map.auth.refresh-token';
+
+/**
+ * 是否是“本地令牌已经不再有效”的失败。
+ *
+ * 只有 401/403 值得销毁会话；status 0（连不上）与 5xx 都是**暂时性**的 ——
+ * 把两者混为一谈，就会出现“后端刚重启/网关抖一下，用户被登出，还得重新读一次验证码”。
+ */
+function isAuthenticationFailure(error: unknown): boolean {
+  return error instanceof HttpErrorResponse && (error.status === 401 || error.status === 403);
+}
 
 /**
  * identity-service 的令牌响应（ADR-0021）。刻意**不含**用户资料：
@@ -56,8 +66,12 @@ export class AuthService {
 
   /**
    * 应用启动 / 路由守卫时恢复会话：
-   * 无本地 token 直接返回 false；有 token 则请求 users/me 校验，
-   * token 失效（401）时自动清理本地会话。
+   * 无本地 token 直接返回 false；有 token 则请求 users/me 校验。
+   *
+   * 只有**认证失败**（401/403）才销毁会话。user-service 没起来、网关 5xx、断网
+   * 这些**暂时性**故障必须保留令牌：一次后端抖动就丢掉仍然有效的 refresh token，
+   * 用户会被迫重新登录（还要再读一次验证码），而这本该只是“稍后重试”。
+   * 暂时性故障后会清空 initPromise，让下一次导航/刷新还有机会重试。
    */
   async initialize(): Promise<boolean> {
     if (this._currentUser()) {
@@ -68,8 +82,12 @@ export class AuthService {
     }
     this.initPromise ??= this.loadProfile()
       .then(() => true)
-      .catch(() => {
-        this.clearSession();
+      .catch((error: unknown) => {
+        if (isAuthenticationFailure(error)) {
+          this.clearSession();      // 令牌真的没用了
+        } else {
+          this.initPromise = null;  // 后端暂时不可用：令牌留着，下次再试
+        }
         return false;
       });
     return this.initPromise;
