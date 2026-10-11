@@ -54,4 +54,10 @@ public interface ITravelService
 
     /// <summary>按 Token 公开读取分享快照（只读，不校验归属）；不存在返回 null。</summary>
     Task<DTOs.PublicShareSnapshotDto?> GetShareSnapshotAsync(string token, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 足迹概览（ADR-0025）：该用户活动记录的聚合摘要（记录数 / 城市数 / 收藏数 / 首末足迹）。
+    /// 归属由调用方传入 —— 内部端点从**委托令牌的 sub** 取得，不接受请求体中声明的 userId。
+    /// </summary>
+    Task<Shared.Contracts.FootprintOverview> GetFootprintAsync(int userId, CancellationToken cancellationToken = default);
 }

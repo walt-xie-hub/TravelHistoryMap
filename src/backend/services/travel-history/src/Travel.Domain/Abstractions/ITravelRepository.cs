@@ -53,6 +53,12 @@ public interface ITravelRepository
     /// <summary>按 id 集合取 userId 名下记录（分享快照创建用）。</summary>
     Task<IReadOnlyList<TravelRecord>> GetByIdsAsync(int userId, IReadOnlyList<int> ids, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// 足迹概览聚合（ADR-0025）：只统计该用户的**活动**记录（不含回收站）。
+    /// 城市数按 City 快照去重；派生城市不落库（ADR-0017），因此不计入。
+    /// </summary>
+    Task<TravelFootprintStats> GetFootprintStatsAsync(int userId, CancellationToken cancellationToken = default);
+
     Task<TravelShareSnapshot?> GetShareByTokenAsync(string token, CancellationToken cancellationToken = default);
     Task<TravelShareSnapshot> AddShareAsync(TravelShareSnapshot share, CancellationToken cancellationToken = default);
 }

@@ -83,6 +83,45 @@
       </div>
     </form>
 
+    <!-- 足迹概览（ADR-0025）：由 user-service 以当前登录用户的名义向 travel-service 委托读取。
+         独立加载/独立失败 —— 这张卡片挂了不影响上面的档案与改密。 -->
+    <section class="card">
+      <h2 class="card__title">足迹概览</h2>
+      <p class="card__hint">来自你的旅行记录（不含回收站）。</p>
+
+      @if (footprintLoading()) {
+        <p class="footprint__state">加载中…</p>
+      } @else if (footprintFailed()) {
+        <div class="footprint__state footprint__state--error">
+          <p>暂时无法加载足迹概览。</p>
+          <button class="btn" type="button" (click)="loadFootprint()">重试</button>
+        </div>
+      } @else {
+        @if (footprint(); as data) {
+          <dl class="footprint">
+            <div class="footprint__item">
+              <dt>记录</dt>
+              <dd>{{ data.totalRecords }}</dd>
+            </div>
+            <div class="footprint__item">
+              <dt>城市</dt>
+              <dd>{{ data.cityCount }}</dd>
+            </div>
+            <div class="footprint__item">
+              <dt>★ 收藏</dt>
+              <dd>{{ data.favoriteCount }}</dd>
+            </div>
+          </dl>
+
+          @if (footprintRange(); as range) {
+            <p class="footprint__range">首末足迹：{{ range }}</p>
+          } @else {
+            <p class="footprint__range">还没有旅行记录。</p>
+          }
+        }
+      }
+    </section>
+
     <!-- 修改密码 -->
     <form class="card" (ngSubmit)="savePassword()" novalidate>
       <h2 class="card__title">修改密码</h2>

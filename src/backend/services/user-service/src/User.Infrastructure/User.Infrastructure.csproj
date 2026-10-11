@@ -11,6 +11,7 @@
     <ProjectReference Include="..\User.Application\User.Application.csproj" />
     <!-- 跨服务统一可观测性（OpenTelemetry 引导） -->
     <ProjectReference Include="..\..\..\..\shared\Shared.Observability\Shared.Observability.csproj" />
+    <ProjectReference Include="..\..\..\..\shared\Shared.Security\Shared.Security.csproj" />
   </ItemGroup>
 
   <ItemGroup>

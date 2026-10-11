@@ -4,7 +4,7 @@
 
 - 建立时的定位基准：**小范围真实用户**（有公开注册入口、分享链接公网可达、数据库公网可达）。
 - **生产环境的唯一真相是 Azure Container Apps**（`deploy-azure.sh`）。`infra/k8s/**` 已冻结为本地实验，只在恢复维护时按 `network-and-edge.md` 的附录逐项补齐。
-- 本目录只描述**目标态与差距**；已落盘的架构决策在 `docs/adr/0019`–`0024`。
+- 本目录只描述**目标态与差距**；已落盘的架构决策在 `docs/adr/0019`–`0025`。
 
 > 🔴 **当前最高优先级（2026-09-17 确认）**：本仓库是 **public**，且初始提交 `8faf6c5` 里 `infra/k8s/base/secret.yaml` 的 `Db__Password` **就是当前有效的数据库口令**（2026-07-26 起对全网可见，2026-09-07 才从工作树移除，历史仍可取出）。处置步骤见 [secrets-and-keys.md](./secrets-and-keys.md) 的「立即处置」。
 
@@ -38,6 +38,7 @@
 | [0022](../adr/0022-service-identity-client-credentials-and-internal-channel.md) | 服务身份：client credentials + 默认拒绝 + 内部通道分期 |
 | [0023](../adr/0023-secret-and-key-management-key-vault-and-managed-identity.md) | 机密与密钥托管：Key Vault + 托管身份 |
 | [0024](../adr/0024-token-exchange-for-user-delegation.md) | 用户委托：token exchange（`sub`=用户 + `act`=服务 + `aud`=被调服务） |
+| [0025](../adr/0025-first-cross-service-call-footprint-overview-via-user-delegation.md) | 首个真实跨服务调用：user-service 以用户委托读 travel 的足迹概览 |
 
 ## 四条硬规则
 
@@ -164,7 +165,25 @@
 | 单测 | `TokenExchangeServiceTests`（8 条：四道闸门 + “凭证无效时不碰主体令牌”）、`JwtAccessTokenIssuerTests`（act 的嵌套 JSON 形状与 TTL）、`DelegatedIdentityTests`（10 条：act 解析 + 标识缺失拒绝启动） |
 | 验收方式 | [service-identity.md](./service-identity.md) 的「用户委托（token exchange）的验收」表——含“服务令牌调同一端点 → 403”这条关键断言 |
 
+**本次已实现（首个真实跨服务调用，ADR-0025）**：
+
+| 项 | 落地位置 |
+|---|---|
+| 发起侧（首次存在） | `Shared.Security/DelegatedTokenClient.cs`（`IDelegatedTokenClient`）——**不做缓存**：缓存键漏了 subject 就会把甲用户的令牌发给乙用户（ADR-0024 点名）；4xx 与 5xx 分成"配置错"与"依赖不可用" |
+| 被调端点 | travel-service `GET /internal/travels/footprint`——`DelegatedIdentity` 策略 + `travel:read`（策略在 `Travel.Api/Program.cs` 登记） |
+| 对外端点 | user-service `GET /api/users/me/footprint`——**独立端点**，下游不可用 → **503 且不降级**（静默降级会把链路故障伪装成"你还没记录过旅行"） |
+| 跨服务契约 | `Shared.Contracts/FootprintOverview.cs`（载荷）+ `ServiceScopes.cs`（scope 名）——两端共用，避免契约漂移 |
+| 授权登记 | identity `appsettings.json` 给 `user-service` 客户端授予 `travel:read`（`AllowedServiceAudiences` 早已含 `travel-service`） |
+| 前端 | profile 页「足迹概览」卡片（独立加载 / 独立失败 / 可重试） |
+| 单测 | `DelegatedTokenClientTests`（9 条，含"不同主体绝不复用令牌"）、`DelegatedIdentityScopeTests`（7 条，含多 scope 声明）、`TravelFootprintTests`（2 条）、`TravelFootprintGatewayTests`（9 条，失败语义分类） |
+| 验收方式 | `scripts/validate-delegation.sh`（可重放：四道闸门 + 401/403 边界 + 端到端一致性） |
+
 **仍未完成**（需要真实凭据或环境操作，我无法代做）：
+
+| 项 | 原因 |
+|---|---|
+| **内部端点限流** | `service-identity.md` 的形态约定要求限流，ADR-0025 的端点尚未做；网关也不转发 `/internal/*`，所以目前只能靠平台通道与令牌本身 |
+| **首次端到端验收需要人工提供用户令牌** | 登录强制图片验证码，脚本无法代登录；把浏览器 `localStorage['travel-map.auth.token']` 作为 `SUBJECT_TOKEN` 传入 `scripts/validate-delegation.sh` 即可一次跑完 |
 
 | 项 | 原因 |
 |---|---|

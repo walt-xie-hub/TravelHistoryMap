@@ -152,6 +152,8 @@ az containerapp create \
     "Jwt__Audience=travel-map-client" \
     "ServiceIdentity__Issuer=https://pending.invalid/identity" \
     "ServiceIdentity__ClientSecret=secretref:service-client-secret" \
+    "TravelService__Audience=travel-service" \
+    "TravelService__BaseUrl=https://travel-service.internal.$ENV_NAME.$REGION.azurecontainerapps.io" \
     "OTEL_TRACE_SAMPLING_RATIO=0.1" \
   "${REGISTRY_ARGS[@]}"
 

@@ -1,13 +1,22 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { AuthService } from '@core/services/auth.service';
 import { NotificationService } from '@core/services/notification.service';
+import { FootprintOverview } from '@core/models/footprint.model';
+import { FootprintService } from '../../data-access/footprint.service';
 
 const MIN_PASSWORD_LENGTH = 8;
+
+/** 首末足迹只到“日”就够：概览卡片不是详情页，不展示时刻。 */
+function fmtDay(iso: string): string {
+  return new Date(iso).toLocaleDateString('zh-CN', { year: 'numeric', month: 'numeric', day: 'numeric' });
+}
 
 /**
  * 我的资料页：
  * - 基本信息（姓名 / 邮箱 / 电话 / 头像 URL）→ PUT /users/me
  * - 登录密码 → PUT /users/me/password
+ * - 足迹概览 → GET /users/me/footprint（ADR-0025：由 user-service 以当前登录用户的名义
+ *   向 travel-service 发起**委托调用**，见 FootprintService 的注释）
  * 页面位于主布局内，错误提示由全局通知（toast）承载。
  */
 @Component({
@@ -19,6 +28,7 @@ const MIN_PASSWORD_LENGTH = 8;
 export class ProfilePage {
   private readonly auth = inject(AuthService);
   private readonly notification = inject(NotificationService);
+  private readonly footprintApi = inject(FootprintService);
 
   protected readonly currentUser = this.auth.currentUser;
 
@@ -43,12 +53,40 @@ export class ProfilePage {
     (this.name().trim().charAt(0) || this.currentUser()?.name?.charAt(0) || '?').toUpperCase(),
   );
 
+  // 足迹概览（ADR-0025）：独立加载、独立失败 —— 这张卡片挂了不影响上面的档案与改密。
+  // 后端在同一条链路上刻意**不降级**（下游挂了就 503），所以这里必须能展示失败态，
+  // 否则“链路断了”会被看成“你还没记录过旅行”。
+  protected readonly footprint = signal<FootprintOverview | null>(null);
+  protected readonly footprintLoading = signal(false);
+  protected readonly footprintFailed = signal(false);
+
+  /** “首末足迹”区间文案；无记录时为 null */
+  protected readonly footprintRange = computed(() => {
+    const data = this.footprint();
+    if (!data?.firstArrivedAt || !data.lastArrivedAt) return null;
+    return `${fmtDay(data.firstArrivedAt)} — ${fmtDay(data.lastArrivedAt)}`;
+  });
+
   constructor() {
     const user = this.auth.currentUser();
     this.name.set(user?.name ?? '');
     this.email.set(user?.email ?? '');
     this.phoneNumber.set(user?.phoneNumber ?? '');
     this.avatarUrl.set(user?.avatarUrl ?? '');
+    void this.loadFootprint();
+  }
+
+  protected async loadFootprint(): Promise<void> {
+    this.footprintLoading.set(true);
+    this.footprintFailed.set(false);
+    try {
+      this.footprint.set(await this.footprintApi.get());
+    } catch {
+      // 全局拦截器已经弹过提示，这里只负责把卡片切成“可重试”的状态
+      this.footprintFailed.set(true);
+    } finally {
+      this.footprintLoading.set(false);
+    }
   }
 
   protected onNameChange(event: Event): void {

@@ -9,6 +9,7 @@ using Travel.Application.Services;
 using Travel.Domain.Common;
 using Travel.Infrastructure;
 using Travel.Infrastructure.Persistence;
+using Shared.Contracts;
 using Shared.Observability;
 using Shared.Security;
 
@@ -28,7 +29,12 @@ builder.Services.AddTravelMapJwt(builder.Configuration, builder.Environment);
 builder.Services.AddTravelMapServiceTokenClient(builder.Configuration);
 // 用户委托令牌（token exchange，ADR-0024）：接受 sub=用户、act=代理服务、aud=本服务的令牌
 builder.Services.AddTravelMapDelegatedIdentity(builder.Configuration, builder.Environment);
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    // 首个**真实**内部端点（ADR-0025）：除了“这是一枚用户委托令牌”，还要求它带着 travel:read。
+    // 策略名就用 scope 本身，端点处一眼能看出它要什么权限。
+    options.AddPolicy(ServiceScopes.TravelRead, policy => policy.RequireDelegatedScope(ServiceScopes.TravelRead));
+});
 builder.Services.AddAntiforgery();
 builder.Services.ConfigureHttpJsonOptions(options => options.SerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase);
 

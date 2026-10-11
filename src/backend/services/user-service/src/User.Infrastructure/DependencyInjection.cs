@@ -1,9 +1,12 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Shared.Observability;
+using Shared.Security;
 using User.Application.Abstractions;
 using User.Domain.Abstractions;
+using User.Infrastructure.Clients;
 using User.Infrastructure.Persistence;
 using User.Infrastructure.Repositories;
 using User.Infrastructure.Security;
@@ -36,6 +39,21 @@ public static class DependencyInjection
         // 安全事件审计（改密等）：与 identity-service 共用同一个端口与实现
         // （docs/security/observability-and-audit.md）
         services.AddSingleton<IAuditLog, LoggerAuditLog>();
+
+        // 跨服务调用（ADR-0025）：以登录用户的名义读取 travel-service 的足迹概览。
+        // 委托令牌客户端与 IServiceTokenClient 共用同一份 ServiceIdentity ——
+        // 在 identity 眼里本服务始终是同一个 Client，只是授权模式不同（token exchange vs client credentials）。
+        services.AddTravelMapDelegatedTokenClient(configuration);
+
+        var travelService = new TravelServiceOptions();
+        configuration.GetSection(TravelServiceOptions.SectionName).Bind(travelService);
+        travelService.Validate();          // 缺项即拒绝启动，不做静默默认
+        services.AddSingleton(Options.Create(travelService));
+
+        // 超时（10s）大于换令牌的超时（5s）：一次请求最多两跳，且本调用在**请求路径**上，
+        // 宁可快速失败把“依赖不可用”如实报到上层，也不要把用户请求一起拖住。
+        services.AddHttpClient<ITravelFootprintGateway, DelegatedTravelFootprintGateway>(
+            http => http.Timeout = TimeSpan.FromSeconds(10));
 
         return services;
     }

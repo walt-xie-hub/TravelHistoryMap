@@ -165,6 +165,17 @@ public class TravelService : ITravelService
         return new PublicShareSnapshotDto(share.Title, share.CreatedAt, share.RecordCount, rows);
     }
 
+    public async Task<Shared.Contracts.FootprintOverview> GetFootprintAsync(int userId, CancellationToken ct = default)
+    {
+        var stats = await _repository.GetFootprintStatsAsync(userId, ct);
+        return new Shared.Contracts.FootprintOverview(
+            stats.TotalRecords,
+            stats.CityCount,
+            stats.FavoriteCount,
+            stats.FirstArrivedAt,
+            stats.LastArrivedAt);
+    }
+
     private static string GenerateShareToken()
         => Convert.ToHexString(RandomNumberGenerator.GetBytes(24)).ToLowerInvariant();
 

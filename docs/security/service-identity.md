@@ -6,11 +6,14 @@
 
 ## 现状
 
-- **当前后端仍零真实服务间业务调用**：服务身份基础设施已经实现，但尚未有业务端点使用它发起跨服务请求。
+- **已有一个真实跨服务业务调用**（ADR-0025）：`浏览器 → user-service →（token exchange）→ travel-service`
+  的「足迹概览」——对外 `GET /api/users/me/footprint`，内部 `GET /internal/travels/footprint`，scope `travel:read`。
+  它是目前**唯一**一处，也是「服务身份 + 用户委托」第一次在真实业务端点上被端到端走通。
 - **用户委托（token exchange）已实现**（ADR-0024）：调用方可用「自己的服务凭证 + 用户的令牌」换一枚
-  `sub=用户`、`act=服务`、`aud=被调服务` 的短 TTL 令牌；接收侧是 `Shared.Security` 的 `Delegated` 方案。
-  但目前除 travel-service 的 `/internal/whoami` 验收端点外，**没有真实业务调用点**在使用它。
-- 两服务之间唯一的"协作"是共享 `appdb` 与数据库级外键（ADR-0002），以及 `shared/Shared.Contracts` 里两个**尚未被使用**的集成事件契约（`IIntegrationEvent`、`UserCreatedEvent`）。
+  `sub=用户`、`act=服务`、`aud=被调服务` 的短 TTL 令牌；接收侧是 `Shared.Security` 的 `Delegated` 方案，
+  发起侧是同一程序集里的 `IDelegatedTokenClient`（**不做缓存**：缓存键漏了 subject 就会把甲用户的令牌发给乙用户）。
+- 两服务之间**其余**的协作仍然是共享 `appdb` 与数据库级外键（ADR-0002），以及 `shared/Shared.Contracts` 里
+  两个**尚未被使用**的集成事件契约（`IIntegrationEvent`、`UserCreatedEvent`）。
 - 网关转发时**不注入任何身份头**，也不剥离客户端伪造的头；服务识别调用方的唯一手段是客户端自带的 `Authorization`（ADR-0019 的现状描述）。
 - ACA 上后端都是 `internal`，但 `internal` = 同环境内任意容器应用可达，**没有对等认证**，也没有 NetworkPolicy。
 - 环境**未接 VNet**，且网络类型创建后不可改 → 本期不可能用网络策略来隔离。
@@ -97,6 +100,12 @@
   接收侧 `Shared.Security/DelegatedIdentity.cs`；验收端点 `Travel.Api/Endpoints/InternalEndpoints.cs`。
   单测：`TokenExchangeServiceTests`、`JwtAccessTokenIssuerTests`（含 act 的嵌套 JSON 形状与 TTL）、
   `DelegatedIdentityTests`（act 解析 + 本服务标识缺失时拒绝启动）。
+- **首个真实跨服务调用**（ADR-0025）：发起侧 `Shared.Security/DelegatedTokenClient.cs`（`IDelegatedTokenClient`）；
+  被调端点 travel-service `GET /internal/travels/footprint`（要求 `DelegatedIdentity` 策略 + `travel:read`）；
+  对外端点 user-service `GET /api/users/me/footprint`（下游不可用 → 503，**不降级成空概览**）；
+  端点级 scope 授权用 `DelegatedIdentity.RequireDelegatedScope`，它把 `scope` 按空格拆分 ——
+  签发侧把多个 scope 放在**一个**声明里，`RequireClaim("scope", ...)` 的整串精确匹配会在多 scope 令牌上静默失败。
+  可重放验收：`scripts/validate-delegation.sh`（需 `curl` + `jq` + 一个真实用户令牌）。
 
 ### P1
 
@@ -108,6 +117,9 @@
 ### P2
 
 - [ ] 首个真实 S2S 调用落地时启用 Dapr（含 mTLS），并把 `includeDapr` 的 trace 接到观测后端。
+  > 首个真实调用已于 ADR-0025 落地（未启用 Dapr）；`/internal/*` 目前只靠平台层通道加密。
+- [ ] 内部端点限流（本文件「内部端点的形态约定」要求，但 ADR-0025 的端点尚未做；网关也不转发 `/internal/*`，
+  所以现在只能靠 ACA internal ingress 与令牌本身）。
 - [ ] 若跨服务调用数量增长到需要可观测的调用拓扑，评估服务网格（Istio/Ambient）而非手工 mTLS。
 
 ## 验收方式
@@ -131,8 +143,61 @@
 | 带**用户令牌**调 `/internal/whoami` | **401** | 用户令牌 `aud` 是客户端标识，与 `Delegated` 方案的 `ValidAudience` 不匹配 |
 | 带委托令牌调**别的**服务 | 401 | `aud` 精确匹配，一个令牌只对一个目标有效 |
 
+### 足迹概览（首个真实业务调用，ADR-0025）
+
+| 请求 | 期望 | 原因 |
+|---|---|---|
+| 委托令牌调 `GET /internal/travels/footprint`（scope 含 `travel:read`） | **200** | 首个真实内部业务端点 |
+| 同端点、令牌缺 `travel:read` | 403 | 端点级 scope 授权 |
+| 委托令牌调 `GET /api/travels`（用户端点） | 401 | `aud` 不匹配用户方案 |
+| 用户令牌调 `GET /api/users/me/footprint` | **200** | 端到端：浏览器只调 user-service，跨服务那一跳由它自己完成 |
+| 同一请求在下游不可用时 | 503 | **刻意不降级成空概览**：静默降级会把链路故障伪装成"你还没记录过旅行" |
+
+上表全部项由 `scripts/validate-delegation.sh` 一次跑完（含 token exchange 的四道闸门与 401/403 边界）：
+
+```bash
+SUBJECT_TOKEN='<浏览器 localStorage[\"travel-map.auth.token\"]>' \
+USER_SERVICE_CLIENT_SECRET="$(grep '^USER_SERVICE_CLIENT_SECRET=' .env | cut -d= -f2-)" \
+bash scripts/validate-delegation.sh
+```
+
 一条 curl 就能验通最后三行（`$TOKEN` 为换到的委托令牌）：
 
 ```bash
 curl -i -H "Authorization: Bearer $TOKEN" http://localhost:8081/internal/whoami
 ```
+
+### 逐步验证：看见每一枚令牌
+
+`scripts/validate-delegation.sh` 只回 `[PASS]`/`[FAIL]`。要看清**每一步产出的令牌长什么样**，用 `scripts/walk-s2s-auth.sh`：它把请求参数、原始响应、以及每枚 JWT 解码后的声明都打出来，并逐条核对。
+
+先看身份提供方公布的事实：`GET /identity/.well-known/openid-configuration` 的 `grant_types_supported` **必须包含** token exchange，`scopes_supported` 为**空**（scope 是逐 Client 授予的，没有可供客户端发现的全集）；`GET /identity/jwks` 列出的 `kid` 必须包含令牌头里的 `kid` —— 否则接收方一定验签失败。
+
+| 步骤 | 产出的令牌 | 由谁签发 | 关键字段（期望） | 谁验证它 |
+|---|---|---|---|---|
+| ① 登录 | 用户 access token | identity | `sub`=用户 id、`aud`=`travel-map-client`、`exp-iat`=1200、**无 `act`** | 资源服务的用户令牌方案；换 token 时充当主体令牌 |
+| ② client credentials | 服务令牌 | identity | `sub`=`service:user-service`、`aud`=被调服务、**无 `act`**、`exp-iat`=300 | 要求服务身份的端点 |
+| ③ token exchange | 委托令牌 | identity | `sub`=用户 id、`act.sub`=`service:user-service`、`aud`=被调服务、`scope`=收窄后的权限、`exp-iat`=300 | 被调服务的 `Delegated` 方案（要求 `act`）+ 端点级 scope 策略 |
+
+三枚令牌最关键的差别是 **`act`**：服务令牌**不会带它**，所以"有没有 `act`"是接收侧区分"服务在调"与"服务代表用户调"的唯一判据（ADR-0024）。第 ⑤ 步用一组**篡改测试**（改签名 / 改 payload 但沿用原签名 / `alg=none`）证明接收侧真的**验签**，而不是"解出 JSON 就信"；再换一枚 `aud` 指向别的服务的委托令牌，证明 `aud` 是精确匹配。
+
+怎么拿 `SUBJECT_TOKEN`（登录有图片验证码，脚本不代登录）：浏览器 DevTools → Application → Local Storage → `travel-map.auth.token`（20 分钟过期）。
+
+```bash
+# 宿主机
+SUBJECT_TOKEN='<粘贴>' \
+USER_SERVICE_CLIENT_SECRET="$(grep '^USER_SERVICE_CLIENT_SECRET=' .env | cut -d= -f2-)" \
+bash scripts/walk-s2s-auth.sh
+```
+
+```bash
+# 容器里（宿主 127.0.0.1 不可达时）。dev 栈的宿主端口只绑 IPv4，所以默认地址用 127.0.0.1。
+docker run --rm --add-host=host.docker.internal:host-gateway -v "$PWD:/w" alpine:3.20 \
+  sh -c 'apk add --no-cache bash curl jq >/dev/null && \
+         IDENTITY_BASE=http://host.docker.internal:8090/identity \
+         USER_API=http://host.docker.internal:8080/api \
+         TRAVEL_BASE=http://host.docker.internal:8081 \
+         SUBJECT_TOKEN=<...> USER_SERVICE_CLIENT_SECRET=<...> bash /w/scripts/walk-s2s-auth.sh'
+```
+
+实跑结果（2026-10-07，本地 dev 栈）：**32 项全过**，含 4 项篡改/算法混淆测试与 5 项 `invalid_*` 负例。

@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Security.Claims;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -141,4 +142,39 @@ public static class DelegatedIdentity
             ? userId
             : null;
     }
+
+    /// <summary>scope 声明名。签发侧（identity-service）把请求到的 scope 拼成**一个**空格分隔的声明。</summary>
+    public const string ScopeClaimType = "scope";
+
+    /// <summary>
+    /// 判断令牌是否带有某个 scope。
+    ///
+    /// **必须按空格拆分，而且必须遍历全部声明**：签发侧把多个 scope 拼成**一个**
+    /// 空格分隔的声明（形如 <c>"travel:read user:read"</c>），而 ASP.NET 的 <c>RequireClaim</c>
+    /// 一类 API 做的是**整串精确匹配**；用 <c>FindFirst</c> 又只能看到第一条声明。
+    /// 两种写法都会退化成“今天能过、明天过不了”的静默 403。
+    /// </summary>
+    public static bool HasScope(this ClaimsPrincipal principal, string scope)
+        => principal.FindAll(ScopeClaimType)
+            .SelectMany(claim => claim.Value.Split(
+                ' ',
+                StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            .Contains(scope, StringComparer.Ordinal);
+
+    /// <summary>
+    /// 构造"委托令牌 + 该 scope"的授权策略要求：与 <see cref="PolicyName"/> 同一套前置条件
+    /// （Delegated 方案 / 已认证 / 必须有 <c>act</c>），再加 scope 断言。
+    ///
+    /// 之所以提供这个方法而不是让调用方写 <c>RequireClaim("scope", ...)</c>：见 <see cref="HasScope"/>。
+    /// 之所以不让 Shared.Security 直接登记策略：scope 名是**各服务的领域知识**，
+    /// 由使用方在 <c>AddAuthorization</c> 里登记，本程序集只提供构造器。
+    /// </summary>
+    public static AuthorizationPolicyBuilder RequireDelegatedScope(
+        this AuthorizationPolicyBuilder policy,
+        string scope)
+        => policy
+            .AddAuthenticationSchemes(Scheme)
+            .RequireAuthenticatedUser()
+            .RequireClaim(ActClaimType)
+            .RequireAssertion(context => context.User.HasScope(scope));
 }

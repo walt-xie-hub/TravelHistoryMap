@@ -68,6 +68,41 @@ public class TravelRepository : ITravelRepository
         return new PagedResult<TravelRecord>(items, page, pageSize, totalCount, totalPages);
     }
 
+    public async Task<TravelFootprintStats> GetFootprintStatsAsync(int userId, CancellationToken ct = default)
+    {
+        var query = _db.TravelRecords.AsNoTracking()
+            .Where(t => t.UserId == userId && t.DeletedAt == null);
+
+        // 标量聚合放在一条查询里（计数 + 时间极值），城市去重单独一条：
+        // count(distinct ...) 混进 GroupBy 聚合更容易踩到翻译器的边界，拆开更稳且都走索引。
+        var totals = await query
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                TotalRecords = g.Count(),
+                FavoriteCount = g.Count(t => t.IsFavorite),
+                FirstArrivedAt = (DateTimeOffset?)g.Min(t => t.ArrivedAt),
+                LastArrivedAt = (DateTimeOffset?)g.Max(t => t.ArrivedAt),
+            })
+            .FirstOrDefaultAsync(ct);
+
+        if (totals is null)
+            return new TravelFootprintStats(0, 0, 0, null, null);
+
+        var cityCount = await query
+            .Where(t => t.City != null && t.City != "")
+            .Select(t => t.City)
+            .Distinct()
+            .CountAsync(ct);
+
+        return new TravelFootprintStats(
+            totals.TotalRecords,
+            cityCount,
+            totals.FavoriteCount,
+            totals.FirstArrivedAt,
+            totals.LastArrivedAt);
+    }
+
     public async Task<TravelRecord?> GetByIdAsync(int id, CancellationToken ct = default)
         => await _db.TravelRecords.AsNoTracking().FirstOrDefaultAsync(t => t.Id == id, ct);
 
